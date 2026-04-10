@@ -67,8 +67,8 @@ public class TramiteService {
 
     private Map<String, Object> construirConvocatoria() {
         Map<String, Object> convocatoria = new LinkedHashMap<>();
-        convocatoria.put("fechaInicio", "2026-04-02");
-        convocatoria.put("fechaFin", "2026-04-06");
+        convocatoria.put("fechaInicio", "2026-04-07");
+        convocatoria.put("fechaFin", "2026-04-25");
         return convocatoria;
     }
 
