@@ -22,13 +22,54 @@ public class TramiteService {
         return response;
     }
 
+    public Map<String, Object> construirProcesoDeGrado(Usuario usuario) {
+        int creditosAprobados = usuario.getCreditosAprobados() != null ? usuario.getCreditosAprobados() : 0;
+        boolean etapa1Completada = creditosAprobados >= 100;
+
+        Map<String, Object> response = new LinkedHashMap<>();
+
+        response.put("estudiante", construirEstudiante(usuario));
+        response.put("creditos", construirCreditos(usuario));
+        response.put("estadoAcademico", "Regular");
+        response.put("convocatoria", construirConvocatoria());
+        response.put("etapa1Completada", etapa1Completada);
+        response.put("etapa2Disponible", etapa1Completada);
+
+        return response;
+    }
+
     private Map<String, Object> construirUsuario(Usuario usuario) {
         Map<String, Object> usuarioMap = new LinkedHashMap<>();
         usuarioMap.put("cedula", usuario.getCedula());
         usuarioMap.put("nombre", usuario.getNombre());
         usuarioMap.put("codigo", usuario.getCodigo());
         usuarioMap.put("rol", usuario.getRol());
+        usuarioMap.put("creditosAprobados", usuario.getCreditosAprobados());
+        usuarioMap.put("programaAcademico", usuario.getProgramaAcademico());
         return usuarioMap;
+    }
+
+    private Map<String, Object> construirEstudiante(Usuario usuario) {
+        Map<String, Object> estudiante = new LinkedHashMap<>();
+        estudiante.put("nombre", usuario.getNombre());
+        estudiante.put("avatar", "");
+        estudiante.put("programaAcademico", usuario.getProgramaAcademico());
+        return estudiante;
+    }
+
+    private Map<String, Object> construirCreditos(Usuario usuario) {
+        Map<String, Object> creditos = new LinkedHashMap<>();
+        int aprobados = usuario.getCreditosAprobados() != null ? usuario.getCreditosAprobados() : 0;
+        creditos.put("aprobados", aprobados);
+        creditos.put("requeridos", 100);
+        return creditos;
+    }
+
+    private Map<String, Object> construirConvocatoria() {
+        Map<String, Object> convocatoria = new LinkedHashMap<>();
+        convocatoria.put("fechaInicio", "2026-04-02");
+        convocatoria.put("fechaFin", "2026-04-06");
+        return convocatoria;
     }
 
     private List<Map<String, Object>> construirSidebar(String rol) {

@@ -47,6 +47,28 @@ public class TramiteController {
         return ResponseEntity.ok(tramiteService.construirModuloPorRol(usuario));
     }
 
+    @GetMapping("/proceso-grado")
+    public ResponseEntity<?> obtenerProcesoDeGrado(
+            @RequestParam(required = false) String cedula,
+            @RequestParam(required = false) String codigo) {
+        Usuario usuario;
+
+        if (cedula != null && !cedula.isBlank()) {
+            usuario = usuarioService.obtenerUsuarioPorCedula(cedula);
+        } else if (codigo != null && !codigo.isBlank()) {
+            usuario = usuarioService.obtenerUsuarioPorCodigo(codigo);
+        } else {
+            usuario = usuarioService.obtenerPrimerUsuario();
+        }
+
+        if (usuario == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(error("Usuario no encontrado"));
+        }
+
+        return ResponseEntity.ok(tramiteService.construirProcesoDeGrado(usuario));
+    }
+
     private Map<String, Object> error(String mensaje) {
         Map<String, Object> error = new LinkedHashMap<>();
         error.put("error", mensaje);
