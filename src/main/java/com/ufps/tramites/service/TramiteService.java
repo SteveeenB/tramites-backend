@@ -1,14 +1,21 @@
 package com.ufps.tramites.service;
 
+import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
+import com.ufps.tramites.repository.SolicitudRepository;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
 public class TramiteService {
+
+    @Autowired
+    private SolicitudRepository solicitudRepository;
 
     public Map<String, Object> construirModuloPorRol(Usuario usuario) {
         String rol = usuario.getRol();
@@ -26,14 +33,18 @@ public class TramiteService {
         int creditosAprobados = usuario.getCreditosAprobados() != null ? usuario.getCreditosAprobados() : 0;
         boolean etapa1Completada = creditosAprobados >= 100;
 
+        Optional<Solicitud> solicitudTerminacion = solicitudRepository
+                .findByCedulaAndTipo(usuario.getCedula(), "TERMINACION_MATERIAS");
+        boolean etapa2Disponible = solicitudTerminacion.isPresent()
+                && "APROBADA".equals(solicitudTerminacion.get().getEstado());
+
         Map<String, Object> response = new LinkedHashMap<>();
 
-        response.put("estudiante", construirEstudiante(usuario));
         response.put("creditos", construirCreditos(usuario));
         response.put("estadoAcademico", "Regular");
         response.put("convocatoria", construirConvocatoria());
         response.put("etapa1Completada", etapa1Completada);
-        response.put("etapa2Disponible", etapa1Completada);
+        response.put("etapa2Disponible", etapa2Disponible);
 
         return response;
     }
@@ -45,23 +56,18 @@ public class TramiteService {
         usuarioMap.put("codigo", usuario.getCodigo());
         usuarioMap.put("rol", usuario.getRol());
         usuarioMap.put("creditosAprobados", usuario.getCreditosAprobados());
-        usuarioMap.put("programaAcademico", usuario.getProgramaAcademico());
+        usuarioMap.put("programaAcademico", usuario.getProgramaAcademico() != null
+                ? usuario.getProgramaAcademico().getNombre() : null);
         return usuarioMap;
-    }
-
-    private Map<String, Object> construirEstudiante(Usuario usuario) {
-        Map<String, Object> estudiante = new LinkedHashMap<>();
-        estudiante.put("nombre", usuario.getNombre());
-        estudiante.put("avatar", "");
-        estudiante.put("programaAcademico", usuario.getProgramaAcademico());
-        return estudiante;
     }
 
     private Map<String, Object> construirCreditos(Usuario usuario) {
         Map<String, Object> creditos = new LinkedHashMap<>();
         int aprobados = usuario.getCreditosAprobados() != null ? usuario.getCreditosAprobados() : 0;
+        int requeridos = usuario.getProgramaAcademico() != null
+                ? usuario.getProgramaAcademico().getTotalCreditos() : 0;
         creditos.put("aprobados", aprobados);
-        creditos.put("requeridos", 100);
+        creditos.put("requeridos", requeridos);
         return creditos;
     }
 

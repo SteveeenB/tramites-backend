@@ -32,9 +32,13 @@ public class SolicitudService {
     public Map<String, Object> crearSolicitudTerminacion(Usuario estudiante) {
         // 1. Validar créditos (requisito reglamentario)
         int creditosAprobados = estudiante.getCreditosAprobados() != null ? estudiante.getCreditosAprobados() : 0;
-        if (creditosAprobados < 100) {
+        int creditosRequeridos = estudiante.getProgramaAcademico() != null
+                ? estudiante.getProgramaAcademico().getTotalCreditos()
+                : Integer.MAX_VALUE;
+        if (creditosAprobados < creditosRequeridos) {
             throw new IllegalStateException(
-                "No cumple los requisitos académicos: tiene " + creditosAprobados + "/100 créditos aprobados."
+                "No cumple los requisitos académicos: tiene " + creditosAprobados
+                + "/" + creditosRequeridos + " créditos aprobados."
             );
         }
 
