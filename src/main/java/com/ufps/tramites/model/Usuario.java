@@ -16,6 +16,7 @@ public class Usuario {
     private String rol; // ESTUDIANTE, DIRECTOR, ADMIN
 
     private Integer creditosAprobados;
+    private String correo;
 
     @ManyToOne
     @JoinColumn(name = "programa_id")
@@ -40,6 +41,9 @@ public class Usuario {
 
     public Integer getCreditosAprobados() { return creditosAprobados; }
     public void setCreditosAprobados(Integer creditosAprobados) { this.creditosAprobados = creditosAprobados; }
+
+    public String getCorreo() { return correo; }
+    public void setCorreo(String correo) { this.correo = correo; }
 
     public ProgramaAcademico getProgramaAcademico() { return programaAcademico; }
     public void setProgramaAcademico(ProgramaAcademico programaAcademico) { this.programaAcademico = programaAcademico; }

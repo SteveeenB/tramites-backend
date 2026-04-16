@@ -19,16 +19,16 @@ INSERT INTO programa_academico (nombre, tipo, total_creditos) VALUES
 ('Especialización en Educación, Emprendimiento y Economía Solidaria',                                           'ESPECIALIZACION', 32),
 ('Especialización en Educación para la Atención a Población Afectada por el Conflicto Armado y en Problemática Fronteriza', 'ESPECIALIZACION', 28);
 
-INSERT INTO usuario (cedula, codigo, nombre, contrasena, rol, creditos_aprobados, programa_id) VALUES
+INSERT INTO usuario (cedula, codigo, nombre, correo, contrasena, rol, creditos_aprobados, programa_id) VALUES
 -- Estudiante bloqueado: 40/56 créditos → etapa 1 bloqueada
-('1098765432', '20261001', 'Juan Perez',     '123456', 'ESTUDIANTE', 40,
+('1098765432', '20261001', 'Juan Perez',     'juan.perez@ufps.edu.co',     '123456', 'ESTUDIANTE', 40,
     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas')),
 -- Estudiante habilitado: 56/56 créditos → terminación aprobada → etapa 2 disponible
-('1098765435', '20261005', 'Laura Gomez',    '123456', 'ESTUDIANTE', 56,
+('1098765435', '20261005', 'Laura Gomez',    'laura.gomez@ufps.edu.co',    '123456', 'ESTUDIANTE', 56,
     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas')),
-('1098765433', '20261002', 'Maria Director', '123456', 'DIRECTOR',   48,
+('1098765433', '20261002', 'Maria Director', 'maria.director@ufps.edu.co', '123456', 'DIRECTOR',   48,
     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Educación Matemáticas')),
-('1098765434', '20261003', 'Admin User',     '123456', 'ADMIN',      30,
+('1098765434', '20261003', 'Admin User',     'admin@ufps.edu.co',          '123456', 'ADMIN',      30,
     (SELECT id FROM programa_academico WHERE nombre = 'Especialización en Estructuras'));
 
 -- Laura ya tiene su terminación de materias aprobada → etapa 2 habilitada
