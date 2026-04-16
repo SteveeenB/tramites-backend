@@ -140,6 +140,33 @@ public class SolicitudService {
         }).collect(Collectors.toList());
     }
 
+    /** Aprueba una solicitud de terminación de materias pendiente. */
+    public Map<String, Object> aprobarSolicitud(Long id) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())) {
+            throw new IllegalStateException("Solo se pueden aprobar solicitudes en estado pendiente");
+        }
+        s.setEstado("APROBADA");
+        s.setObservaciones("Aprobada por el director de programa.");
+        solicitudRepository.save(s);
+        return construirRespuestaSolicitud(s);
+    }
+
+    /** Rechaza una solicitud de terminación de materias pendiente. */
+    public Map<String, Object> rechazarSolicitud(Long id, String motivo) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())) {
+            throw new IllegalStateException("Solo se pueden rechazar solicitudes en estado pendiente");
+        }
+        s.setEstado("RECHAZADA");
+        s.setObservaciones(motivo != null && !motivo.isBlank()
+                ? motivo : "Rechazada por el director de programa.");
+        solicitudRepository.save(s);
+        return construirRespuestaSolicitud(s);
+    }
+
     /** Retorna todas las solicitudes de un estudiante. */
     public List<Map<String, Object>> obtenerSolicitudesPorCedula(String cedula) {
         List<Solicitud> solicitudes = solicitudRepository.findByCedula(cedula);
