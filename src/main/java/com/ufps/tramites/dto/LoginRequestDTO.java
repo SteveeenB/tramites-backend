@@ -1,23 +1,23 @@
 package com.ufps.tramites.dto;
 
 public class LoginRequestDTO {
-    private String correo;
+    private String codigo;
     private String contrasena;
 
     public LoginRequestDTO() {
     }
 
-    public LoginRequestDTO(String correo, String contrasena) {
-        this.correo = correo;
+    public LoginRequestDTO(String codigo, String contrasena) {
+        this.codigo = codigo;
         this.contrasena = contrasena;
     }
 
-    public String getCorreo() {
-        return correo;
+    public String getCodigo() {
+        return codigo;
     }
 
-    public void setCorreo(String correo) {
-        this.correo = correo;
+    public void setCodigo(String codigo) {
+        this.codigo = codigo;
     }
 
     public String getContrasena() {
