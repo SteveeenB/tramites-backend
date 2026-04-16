@@ -1,8 +1,10 @@
 package com.ufps.tramites.service;
 
+import com.ufps.tramites.event.SolicitudEstadoCambiadoEvent;
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.repository.SolicitudRepository;
+import com.ufps.tramites.repository.UsuarioRepository;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -10,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -24,6 +27,12 @@ public class SolicitudService {
 
     @Autowired
     private SolicitudRepository solicitudRepository;
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     /**
      * Crea una solicitud de terminación de materias.
@@ -75,6 +84,30 @@ public class SolicitudService {
         return construirRespuestaSolicitud(solicitud);
     }
 
+    /**
+     * Cambia el estado de una solicitud (EN_REVISION, APROBADA o RECHAZADA).
+     * Dispara el evento de dominio SolicitudEstadoCambiadoEvent, que a su vez
+     * notifica al estudiante por correo y por SSE en tiempo real.
+     */
+    public Map<String, Object> actualizarEstado(Long solicitudId, String nuevoEstado, String observaciones) {
+        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada: " + solicitudId));
+
+        String estadoAnterior = solicitud.getEstado();
+        solicitud.setEstado(nuevoEstado);
+        if (observaciones != null && !observaciones.isBlank()) {
+            solicitud.setObservaciones(observaciones);
+        }
+        solicitudRepository.save(solicitud);
+
+        usuarioRepository.findById(solicitud.getCedula()).ifPresent(estudiante ->
+            eventPublisher.publishEvent(
+                new SolicitudEstadoCambiadoEvent(this, solicitud, estudiante, estadoAnterior))
+        );
+
+        return construirRespuestaSolicitud(solicitud);
+    }
+
     /** Retorna todas las solicitudes de un estudiante. */
     public List<Map<String, Object>> obtenerSolicitudesPorCedula(String cedula) {
         List<Solicitud> solicitudes = solicitudRepository.findByCedula(cedula);
@@ -94,6 +127,8 @@ public class SolicitudService {
         map.put("costo", s.getCosto());
         map.put("observaciones", s.getObservaciones());
         map.put("liquidacion", construirLiquidacion(s));
+        map.put("certificadoDisponible",
+                "APROBADA".equals(s.getEstado()) && "TERMINACION_MATERIAS".equals(s.getTipo()));
         return map;
     }
 

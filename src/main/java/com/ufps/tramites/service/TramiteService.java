@@ -35,8 +35,10 @@ public class TramiteService {
 
         Optional<Solicitud> solicitudTerminacion = solicitudRepository
                 .findByCedulaAndTipo(usuario.getCedula(), "TERMINACION_MATERIAS");
-        boolean etapa2Disponible = solicitudTerminacion.isPresent()
+        boolean terminacionAprobada = solicitudTerminacion.isPresent()
                 && "APROBADA".equals(solicitudTerminacion.get().getEstado());
+        boolean etapa2Disponible = terminacionAprobada;
+        boolean certificadoDisponible = terminacionAprobada;
 
         Map<String, Object> response = new LinkedHashMap<>();
 
@@ -45,6 +47,7 @@ public class TramiteService {
         response.put("convocatoria", construirConvocatoria());
         response.put("etapa1Completada", etapa1Completada);
         response.put("etapa2Disponible", etapa2Disponible);
+        response.put("certificadoDisponible", certificadoDisponible);
 
         return response;
     }
