@@ -60,6 +60,22 @@ public class SolicitudController {
         return ResponseEntity.ok(solicitudService.obtenerSolicitudesPorCedula(cedula));
     }
 
+    /**
+     * GET /api/solicitudes/bandeja?cedula=...
+     * Retorna la bandeja del director: solicitudes de su programa agrupadas por estado.
+     */
+    @GetMapping("/bandeja")
+    public ResponseEntity<?> obtenerBandeja(@RequestParam String cedula) {
+        Usuario director = usuarioService.obtenerUsuarioPorCedula(cedula);
+        if (director == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Director no encontrado"));
+        }
+        if (!"DIRECTOR".equals(director.getRol())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores de programa"));
+        }
+        return ResponseEntity.ok(solicitudService.obtenerBandejaDirector(director));
+    }
+
     private Map<String, Object> error(String mensaje) {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("error", mensaje);

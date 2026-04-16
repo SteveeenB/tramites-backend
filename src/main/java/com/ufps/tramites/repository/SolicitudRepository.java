@@ -12,4 +12,6 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
     List<Solicitud> findByCedula(String cedula);
 
     Optional<Solicitud> findByCedulaAndTipo(String cedula, String tipo);
+
+    List<Solicitud> findByCedulaInAndTipo(List<String> cedulas, String tipo);
 }
