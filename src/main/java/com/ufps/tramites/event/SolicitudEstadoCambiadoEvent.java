@@ -16,7 +16,7 @@ public class SolicitudEstadoCambiadoEvent extends ApplicationEvent {
         this.estudiante = estudiante;
         this.estadoAnterior = estadoAnterior;
     }
-
+    
     public Solicitud getSolicitud() { return solicitud; }
     public Usuario getEstudiante() { return estudiante; }
     public String getEstadoAnterior() { return estadoAnterior; }
