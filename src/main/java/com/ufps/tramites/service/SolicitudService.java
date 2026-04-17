@@ -3,12 +3,14 @@ package com.ufps.tramites.service;
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.repository.SolicitudRepository;
+import com.ufps.tramites.repository.UsuarioRepository;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -16,14 +18,17 @@ import org.springframework.stereotype.Service;
 public class SolicitudService {
 
     // Período habilitado por el calendario académico
-    private static final LocalDate CONVOCATORIA_INICIO = LocalDate.of(2026, 4, 7);
-    private static final LocalDate CONVOCATORIA_FIN    = LocalDate.of(2026, 4, 25);
+    public static final LocalDate CONVOCATORIA_INICIO = LocalDate.of(2026, 4, 7);
+    public static final LocalDate CONVOCATORIA_FIN    = LocalDate.of(2026, 4, 25);
 
     // Costo fijo del trámite de terminación de materias (COP)
     private static final double COSTO_TERMINACION = 150_000.0;
 
     @Autowired
     private SolicitudRepository solicitudRepository;
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
 
     /**
      * Crea una solicitud de terminación de materias.
@@ -73,6 +78,93 @@ public class SolicitudService {
         solicitudRepository.save(solicitud);
 
         return construirRespuestaSolicitud(solicitud);
+    }
+
+    /**
+     * Retorna la bandeja del director agrupada por estado.
+     * Incluye todas las solicitudes de TERMINACION_MATERIAS de los estudiantes
+     * del mismo programa académico del director.
+     */
+    public Map<String, Object> obtenerBandejaDirector(Usuario director) {
+        Long programaId = director.getProgramaAcademico() != null
+                ? director.getProgramaAcademico().getId() : null;
+
+        if (programaId == null) {
+            return Map.of("pendientes", List.of(), "aprobadas", List.of(), "rechazadas", List.of());
+        }
+
+        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRol(programaId, "ESTUDIANTE");
+        List<String> cedulas = estudiantes.stream().map(Usuario::getCedula).collect(Collectors.toList());
+        Map<String, Usuario> porCedula = estudiantes.stream()
+                .collect(Collectors.toMap(Usuario::getCedula, u -> u));
+
+        List<Solicitud> todas = solicitudRepository.findByCedulaInAndTipo(cedulas, "TERMINACION_MATERIAS");
+
+        List<Solicitud> pendientes = todas.stream()
+                .filter(s -> "PENDIENTE_PAGO".equals(s.getEstado()) || "EN_REVISION".equals(s.getEstado()))
+                .collect(Collectors.toList());
+        List<Solicitud> aprobadas  = todas.stream()
+                .filter(s -> "APROBADA".equals(s.getEstado()))
+                .collect(Collectors.toList());
+        List<Solicitud> rechazadas = todas.stream()
+                .filter(s -> "RECHAZADA".equals(s.getEstado()))
+                .collect(Collectors.toList());
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("pendientes", mapearConEstudiante(pendientes, porCedula));
+        response.put("aprobadas",  mapearConEstudiante(aprobadas,  porCedula));
+        response.put("rechazadas", mapearConEstudiante(rechazadas, porCedula));
+        return response;
+    }
+
+    private List<Map<String, Object>> mapearConEstudiante(List<Solicitud> solicitudes,
+                                                          Map<String, Usuario> porCedula) {
+        return solicitudes.stream().map(s -> {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("id",             s.getId());
+            map.put("tipo",           s.getTipo());
+            map.put("estado",         s.getEstado());
+            map.put("fechaSolicitud", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : null);
+            map.put("observaciones",  s.getObservaciones());
+
+            Usuario est = porCedula.get(s.getCedula());
+            if (est != null) {
+                Map<String, Object> estMap = new LinkedHashMap<>();
+                estMap.put("cedula",   est.getCedula());
+                estMap.put("nombre",   est.getNombre());
+                estMap.put("programa", est.getProgramaAcademico() != null
+                        ? est.getProgramaAcademico().getNombre() : null);
+                map.put("estudiante", estMap);
+            }
+            return map;
+        }).collect(Collectors.toList());
+    }
+
+    /** Aprueba una solicitud de terminación de materias pendiente. */
+    public Map<String, Object> aprobarSolicitud(Long id) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())) {
+            throw new IllegalStateException("Solo se pueden aprobar solicitudes en estado pendiente");
+        }
+        s.setEstado("APROBADA");
+        s.setObservaciones("Aprobada por el director de programa.");
+        solicitudRepository.save(s);
+        return construirRespuestaSolicitud(s);
+    }
+
+    /** Rechaza una solicitud de terminación de materias pendiente. */
+    public Map<String, Object> rechazarSolicitud(Long id, String motivo) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())) {
+            throw new IllegalStateException("Solo se pueden rechazar solicitudes en estado pendiente");
+        }
+        s.setEstado("RECHAZADA");
+        s.setObservaciones(motivo != null && !motivo.isBlank()
+                ? motivo : "Rechazada por el director de programa.");
+        solicitudRepository.save(s);
+        return construirRespuestaSolicitud(s);
     }
 
     /** Retorna todas las solicitudes de un estudiante. */
