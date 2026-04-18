@@ -1,10 +1,18 @@
 package com.ufps.tramites.model;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import java.time.LocalDate;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 
 @Entity
 public class Solicitud {
@@ -41,4 +49,23 @@ public class Solicitud {
 
     public String getObservaciones() { return observaciones; }
     public void setObservaciones(String observaciones) { this.observaciones = observaciones; }
+
+    // ── Campos nuevos para TP-41 ──────────────────────────────────────────
+
+    @Column(name = "decision")
+    @Enumerated(EnumType.STRING)
+    private DecisionDirector decision;           // APROBADA | RECHAZADA | null si aún no decidió
+
+    @Column(name = "observaciones_director")
+    private String observacionesDirector;        // separado de observaciones del estudiante
+
+    @Column(name = "fecha_decision")
+    private LocalDateTime fechaDecision;         // cuándo decidió — base para la alerta de plazo
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "director_id")
+    private Usuario responsableDecision;         // quién decidió — trazabilidad HU-04
+
+    // getters y setters
+
 }
