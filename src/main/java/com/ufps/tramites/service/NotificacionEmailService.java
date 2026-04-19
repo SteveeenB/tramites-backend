@@ -16,6 +16,8 @@ public class NotificacionEmailService {
 
     private static final Logger log = LoggerFactory.getLogger(NotificacionEmailService.class);
 
+    // required = false: si no hay SMTP configurado en application.properties,
+    // Spring no crea el bean y el servicio cae al modo de simulación por consola
     @Autowired(required = false)
     private JavaMailSender mailSender;
 
