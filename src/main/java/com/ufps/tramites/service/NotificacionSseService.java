@@ -23,7 +23,10 @@ public class NotificacionSseService {
     private final Map<String, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
     public SseEmitter suscribir(String cedula) {
+        // 0L = sin timeout: la conexión se mantiene hasta que el cliente la cierre
         SseEmitter emitter = new SseEmitter(0L);
+        // CopyOnWriteArrayList permite eliminar emitters durante la iteración en onEstadoCambiado
+        // sin lanzar ConcurrentModificationException cuando un cliente se desconecta a mitad del envío
         emitters.computeIfAbsent(cedula, k -> new CopyOnWriteArrayList<>()).add(emitter);
 
         emitter.onCompletion(() -> eliminarEmitter(cedula, emitter));
