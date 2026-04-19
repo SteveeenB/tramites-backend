@@ -1,3 +1,9 @@
+-- ============================================================
+-- data.sql  –  datos iniciales para PostgreSQL (Supabase)
+-- Se usa ON CONFLICT DO NOTHING para evitar duplicados
+-- cada vez que reinicia la aplicación (ddl-auto=update)
+-- ============================================================
+
 INSERT INTO programa_academico (nombre, tipo, total_creditos) VALUES
 -- Doctorados
 ('Doctorado en Educación',                                                                                      'DOCTORADO',       80),
@@ -17,7 +23,8 @@ INSERT INTO programa_academico (nombre, tipo, total_creditos) VALUES
 ('Especialización en Estructuras',                                                                              'ESPECIALIZACION', 30),
 ('Especialización en Logística y Negocios Internacionales',                                                     'ESPECIALIZACION', 24),
 ('Especialización en Educación, Emprendimiento y Economía Solidaria',                                           'ESPECIALIZACION', 32),
-('Especialización en Educación para la Atención a Población Afectada por el Conflicto Armado y en Problemática Fronteriza', 'ESPECIALIZACION', 28);
+('Especialización en Educación para la Atención a Población Afectada por el Conflicto Armado y en Problemática Fronteriza', 'ESPECIALIZACION', 28)
+ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO usuario (cedula, codigo, nombre, contrasena, rol, creditos_aprobados, programa_id) VALUES
 -- Estudiante bloqueado: 40/56 créditos → etapa 1 bloqueada
@@ -36,7 +43,8 @@ INSERT INTO usuario (cedula, codigo, nombre, contrasena, rol, creditos_aprobados
 ('1098765433', '20261002', 'Maria Director', '123456', 'DIRECTOR',   NULL,
     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas')),
 ('1098765434', '20261003', 'Admin User',     '123456', 'ADMIN',      30,
-    (SELECT id FROM programa_academico WHERE nombre = 'Especialización en Estructuras'));
+    (SELECT id FROM programa_academico WHERE nombre = 'Especialización en Estructuras'))
+ON CONFLICT (cedula) DO NOTHING;
 
 INSERT INTO solicitud (cedula, tipo, estado, fecha_solicitud, costo, observaciones) VALUES
 -- Laura: terminación aprobada → etapa 2 habilitada
@@ -44,4 +52,5 @@ INSERT INTO solicitud (cedula, tipo, estado, fecha_solicitud, costo, observacion
 -- Pedro: pendiente de pago → aparece en bandeja como pendiente
 ('1098765436', 'TERMINACION_MATERIAS', 'PENDIENTE_PAGO', '2026-04-12', 150000, 'En espera de pago.'),
 -- Carlos: rechazada → aparece en bandeja como rechazada
-('1098765437', 'TERMINACION_MATERIAS', 'RECHAZADA',      '2026-04-08', 150000, 'No cumple requisitos adicionales del programa.');
+('1098765437', 'TERMINACION_MATERIAS', 'RECHAZADA',      '2026-04-08', 150000, 'No cumple requisitos adicionales del programa.')
+ON CONFLICT DO NOTHING;
