@@ -5,9 +5,11 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 @Entity
-@Table(name = "programa_academico")
+@Table(name = "programa_academico",
+       uniqueConstraints = @UniqueConstraint(columnNames = "nombre"))
 public class ProgramaAcademico {
 
     @Id
