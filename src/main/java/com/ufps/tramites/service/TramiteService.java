@@ -44,7 +44,7 @@ public class TramiteService {
         boolean etapa1Habilitada = creditosAprobados >= creditosRequeridos && enConvocatoria;
 
         Optional<Solicitud> solicitudTerminacion = solicitudRepository
-                .findByCedulaAndTipo(usuario.getCedula(), "TERMINACION_MATERIAS");
+                .findFirstByCedulaAndTipo(usuario.getCedula(), "TERMINACION_MATERIAS");
 
         // Etapa 2 se habilita cuando la solicitud de terminación fue aprobada (etapa 1 completada)
         boolean etapa2Habilitada = solicitudTerminacion.isPresent()

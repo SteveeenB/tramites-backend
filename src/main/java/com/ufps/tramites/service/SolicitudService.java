@@ -57,7 +57,7 @@ public class SolicitudService {
         }
 
         // 3. Verificar que no exista una solicitud activa del mismo tipo
-        Optional<Solicitud> existente = solicitudRepository.findByCedulaAndTipo(
+        Optional<Solicitud> existente = solicitudRepository.findFirstByCedulaAndTipo(
             estudiante.getCedula(), "TERMINACION_MATERIAS"
         );
         if (existente.isPresent()) {
