@@ -3,16 +3,10 @@ package com.ufps.tramites.model;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 
 @Entity
 public class Solicitud {
@@ -21,14 +15,25 @@ public class Solicitud {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String cedula;       // cédula del estudiante
-    private String tipo;         // TERMINACION_MATERIAS | GRADO | CERTIFICADO
-    private String estado;       // PENDIENTE_PAGO | EN_REVISION | APROBADA | RECHAZADA
+    private String cedula;          // cédula del estudiante
+    private String tipo;            // TERMINACION_MATERIAS | GRADO | CERTIFICADO
+    private String estado;          // PENDIENTE_PAGO | EN_REVISION | APROBADA | RECHAZADA
     private LocalDate fechaSolicitud;
     private Double costo;
-    private String observaciones;
+    private String observaciones;   // observaciones del estudiante (no tocar)
+
+    // ── Campos nuevos TP-41 ───────────────────────────────────────────────
+
+    private String decision;              // APROBADA | RECHAZADA  (null mientras no decide)
+    private String observacionesDirector; // motivo de aprobación o rechazo del director
+    private LocalDateTime fechaDecision;  // cuándo decidió — base para alerta de plazo (TP-44)
+    private String cedulaDirector;        // quién decidió — sigue tu convención de cédula como FK ligera
+
+    // ── Constructor ───────────────────────────────────────────────────────
 
     public Solicitud() {}
+
+    // ── Getters y setters existentes (sin cambios) ────────────────────────
 
     public Long getId() { return id; }
 
@@ -50,22 +55,19 @@ public class Solicitud {
     public String getObservaciones() { return observaciones; }
     public void setObservaciones(String observaciones) { this.observaciones = observaciones; }
 
-    // ── Campos nuevos para TP-41 ──────────────────────────────────────────
+    // ── Getters y setters nuevos TP-41 ────────────────────────────────────
 
-    @Column(name = "decision")
-    @Enumerated(EnumType.STRING)
-    private DecisionDirector decision;           // APROBADA | RECHAZADA | null si aún no decidió
+    public String getDecision() { return decision; }
+    public void setDecision(String decision) { this.decision = decision; }
 
-    @Column(name = "observaciones_director")
-    private String observacionesDirector;        // separado de observaciones del estudiante
+    public String getObservacionesDirector() { return observacionesDirector; }
+    public void setObservacionesDirector(String observacionesDirector) {
+        this.observacionesDirector = observacionesDirector;
+    }
 
-    @Column(name = "fecha_decision")
-    private LocalDateTime fechaDecision;         // cuándo decidió — base para la alerta de plazo
+    public LocalDateTime getFechaDecision() { return fechaDecision; }
+    public void setFechaDecision(LocalDateTime fechaDecision) { this.fechaDecision = fechaDecision; }
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "director_id")
-    private Usuario responsableDecision;         // quién decidió — trazabilidad HU-04
-
-    // getters y setters
-
+    public String getCedulaDirector() { return cedulaDirector; }
+    public void setCedulaDirector(String cedulaDirector) { this.cedulaDirector = cedulaDirector; }
 }
