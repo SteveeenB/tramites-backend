@@ -15,12 +15,11 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/api/usuarios")
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class UsuarioController {
 
     @Autowired
     private UsuarioService usuarioService;
-
+/* 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequestDTO loginRequest, HttpSession session) {
         Usuario usuario = usuarioService.autenticar(loginRequest.getCodigo(), loginRequest.getContrasena());
@@ -40,7 +39,7 @@ public class UsuarioController {
         }
         return ResponseEntity.status(401).body("Credenciales inválidas");
     }
-
+*/
     @GetMapping("/me")
     public ResponseEntity<?> obtenerUsuarioActual(HttpSession session) {
         String usuarioCedula = (String) session.getAttribute("usuarioCedula");

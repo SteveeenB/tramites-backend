@@ -1,26 +1,27 @@
 package com.ufps.tramites.service;
 
-import com.ufps.tramites.event.SolicitudEstadoCambiadoEvent;
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.repository.SolicitudRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 @Service
 public class SolicitudService {
 
     // Período habilitado por el calendario académico
-    private static final LocalDate CONVOCATORIA_INICIO = LocalDate.of(2026, 4, 7);
-    private static final LocalDate CONVOCATORIA_FIN    = LocalDate.of(2026, 4, 25);
+    public static final LocalDate CONVOCATORIA_INICIO = LocalDate.of(2026, 4, 7);
+    public static final LocalDate CONVOCATORIA_FIN    = LocalDate.of(2026, 4, 25);
 
     // Costo fijo del trámite de terminación de materias (COP)
     private static final double COSTO_TERMINACION = 150_000.0;
@@ -32,8 +33,10 @@ public class SolicitudService {
     private UsuarioRepository usuarioRepository;
 
     @Autowired
-    private ApplicationEventPublisher eventPublisher;
+    private NotificacionSseService notificacionSseService;
 
+    @Autowired
+    private NotificacionService notificacionService;
     /**
      * Crea una solicitud de terminación de materias.
      * Valida: período de convocatoria, créditos aprobados y duplicados.
@@ -61,7 +64,7 @@ public class SolicitudService {
         }
 
         // 3. Verificar que no exista una solicitud activa del mismo tipo
-        Optional<Solicitud> existente = solicitudRepository.findByCedulaAndTipo(
+        Optional<Solicitud> existente = solicitudRepository.findFirstByCedulaAndTipo(
             estudiante.getCedula(), "TERMINACION_MATERIAS"
         );
         if (existente.isPresent()) {
@@ -85,27 +88,104 @@ public class SolicitudService {
     }
 
     /**
-     * Cambia el estado de una solicitud (EN_REVISION, APROBADA o RECHAZADA).
-     * Dispara el evento de dominio SolicitudEstadoCambiadoEvent, que a su vez
-     * notifica al estudiante por correo y por SSE en tiempo real.
+     * Retorna la bandeja del director agrupada por estado.
+     * Incluye todas las solicitudes de TERMINACION_MATERIAS de los estudiantes
+     * del mismo programa académico del director.
      */
-    public Map<String, Object> actualizarEstado(Long solicitudId, String nuevoEstado, String observaciones) {
-        Solicitud solicitud = solicitudRepository.findById(solicitudId)
-                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada: " + solicitudId));
+    public Map<String, Object> obtenerBandejaDirector(Usuario director) {
+        Long programaId = director.getProgramaAcademico() != null
+                ? director.getProgramaAcademico().getId() : null;
 
-        String estadoAnterior = solicitud.getEstado();
-        solicitud.setEstado(nuevoEstado);
-        if (observaciones != null && !observaciones.isBlank()) {
-            solicitud.setObservaciones(observaciones);
+        if (programaId == null) {
+            return Map.of("pendientes", List.of(), "aprobadas", List.of(), "rechazadas", List.of());
         }
-        solicitudRepository.save(solicitud);
 
-        usuarioRepository.findById(solicitud.getCedula()).ifPresent(estudiante ->
-            eventPublisher.publishEvent(
-                new SolicitudEstadoCambiadoEvent(this, solicitud, estudiante, estadoAnterior))
-        );
+        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRol(programaId, "ESTUDIANTE");
+        List<String> cedulas = estudiantes.stream().map(Usuario::getCedula).collect(Collectors.toList());
+        Map<String, Usuario> porCedula = estudiantes.stream()
+                .collect(Collectors.toMap(Usuario::getCedula, u -> u));
 
-        return construirRespuestaSolicitud(solicitud);
+        List<Solicitud> todas = solicitudRepository.findByCedulaInAndTipo(cedulas, "TERMINACION_MATERIAS");
+
+        List<Solicitud> pendientes = todas.stream()
+                .filter(s -> "PENDIENTE_PAGO".equals(s.getEstado()) || "EN_REVISION".equals(s.getEstado()))
+                .collect(Collectors.toList());
+        List<Solicitud> aprobadas  = todas.stream()
+                .filter(s -> "APROBADA".equals(s.getEstado()))
+                .collect(Collectors.toList());
+        List<Solicitud> rechazadas = todas.stream()
+                .filter(s -> "RECHAZADA".equals(s.getEstado()))
+                .collect(Collectors.toList());
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("pendientes", mapearConEstudiante(pendientes, porCedula));
+        response.put("aprobadas",  mapearConEstudiante(aprobadas,  porCedula));
+        response.put("rechazadas", mapearConEstudiante(rechazadas, porCedula));
+        return response;
+    }
+
+    private List<Map<String, Object>> mapearConEstudiante(List<Solicitud> solicitudes,
+                                                          Map<String, Usuario> porCedula) {
+        return solicitudes.stream().map(s -> {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("id",             s.getId());
+            map.put("tipo",           s.getTipo());
+            map.put("estado",         s.getEstado());
+            map.put("fechaSolicitud", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : null);
+            map.put("observaciones",  s.getObservaciones());
+
+            Usuario est = porCedula.get(s.getCedula());
+            if (est != null) {
+                Map<String, Object> estMap = new LinkedHashMap<>();
+                estMap.put("cedula",   est.getCedula());
+                estMap.put("nombre",   est.getNombre());
+                estMap.put("programa", est.getProgramaAcademico() != null
+                        ? est.getProgramaAcademico().getNombre() : null);
+                map.put("estudiante", estMap);
+            }
+            return map;
+        }).collect(Collectors.toList());
+    }
+
+    /** Aprueba una solicitud de terminación de materias pendiente. */
+    public Map<String, Object> aprobarSolicitud(Long id) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())) {
+            throw new IllegalStateException("Solo se pueden aprobar solicitudes en estado pendiente");
+        }
+        String estadoAnterior = s.getEstado();
+        s.setEstado("APROBADA");
+        s.setObservaciones("Aprobada por el director de programa.");
+        solicitudRepository.save(s);
+
+        notificarEstudiante(s, estadoAnterior);
+        return construirRespuestaSolicitud(s);
+    }
+
+    /** Rechaza una solicitud de terminación de materias pendiente. */
+    public Map<String, Object> rechazarSolicitud(Long id, String motivo) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())) {
+            throw new IllegalStateException("Solo se pueden rechazar solicitudes en estado pendiente");
+        }
+        if (motivo == null || motivo.isBlank()) {
+            throw new IllegalStateException("Se requiere motivo de rechazo");
+        }
+        String estadoAnterior = s.getEstado();
+        s.setEstado("RECHAZADA");
+        s.setObservaciones(motivo);
+        solicitudRepository.save(s);
+
+        notificarEstudiante(s, estadoAnterior);
+        return construirRespuestaSolicitud(s);
+    }
+
+    private void notificarEstudiante(Solicitud s, String estadoAnterior) {
+        notificacionSseService.notificarCambioEstado(s, estadoAnterior);
+        usuarioRepository.findById(s.getCedula())
+                .ifPresent(est -> notificacionService.notificarEstudianteCambioEstado(s, est));
     }
 
     /** Retorna todas las solicitudes de un estudiante. */
@@ -141,5 +221,57 @@ public class SolicitudService {
             : null);
         liq.put("instrucciones", "Realiza el pago en la ventanilla de Tesorería o por PSE antes de la fecha límite.");
         return liq;
+    }
+
+    /**
+     * Genera el contenido de texto del certificado de terminación de materias.
+     * Valida que la solicitud exista, sea de tipo TERMINACION_MATERIAS y esté APROBADA.
+     */
+    public byte[] generarCertificado(Long id) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"APROBADA".equals(s.getEstado())) {
+            throw new IllegalStateException("El certificado solo está disponible para solicitudes aprobadas");
+        }
+        if (!"TERMINACION_MATERIAS".equals(s.getTipo())) {
+            throw new IllegalStateException("Este tipo de solicitud no genera certificado");
+        }
+
+        Usuario est = usuarioRepository.findById(s.getCedula()).orElse(null);
+        String nombre   = est != null ? est.getNombre() : "Estudiante";
+        String cedula   = s.getCedula();
+        String codigo   = est != null ? est.getCodigo() : "-";
+        String programa = est != null && est.getProgramaAcademico() != null
+                ? est.getProgramaAcademico().getNombre() : "-";
+        String fecha    = s.getFechaSolicitud() != null
+                ? s.getFechaSolicitud().format(DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy",
+                        new java.util.Locale("es", "CO")))
+                : LocalDate.now().toString();
+
+        String contenido =
+            "================================================================\n" +
+            "       UNIVERSIDAD FRANCISCO DE PAULA SANTANDER\n" +
+            "         SISTEMA DE TRAMITES DE POSGRADO\n" +
+            "================================================================\n\n" +
+            "         CERTIFICADO DE TERMINACION DE MATERIAS\n\n" +
+            "Se certifica que el/la estudiante:\n\n" +
+            "  Nombre:             " + nombre   + "\n" +
+            "  Cedula:             " + cedula   + "\n" +
+            "  Codigo estudiantil: " + codigo   + "\n" +
+            "  Programa:           " + programa + "\n\n" +
+            "Ha cumplido satisfactoriamente con los requisitos academicos\n" +
+            "establecidos para la Terminacion de Materias, segun resolucion\n" +
+            "aprobada el " + fecha + ".\n\n" +
+            "Expedido el: " + LocalDate.now().format(
+                    DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy",
+                            new java.util.Locale("es", "CO"))) + "\n\n" +
+            "================================================================\n" +
+            "  UNIVERSIDAD FRANCISCO DE PAULA SANTANDER\n" +
+            "  San Jose de Cucuta, Colombia\n" +
+            "  Este documento es valido ante la oficina de\n" +
+            "  Registro y Control Academico.\n" +
+            "================================================================\n";
+
+        return contenido.getBytes(StandardCharsets.UTF_8);
     }
 }
