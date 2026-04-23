@@ -50,6 +50,9 @@ public class TramiteService {
         boolean etapa2Habilitada = solicitudTerminacion.isPresent()
                 && "APROBADA".equals(solicitudTerminacion.get().getEstado());
 
+        Optional<Solicitud> solicitudGrado = solicitudRepository
+                .findFirstByCedulaAndTipo(usuario.getCedula(), "GRADO");
+
         Map<String, Object> response = new LinkedHashMap<>();
 
         response.put("creditos", construirCreditos(usuario));
@@ -57,6 +60,7 @@ public class TramiteService {
         response.put("convocatoria", construirConvocatoria());
         response.put("etapa1Habilitada", etapa1Habilitada);
         response.put("etapa2Habilitada", etapa2Habilitada);
+        response.put("solicitudGrado", solicitudGrado.map(this::construirResumenSolicitudGrado).orElse(null));
 
         return response;
     }
@@ -131,6 +135,25 @@ public class TramiteService {
         acciones.add(accion("GESTION_TOTAL", "Gestion total", puedeGestionar));
 
         return acciones;
+    }
+
+    private Map<String, Object> construirResumenSolicitudGrado(Solicitud s) {
+        Map<String, Object> liq = new LinkedHashMap<>();
+        liq.put("concepto", "Derechos de Grado");
+        liq.put("valor", s.getCosto());
+        liq.put("fechaLimite", s.getFechaSolicitud() != null
+                ? s.getFechaSolicitud().plusDays(5).toString() : null);
+        liq.put("instrucciones", "Realiza el pago en la ventanilla de Tesorería o por PSE antes de la fecha límite.");
+
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("id", s.getId());
+        map.put("tipo", s.getTipo());
+        map.put("estado", s.getEstado());
+        map.put("fechaSolicitud", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : null);
+        map.put("costo", s.getCosto());
+        map.put("observaciones", s.getObservaciones());
+        map.put("liquidacion", liq);
+        return map;
     }
 
     private Map<String, Object> item(String id, String label, String ruta) {
