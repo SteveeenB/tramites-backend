@@ -3,6 +3,7 @@ package com.ufps.tramites.service;
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.repository.SolicitudRepository;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,13 +32,23 @@ public class TramiteService {
 
     public Map<String, Object> construirProcesoDeGrado(Usuario usuario) {
         int creditosAprobados = usuario.getCreditosAprobados() != null ? usuario.getCreditosAprobados() : 0;
-        boolean etapa1Completada = creditosAprobados >= 100;
+        int creditosRequeridos = usuario.getProgramaAcademico() != null
+                ? usuario.getProgramaAcademico().getTotalCreditos() : Integer.MAX_VALUE;
+
+        LocalDate hoy = LocalDate.now();
+        boolean enConvocatoria = !hoy.isBefore(SolicitudService.CONVOCATORIA_INICIO)
+                && !hoy.isAfter(SolicitudService.CONVOCATORIA_FIN);
+
+        // Etapa 1 se habilita si el estudiante tiene los créditos suficientes
+        // Y la convocatoria académica está vigente
+        boolean etapa1Habilitada = creditosAprobados >= creditosRequeridos && enConvocatoria;
 
         Optional<Solicitud> solicitudTerminacion = solicitudRepository
-                .findByCedulaAndTipo(usuario.getCedula(), "TERMINACION_MATERIAS");
+                .findFirstByCedulaAndTipo(usuario.getCedula(), "TERMINACION_MATERIAS");
+
         boolean terminacionAprobada = solicitudTerminacion.isPresent()
                 && "APROBADA".equals(solicitudTerminacion.get().getEstado());
-        boolean etapa2Disponible = terminacionAprobada;
+        boolean etapa2Disponible    = terminacionAprobada;
         boolean certificadoDisponible = terminacionAprobada;
 
         Map<String, Object> response = new LinkedHashMap<>();
@@ -45,7 +56,7 @@ public class TramiteService {
         response.put("creditos", construirCreditos(usuario));
         response.put("estadoAcademico", "Regular");
         response.put("convocatoria", construirConvocatoria());
-        response.put("etapa1Completada", etapa1Completada);
+        response.put("etapa1Completada", etapa1Habilitada);
         response.put("etapa2Disponible", etapa2Disponible);
         response.put("certificadoDisponible", certificadoDisponible);
 
