@@ -47,6 +47,24 @@ public class SolicitudController {
     }
 
     /**
+     * POST /api/solicitudes/grado?cedula=...
+     * Crea una solicitud de grado académico para el estudiante.
+     */
+    @PostMapping("/grado")
+    public ResponseEntity<?> crearSolicitudGrado(@RequestParam String cedula) {
+        Usuario estudiante = usuarioService.obtenerUsuarioPorCedula(cedula);
+        if (estudiante == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Estudiante no encontrado"));
+        }
+        try {
+            Map<String, Object> resultado = solicitudService.crearSolicitudGrado(estudiante);
+            return ResponseEntity.status(HttpStatus.CREATED).body(resultado);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
+        }
+    }
+
+    /**
      * GET /api/solicitudes?cedula=...
      * Retorna todas las solicitudes del estudiante.
      */
