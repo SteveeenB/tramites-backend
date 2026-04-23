@@ -8,18 +8,16 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/solicitudes")
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class SolicitudController {
 
     @Autowired
@@ -45,7 +43,7 @@ public class SolicitudController {
             Map<String, Object> resultado = solicitudService.crearSolicitudTerminacion(estudiante);
             return ResponseEntity.status(HttpStatus.CREATED).body(resultado);
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(error(e.getMessage()));
+            return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
         }
     }
 
@@ -63,29 +61,69 @@ public class SolicitudController {
     }
 
     /**
-     * PUT /api/solicitudes/{id}/estado?estado=APROBADA&observaciones=...
-     * Permite al director o admin cambiar el estado de una solicitud.
-     * Dispara el evento de dominio que notifica al estudiante por correo y SSE.
+     * GET /api/solicitudes/bandeja?cedula=...
+     * Retorna la bandeja del director: solicitudes de su programa agrupadas por estado.
      */
-    @PutMapping("/{id}/estado")
-    public ResponseEntity<?> actualizarEstado(
-            @PathVariable Long id,
-            @RequestParam String estado,
-            @RequestParam(required = false) String observaciones) {
-
-        if (!"EN_REVISION".equals(estado) && !"APROBADA".equals(estado) && !"RECHAZADA".equals(estado)) {
-            return ResponseEntity.badRequest().body(error("Estado inválido: " + estado
-                    + ". Valores permitidos: EN_REVISION, APROBADA, RECHAZADA"));
+    @GetMapping("/bandeja")
+    public ResponseEntity<?> obtenerBandeja(@RequestParam String cedula) {
+        Usuario director = usuarioService.obtenerUsuarioPorCedula(cedula);
+        if (director == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Director no encontrado"));
         }
-        if ("RECHAZADA".equals(estado) && (observaciones == null || observaciones.isBlank())) {
-            return ResponseEntity.badRequest().body(error("Se requiere motivo de rechazo en 'observaciones'"));
+        if (!"DIRECTOR".equals(director.getRol())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores de programa"));
         }
+        return ResponseEntity.ok(solicitudService.obtenerBandejaDirector(director));
+    }
 
+    /** POST /api/solicitudes/{id}/aprobar?cedula=... */
+    @PostMapping("/{id}/aprobar")
+    public ResponseEntity<?> aprobarSolicitud(@PathVariable Long id, @RequestParam String cedula) {
+        Usuario director = usuarioService.obtenerUsuarioPorCedula(cedula);
+        if (director == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Director no encontrado"));
+        if (!"DIRECTOR".equals(director.getRol())) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores"));
         try {
-            Map<String, Object> resultado = solicitudService.actualizarEstado(id, estado, observaciones);
-            return ResponseEntity.ok(resultado);
+            return ResponseEntity.ok(solicitudService.aprobarSolicitud(id));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
+        }
+    }
+
+    /** POST /api/solicitudes/{id}/rechazar?cedula=...&motivo=... */
+    @PostMapping("/{id}/rechazar")
+    public ResponseEntity<?> rechazarSolicitud(@PathVariable Long id, @RequestParam String cedula,
+            @RequestParam(required = false) String motivo) {
+        Usuario director = usuarioService.obtenerUsuarioPorCedula(cedula);
+        if (director == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Director no encontrado"));
+        if (!"DIRECTOR".equals(director.getRol())) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores"));
+        try {
+            return ResponseEntity.ok(solicitudService.rechazarSolicitud(id, motivo));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
+        }
+    }
+
+    /**
+     * GET /api/solicitudes/{id}/certificado
+     * Descarga el certificado de terminacion de materias.
+     * Solo disponible cuando la solicitud esta APROBADA y es de tipo TERMINACION_MATERIAS.
+     */
+    @GetMapping("/{id}/certificado")
+    public ResponseEntity<byte[]> descargarCertificado(@PathVariable Long id) {
+        try {
+            byte[] contenido = solicitudService.generarCertificado(id);
+            return ResponseEntity.ok()
+                    .header("Content-Disposition", "attachment; filename=\"certificado-terminacion-" + id + ".txt\"")
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .body(contenido);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.valueOf(422)).build();
         }
     }
 
