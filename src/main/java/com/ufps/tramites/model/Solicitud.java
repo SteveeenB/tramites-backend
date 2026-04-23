@@ -70,4 +70,15 @@ public class Solicitud {
 
     public String getCedulaDirector() { return cedulaDirector; }
     public void setCedulaDirector(String cedulaDirector) { this.cedulaDirector = cedulaDirector; }
+
+    // campo
+    private LocalDateTime fechaEnRevision;
+
+    // getter
+    public LocalDateTime getFechaEnRevision() { return fechaEnRevision; }
+
+    // setter
+    public void setFechaEnRevision(LocalDateTime fechaEnRevision) {
+    this.fechaEnRevision = fechaEnRevision;
+}
 }
