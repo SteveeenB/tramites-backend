@@ -209,4 +209,50 @@ public class SolicitudService {
         liq.put("instrucciones", "Realiza el pago en la ventanilla de Tesorería o por PSE antes de la fecha límite.");
         return liq;
     }
+
+        /**
+     * Retorna solo las solicitudes EN_REVISION del programa del director.
+     */
+    public List<Map<String, Object>> obtenerSolicitudesEnRevisionPorDirector(Usuario director) {
+        Long programaId = director.getProgramaAcademico() != null
+                ? director.getProgramaAcademico().getId() : null;
+
+        if (programaId == null) return List.of();
+
+        List<Usuario> estudiantes = usuarioRepository
+                .findByProgramaAcademicoIdAndRol(programaId, "ESTUDIANTE");
+        List<String> cedulas = estudiantes.stream()
+                .map(Usuario::getCedula).collect(Collectors.toList());
+        Map<String, Usuario> porCedula = estudiantes.stream()
+                .collect(Collectors.toMap(Usuario::getCedula, u -> u));
+
+        List<Solicitud> enRevision = solicitudRepository
+                .findByCedulaInAndTipo(cedulas, "TERMINACION_MATERIAS")
+                .stream()
+                .filter(s -> "EN_REVISION".equals(s.getEstado()))
+                .collect(Collectors.toList());
+
+        return enRevision.stream().map(s -> {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("id",                    s.getId());
+            map.put("tipo",                  s.getTipo());
+            map.put("estado",                s.getEstado());
+            map.put("fechaSolicitud",        s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : null);
+            map.put("decision",              s.getDecision());
+            map.put("observacionesDirector", s.getObservacionesDirector());
+            map.put("fechaDecision",         s.getFechaDecision() != null ? s.getFechaDecision().toString() : null);
+            map.put("cedulaDirector",        s.getCedulaDirector());
+
+            Usuario est = porCedula.get(s.getCedula());
+            if (est != null) {
+                Map<String, Object> estMap = new LinkedHashMap<>();
+                estMap.put("cedula",   est.getCedula());
+                estMap.put("nombre",   est.getNombre());
+                estMap.put("programa", est.getProgramaAcademico() != null
+                        ? est.getProgramaAcademico().getNombre() : null);
+                map.put("estudiante", estMap);
+            }
+            return map;
+        }).collect(Collectors.toList());
+    }
 }
