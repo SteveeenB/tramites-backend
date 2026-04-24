@@ -141,27 +141,33 @@ public class SolicitudService {
     }
 
     /** Aprueba una solicitud de terminación de materias pendiente. */
-    public Map<String, Object> aprobarSolicitud(Long id) {
+    public Map<String, Object> aprobarSolicitud(Long id, String cedulaDirector) {
         Solicitud s = solicitudRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
         if (!"PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())) {
             throw new IllegalStateException("Solo se pueden aprobar solicitudes en estado pendiente");
         }
         s.setEstado("APROBADA");
-        s.setObservaciones("Aprobada por el director de programa.");
+        s.setDecision("APROBADA");
+        s.setFechaDecision(java.time.LocalDateTime.now());
+        s.setCedulaDirector(cedulaDirector);
+        s.setObservacionesDirector("Aprobada por el director de programa.");
         solicitudRepository.save(s);
         return construirRespuestaSolicitud(s);
     }
 
     /** Rechaza una solicitud de terminación de materias pendiente. */
-    public Map<String, Object> rechazarSolicitud(Long id, String motivo) {
+    public Map<String, Object> rechazarSolicitud(Long id, String motivo, String cedulaDirector) {
         Solicitud s = solicitudRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
         if (!"PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())) {
             throw new IllegalStateException("Solo se pueden rechazar solicitudes en estado pendiente");
         }
         s.setEstado("RECHAZADA");
-        s.setObservaciones(motivo != null && !motivo.isBlank()
+        s.setDecision("RECHAZADA");
+        s.setFechaDecision(java.time.LocalDateTime.now());
+        s.setCedulaDirector(cedulaDirector);
+        s.setObservacionesDirector(motivo != null && !motivo.isBlank()
                 ? motivo : "Rechazada por el director de programa.");
         solicitudRepository.save(s);
         return construirRespuestaSolicitud(s);
@@ -185,6 +191,10 @@ public class SolicitudService {
         map.put("fechaSolicitud", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : null);
         map.put("costo", s.getCosto());
         map.put("observaciones", s.getObservaciones());
+        map.put("decision", s.getDecision());
+        map.put("observacionesDirector", s.getObservacionesDirector());
+        map.put("fechaDecision", s.getFechaDecision() != null ? s.getFechaDecision().toString() : null);
+        map.put("cedulaDirector", s.getCedulaDirector());
         map.put("liquidacion", construirLiquidacion(s));
         return map;
     }

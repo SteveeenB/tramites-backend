@@ -77,33 +77,41 @@ public class SolicitudController {
 
     /** POST /api/solicitudes/{id}/aprobar?cedula=... */
     @PostMapping("/{id}/aprobar")
-    public ResponseEntity<?> aprobarSolicitud(@PathVariable Long id, @RequestParam String cedula) {
-        Usuario director = usuarioService.obtenerUsuarioPorCedula(cedula);
-        if (director == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Director no encontrado"));
-        if (!"DIRECTOR".equals(director.getRol())) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores"));
-        try {
-            return ResponseEntity.ok(solicitudService.aprobarSolicitud(id));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
-        } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
-        }
+    public ResponseEntity<?> aprobarSolicitud(
+        @PathVariable Long id,
+        @RequestParam String cedula) {
+    Usuario director = usuarioService.obtenerUsuarioPorCedula(cedula);
+    if (director == null)
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Director no encontrado"));
+    if (!"DIRECTOR".equals(director.getRol()))
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores"));
+    try {
+        return ResponseEntity.ok(solicitudService.aprobarSolicitud(id, cedula));
+    } catch (IllegalArgumentException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
+    } catch (IllegalStateException e) {
+        return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
+    }
     }
 
     /** POST /api/solicitudes/{id}/rechazar?cedula=...&motivo=... */
     @PostMapping("/{id}/rechazar")
-    public ResponseEntity<?> rechazarSolicitud(@PathVariable Long id, @RequestParam String cedula,
-            @RequestParam(required = false) String motivo) {
-        Usuario director = usuarioService.obtenerUsuarioPorCedula(cedula);
-        if (director == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Director no encontrado"));
-        if (!"DIRECTOR".equals(director.getRol())) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores"));
-        try {
-            return ResponseEntity.ok(solicitudService.rechazarSolicitud(id, motivo));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
-        } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
-        }
+    public ResponseEntity<?> rechazarSolicitud(
+        @PathVariable Long id,
+        @RequestParam String cedula,
+        @RequestParam(required = false) String motivo) {
+    Usuario director = usuarioService.obtenerUsuarioPorCedula(cedula);
+    if (director == null)
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Director no encontrado"));
+    if (!"DIRECTOR".equals(director.getRol()))
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores"));
+    try {
+        return ResponseEntity.ok(solicitudService.rechazarSolicitud(id, motivo, cedula));
+    } catch (IllegalArgumentException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
+    } catch (IllegalStateException e) {
+        return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
+    }
     }
 
     private Map<String, Object> error(String mensaje) {
