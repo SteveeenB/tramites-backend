@@ -1,12 +1,13 @@
 package com.ufps.tramites.service;
 
-import com.ufps.tramites.model.Solicitud;
-import com.ufps.tramites.repository.SolicitudRepository;
+import java.time.LocalDateTime;
+import java.util.List;
+
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import com.ufps.tramites.model.Solicitud;
+import com.ufps.tramites.repository.SolicitudRepository;
 
 @Service
 public class AlertaDirectorService {
@@ -46,9 +47,7 @@ public class AlertaDirectorService {
             // Cuando el estado cambia a EN_REVISION en TP-43, ese momento
             // queda registrado en fechaSolicitud o puedes agregar un campo
             // fechaEnRevision — ver nota al final.
-            LocalDateTime limite = solicitud.getFechaSolicitud()
-                    .atStartOfDay()
-                    .plusHours(PLAZO_HORAS);
+            LocalDateTime limite = solicitud.getFechaEnRevision().plusHours(PLAZO_HORAS);
 
             if (ahora.isAfter(limite)) {
                 notificacionService.notificarDirectorPlazoVencido(solicitud);
