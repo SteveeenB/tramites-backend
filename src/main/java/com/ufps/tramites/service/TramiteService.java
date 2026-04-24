@@ -46,9 +46,10 @@ public class TramiteService {
         Optional<Solicitud> solicitudTerminacion = solicitudRepository
                 .findFirstByCedulaAndTipo(usuario.getCedula(), "TERMINACION_MATERIAS");
 
-        // Etapa 2 se habilita cuando la solicitud de terminación fue aprobada (etapa 1 completada)
-        boolean etapa2Habilitada = solicitudTerminacion.isPresent()
+        boolean terminacionAprobada = solicitudTerminacion.isPresent()
                 && "APROBADA".equals(solicitudTerminacion.get().getEstado());
+        boolean etapa2Disponible    = terminacionAprobada;
+        boolean certificadoDisponible = terminacionAprobada;
 
         Optional<Solicitud> solicitudGrado = solicitudRepository
                 .findFirstByCedulaAndTipo(usuario.getCedula(), "GRADO");
@@ -58,8 +59,9 @@ public class TramiteService {
         response.put("creditos", construirCreditos(usuario));
         response.put("estadoAcademico", "Regular");
         response.put("convocatoria", construirConvocatoria());
-        response.put("etapa1Habilitada", etapa1Habilitada);
-        response.put("etapa2Habilitada", etapa2Habilitada);
+        response.put("etapa1Completada", etapa1Habilitada);
+        response.put("etapa2Disponible", etapa2Disponible);
+        response.put("certificadoDisponible", certificadoDisponible);
         response.put("solicitudGrado", solicitudGrado.map(this::construirResumenSolicitudGrado).orElse(null));
 
         return response;

@@ -4,7 +4,9 @@ import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.repository.SolicitudRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,6 +35,11 @@ public class SolicitudService {
     @Autowired
     private UsuarioRepository usuarioRepository;
 
+    @Autowired
+    private NotificacionSseService notificacionSseService;
+
+    @Autowired
+    private NotificacionService notificacionService;
     /**
      * Crea una solicitud de terminación de materias.
      * Valida: período de convocatoria, créditos aprobados y duplicados.
@@ -189,9 +196,12 @@ public class SolicitudService {
         if (!"PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())) {
             throw new IllegalStateException("Solo se pueden aprobar solicitudes en estado pendiente");
         }
+        String estadoAnterior = s.getEstado();
         s.setEstado("APROBADA");
         s.setObservaciones("Aprobada por el director de programa.");
         solicitudRepository.save(s);
+
+        notificarEstudiante(s, estadoAnterior);
         return construirRespuestaSolicitud(s);
     }
 
@@ -202,11 +212,22 @@ public class SolicitudService {
         if (!"PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())) {
             throw new IllegalStateException("Solo se pueden rechazar solicitudes en estado pendiente");
         }
+        if (motivo == null || motivo.isBlank()) {
+            throw new IllegalStateException("Se requiere motivo de rechazo");
+        }
+        String estadoAnterior = s.getEstado();
         s.setEstado("RECHAZADA");
-        s.setObservaciones(motivo != null && !motivo.isBlank()
-                ? motivo : "Rechazada por el director de programa.");
+        s.setObservaciones(motivo);
         solicitudRepository.save(s);
+
+        notificarEstudiante(s, estadoAnterior);
         return construirRespuestaSolicitud(s);
+    }
+
+    private void notificarEstudiante(Solicitud s, String estadoAnterior) {
+        notificacionSseService.notificarCambioEstado(s, estadoAnterior);
+        usuarioRepository.findById(s.getCedula())
+                .ifPresent(est -> notificacionService.notificarEstudianteCambioEstado(s, est));
     }
 
     /** Retorna todas las solicitudes de un estudiante. */
@@ -228,6 +249,8 @@ public class SolicitudService {
         map.put("costo", s.getCosto());
         map.put("observaciones", s.getObservaciones());
         map.put("liquidacion", construirLiquidacion(s));
+        map.put("certificadoDisponible",
+                "APROBADA".equals(s.getEstado()) && "TERMINACION_MATERIAS".equals(s.getTipo()));
         return map;
     }
 
@@ -241,5 +264,57 @@ public class SolicitudService {
             : null);
         liq.put("instrucciones", "Realiza el pago en la ventanilla de Tesorería o por PSE antes de la fecha límite.");
         return liq;
+    }
+
+    /**
+     * Genera el contenido de texto del certificado de terminación de materias.
+     * Valida que la solicitud exista, sea de tipo TERMINACION_MATERIAS y esté APROBADA.
+     */
+    public byte[] generarCertificado(Long id) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"APROBADA".equals(s.getEstado())) {
+            throw new IllegalStateException("El certificado solo está disponible para solicitudes aprobadas");
+        }
+        if (!"TERMINACION_MATERIAS".equals(s.getTipo())) {
+            throw new IllegalStateException("Este tipo de solicitud no genera certificado");
+        }
+
+        Usuario est = usuarioRepository.findById(s.getCedula()).orElse(null);
+        String nombre   = est != null ? est.getNombre() : "Estudiante";
+        String cedula   = s.getCedula();
+        String codigo   = est != null ? est.getCodigo() : "-";
+        String programa = est != null && est.getProgramaAcademico() != null
+                ? est.getProgramaAcademico().getNombre() : "-";
+        String fecha    = s.getFechaSolicitud() != null
+                ? s.getFechaSolicitud().format(DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy",
+                        new java.util.Locale("es", "CO")))
+                : LocalDate.now().toString();
+
+        String contenido =
+            "================================================================\n" +
+            "       UNIVERSIDAD FRANCISCO DE PAULA SANTANDER\n" +
+            "         SISTEMA DE TRAMITES DE POSGRADO\n" +
+            "================================================================\n\n" +
+            "         CERTIFICADO DE TERMINACION DE MATERIAS\n\n" +
+            "Se certifica que el/la estudiante:\n\n" +
+            "  Nombre:             " + nombre   + "\n" +
+            "  Cedula:             " + cedula   + "\n" +
+            "  Codigo estudiantil: " + codigo   + "\n" +
+            "  Programa:           " + programa + "\n\n" +
+            "Ha cumplido satisfactoriamente con los requisitos academicos\n" +
+            "establecidos para la Terminacion de Materias, segun resolucion\n" +
+            "aprobada el " + fecha + ".\n\n" +
+            "Expedido el: " + LocalDate.now().format(
+                    DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy",
+                            new java.util.Locale("es", "CO"))) + "\n\n" +
+            "================================================================\n" +
+            "  UNIVERSIDAD FRANCISCO DE PAULA SANTANDER\n" +
+            "  San Jose de Cucuta, Colombia\n" +
+            "  Este documento es valido ante la oficina de\n" +
+            "  Registro y Control Academico.\n" +
+            "================================================================\n";
+
+        return contenido.getBytes(StandardCharsets.UTF_8);
     }
 }

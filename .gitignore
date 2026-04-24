@@ -32,5 +32,5 @@ build/
 ### VS Code ###
 .vscode/
 
-### Local config (credentials) ###
+### Configuración local con credenciales — no subir al repo ###
 src/main/resources/application-local.properties
