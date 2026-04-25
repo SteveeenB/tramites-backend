@@ -1,9 +1,9 @@
 package com.ufps.tramites.service;
 
+import com.ufps.tramites.model.Convocatoria;
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.repository.SolicitudRepository;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -14,6 +14,9 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class TramiteService {
+
+    @Autowired
+    private ConvocatoriaService convocatoriaService;
 
     @Autowired
     private SolicitudRepository solicitudRepository;
@@ -35,9 +38,7 @@ public class TramiteService {
         int creditosRequeridos = usuario.getProgramaAcademico() != null
                 ? usuario.getProgramaAcademico().getTotalCreditos() : Integer.MAX_VALUE;
 
-        LocalDate hoy = LocalDate.now();
-        boolean enConvocatoria = !hoy.isBefore(SolicitudService.CONVOCATORIA_INICIO)
-                && !hoy.isAfter(SolicitudService.CONVOCATORIA_FIN);
+        boolean enConvocatoria = convocatoriaService.estaVigente();
 
         // Etapa 1 se habilita si el estudiante tiene los créditos suficientes
         // Y la convocatoria académica está vigente
@@ -90,10 +91,11 @@ public class TramiteService {
     }
 
     private Map<String, Object> construirConvocatoria() {
-        Map<String, Object> convocatoria = new LinkedHashMap<>();
-        convocatoria.put("fechaInicio", "2026-04-07");
-        convocatoria.put("fechaFin", "2026-04-25");
-        return convocatoria;
+        Convocatoria c = convocatoriaService.getActiva();
+        Map<String, Object> conv = new LinkedHashMap<>();
+        conv.put("fechaInicio", c.getFechaInicio().toString());
+        conv.put("fechaFin", c.getFechaFin().toString());
+        return conv;
     }
 
     private List<Map<String, Object>> construirSidebar(String rol) {
