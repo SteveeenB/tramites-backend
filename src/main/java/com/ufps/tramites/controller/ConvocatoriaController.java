@@ -4,17 +4,18 @@ import com.ufps.tramites.model.Convocatoria;
 import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.service.ConvocatoriaService;
 import com.ufps.tramites.service.UsuarioService;
+import jakarta.servlet.http.HttpSession;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -34,15 +35,20 @@ public class ConvocatoriaController {
         return ResponseEntity.ok(mapear(c));
     }
 
-    /** PUT /api/convocatorias?cedula=... — solo ADMIN */
+    /** PUT /api/convocatorias — solo ADMIN autenticado */
     @PutMapping
     public ResponseEntity<?> actualizar(
-            @RequestParam String cedula,
-            @RequestBody Map<String, String> body) {
+            @RequestBody Map<String, String> body,
+            HttpSession session) {
+
+        String cedula = (String) session.getAttribute("usuarioCedula");
+        if (cedula == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "No autenticado"));
+        }
 
         Usuario usuario = usuarioService.obtenerUsuarioPorCedula(cedula);
         if (usuario == null || !"ADMIN".equals(usuario.getRol())) {
-            return ResponseEntity.status(403).body(Map.of("error", "Acción no permitida"));
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Acción no permitida"));
         }
 
         String inicioStr = body.get("fechaInicio");
@@ -55,8 +61,7 @@ public class ConvocatoriaController {
         try {
             LocalDate inicio = LocalDate.parse(inicioStr);
             LocalDate fin    = LocalDate.parse(finStr);
-            Convocatoria actualizada = convocatoriaService.actualizar(inicio, fin);
-            return ResponseEntity.ok(mapear(actualizada));
+            return ResponseEntity.ok(mapear(convocatoriaService.actualizar(inicio, fin)));
         } catch (DateTimeParseException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Formato de fecha inválido (use YYYY-MM-DD)"));
         } catch (IllegalArgumentException e) {
