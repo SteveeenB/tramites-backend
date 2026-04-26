@@ -14,6 +14,7 @@ public class DocumentoSolicitud {
     private Long id;
 
     private Long solicitudId;
+    private String tipo;           // SOPORTE | ACTA
     private String nombreOriginal;
     private String nombreAlmacenado;
     private String contentType;
@@ -26,6 +27,9 @@ public class DocumentoSolicitud {
 
     public Long getSolicitudId() { return solicitudId; }
     public void setSolicitudId(Long solicitudId) { this.solicitudId = solicitudId; }
+
+    public String getTipo() { return tipo; }
+    public void setTipo(String tipo) { this.tipo = tipo; }
 
     public String getNombreOriginal() { return nombreOriginal; }
     public void setNombreOriginal(String nombreOriginal) { this.nombreOriginal = nombreOriginal; }
