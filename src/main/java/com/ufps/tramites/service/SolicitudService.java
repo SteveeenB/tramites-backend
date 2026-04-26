@@ -4,12 +4,14 @@ import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.repository.SolicitudRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -37,6 +39,12 @@ public class SolicitudService {
 
     @Autowired
     private NotificacionService notificacionService;
+
+    @Autowired
+    private ActaPdfGeneratorService actaPdfGeneratorService;
+
+    @Autowired
+    private DocumentoService documentoService;
     /**
      * Crea una solicitud de terminación de materias.
      * Valida: período de convocatoria, créditos aprobados y duplicados.
@@ -224,8 +232,12 @@ public class SolicitudService {
     }
 
     /**
-     * Genera el acta de grado en texto plano.
-     * Solo disponible cuando la solicitud es de tipo GRADO y está APROBADA.
+     * Genera (o reutiliza) el acta de grado en PDF.
+     * En la primera llamada:
+     *   1. Genera el PDF con datos institucionales.
+     *   2. Marca al estudiante como GRADUADO en la base de datos.
+     *   3. Vincula el PDF al expediente digital (DocumentoSolicitud tipo ACTA).
+     * En llamadas posteriores devuelve el PDF ya guardado en disco.
      */
     public byte[] generarActa(Long id) {
         Solicitud s = solicitudRepository.findById(id)
@@ -237,44 +249,45 @@ public class SolicitudService {
             throw new IllegalStateException("Este endpoint es solo para solicitudes de tipo GRADO");
         }
 
+        // Si el acta ya fue generada, devolver la versión guardada en disco
+        Optional<byte[]> actaExistente = documentoService.obtenerActa(id);
+        if (actaExistente.isPresent() && actaExistente.get() != null) {
+            return actaExistente.get();
+        }
+
+        // Primera generación: construir PDF
         Usuario est = usuarioRepository.findById(s.getCedula()).orElse(null);
-        String nombre   = est != null ? est.getNombre() : "Estudiante";
+        String nombre   = est != null ? est.getNombre()   : "Estudiante";
         String cedula   = s.getCedula();
-        String codigo   = est != null ? est.getCodigo() : "-";
+        String codigo   = est != null ? est.getCodigo()   : "-";
         String programa = est != null && est.getProgramaAcademico() != null
                 ? est.getProgramaAcademico().getNombre() : "-";
+
+        Locale es = new Locale("es", "CO");
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy", es);
         String fechaAprobacion = s.getFechaDecision() != null
-                ? s.getFechaDecision().toLocalDate().format(
-                    DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy", new java.util.Locale("es", "CO")))
-                : (s.getFechaSolicitud() != null
-                    ? s.getFechaSolicitud().format(
-                        DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy", new java.util.Locale("es", "CO")))
-                    : LocalDate.now().toString());
+                ? s.getFechaDecision().toLocalDate().format(fmt)
+                : (s.getFechaSolicitud() != null ? s.getFechaSolicitud().format(fmt)
+                    : LocalDate.now().format(fmt));
+        String fechaExpedicion = LocalDate.now().format(fmt);
 
-        String contenido =
-            "================================================================\n" +
-            "       UNIVERSIDAD FRANCISCO DE PAULA SANTANDER\n" +
-            "         SISTEMA DE TRAMITES DE POSGRADO\n" +
-            "================================================================\n\n" +
-            "                     ACTA DE GRADO\n\n" +
-            "Se certifica que el/la candidato/a a grado:\n\n" +
-            "  Nombre:             " + nombre   + "\n" +
-            "  Cedula:             " + cedula   + "\n" +
-            "  Codigo estudiantil: " + codigo   + "\n" +
-            "  Programa:           " + programa + "\n\n" +
-            "Ha cumplido satisfactoriamente con todos los requisitos\n" +
-            "academicos y administrativos para optar al titulo de grado,\n" +
-            "segun resolucion aprobada el " + fechaAprobacion + ".\n\n" +
-            "Expedido el: " + LocalDate.now().format(
-                    DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy",
-                            new java.util.Locale("es", "CO"))) + "\n\n" +
-            "================================================================\n" +
-            "  UNIVERSIDAD FRANCISCO DE PAULA SANTANDER\n" +
-            "  San Jose de Cucuta, Colombia\n" +
-            "  Documento oficial del proceso de graduacion.\n" +
-            "================================================================\n";
+        try {
+            byte[] pdfBytes = actaPdfGeneratorService.generar(
+                    nombre, cedula, codigo, programa, fechaAprobacion, fechaExpedicion);
 
-        return contenido.getBytes(StandardCharsets.UTF_8);
+            // Actualizar estado del estudiante a GRADUADO
+            if (est != null && !"GRADUADO".equals(est.getEstadoGrado())) {
+                est.setEstadoGrado("GRADUADO");
+                usuarioRepository.save(est);
+            }
+
+            // Vincular PDF al expediente digital
+            documentoService.guardarActaComoDocumento(id, pdfBytes);
+
+            return pdfBytes;
+        } catch (IOException e) {
+            throw new RuntimeException("Error al generar el PDF del acta de grado", e);
+        }
     }
 
     /**

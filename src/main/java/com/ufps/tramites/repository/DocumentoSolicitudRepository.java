@@ -8,4 +8,5 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface DocumentoSolicitudRepository extends JpaRepository<DocumentoSolicitud, Long> {
     List<DocumentoSolicitud> findBySolicitudId(Long solicitudId);
+    java.util.Optional<DocumentoSolicitud> findBySolicitudIdAndTipo(Long solicitudId, String tipo);
 }

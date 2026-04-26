@@ -143,21 +143,24 @@ public class SolicitudController {
 
     /**
      * GET /api/solicitudes/{id}/acta
-     * Genera y descarga el acta de grado.
+     * Genera (o descarga) el acta de grado en PDF.
      * Solo disponible cuando la solicitud es de tipo GRADO y está APROBADA.
+     * En la primera llamada actualiza al estudiante como GRADUADO y vincula el PDF al expediente.
      */
     @GetMapping("/{id}/acta")
     public ResponseEntity<byte[]> descargarActa(@PathVariable Long id) {
         try {
             byte[] contenido = solicitudService.generarActa(id);
             return ResponseEntity.ok()
-                    .header("Content-Disposition", "attachment; filename=\"acta-grado-" + id + ".txt\"")
-                    .contentType(MediaType.TEXT_PLAIN)
+                    .header("Content-Disposition", "attachment; filename=\"acta-grado-" + id + ".pdf\"")
+                    .contentType(MediaType.APPLICATION_PDF)
                     .body(contenido);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.valueOf(422)).build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
