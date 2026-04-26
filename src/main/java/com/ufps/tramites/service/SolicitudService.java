@@ -224,6 +224,60 @@ public class SolicitudService {
     }
 
     /**
+     * Genera el acta de grado en texto plano.
+     * Solo disponible cuando la solicitud es de tipo GRADO y está APROBADA.
+     */
+    public byte[] generarActa(Long id) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"APROBADA".equals(s.getEstado())) {
+            throw new IllegalStateException("El acta solo está disponible para solicitudes aprobadas");
+        }
+        if (!"GRADO".equals(s.getTipo())) {
+            throw new IllegalStateException("Este endpoint es solo para solicitudes de tipo GRADO");
+        }
+
+        Usuario est = usuarioRepository.findById(s.getCedula()).orElse(null);
+        String nombre   = est != null ? est.getNombre() : "Estudiante";
+        String cedula   = s.getCedula();
+        String codigo   = est != null ? est.getCodigo() : "-";
+        String programa = est != null && est.getProgramaAcademico() != null
+                ? est.getProgramaAcademico().getNombre() : "-";
+        String fechaAprobacion = s.getFechaDecision() != null
+                ? s.getFechaDecision().toLocalDate().format(
+                    DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy", new java.util.Locale("es", "CO")))
+                : (s.getFechaSolicitud() != null
+                    ? s.getFechaSolicitud().format(
+                        DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy", new java.util.Locale("es", "CO")))
+                    : LocalDate.now().toString());
+
+        String contenido =
+            "================================================================\n" +
+            "       UNIVERSIDAD FRANCISCO DE PAULA SANTANDER\n" +
+            "         SISTEMA DE TRAMITES DE POSGRADO\n" +
+            "================================================================\n\n" +
+            "                     ACTA DE GRADO\n\n" +
+            "Se certifica que el/la candidato/a a grado:\n\n" +
+            "  Nombre:             " + nombre   + "\n" +
+            "  Cedula:             " + cedula   + "\n" +
+            "  Codigo estudiantil: " + codigo   + "\n" +
+            "  Programa:           " + programa + "\n\n" +
+            "Ha cumplido satisfactoriamente con todos los requisitos\n" +
+            "academicos y administrativos para optar al titulo de grado,\n" +
+            "segun resolucion aprobada el " + fechaAprobacion + ".\n\n" +
+            "Expedido el: " + LocalDate.now().format(
+                    DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy",
+                            new java.util.Locale("es", "CO"))) + "\n\n" +
+            "================================================================\n" +
+            "  UNIVERSIDAD FRANCISCO DE PAULA SANTANDER\n" +
+            "  San Jose de Cucuta, Colombia\n" +
+            "  Documento oficial del proceso de graduacion.\n" +
+            "================================================================\n";
+
+        return contenido.getBytes(StandardCharsets.UTF_8);
+    }
+
+    /**
      * Genera el contenido de texto del certificado de terminación de materias.
      * Valida que la solicitud exista, sea de tipo TERMINACION_MATERIAS y esté APROBADA.
      */
