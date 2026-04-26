@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +57,7 @@ public class DocumentoService {
 
         DocumentoSolicitud doc = new DocumentoSolicitud();
         doc.setSolicitudId(solicitudId);
+        doc.setTipo("SOPORTE");
         doc.setNombreOriginal(archivo.getOriginalFilename());
         doc.setNombreAlmacenado(nombreAlmacenado);
         doc.setContentType(contentType);
@@ -69,6 +71,47 @@ public class DocumentoService {
         resultado.put("tamano", doc.getTamano());
         resultado.put("fechaSubida", doc.getFechaSubida().toString());
         return resultado;
+    }
+
+    /**
+     * Guarda el PDF del acta generado como ACTA en el expediente digital.
+     * Si ya existe un acta para esta solicitud, la sobreescribe.
+     */
+    public void guardarActaComoDocumento(Long solicitudId, byte[] pdfBytes) throws IOException {
+        Path directorio = Paths.get(directorioBase, String.valueOf(solicitudId));
+        Files.createDirectories(directorio);
+
+        String nombreAlmacenado = "acta-grado-" + solicitudId + ".pdf";
+        Files.write(directorio.resolve(nombreAlmacenado), pdfBytes);
+
+        Optional<DocumentoSolicitud> existente =
+                documentoRepository.findBySolicitudIdAndTipo(solicitudId, "ACTA");
+
+        DocumentoSolicitud doc = existente.orElseGet(DocumentoSolicitud::new);
+        doc.setSolicitudId(solicitudId);
+        doc.setTipo("ACTA");
+        doc.setNombreOriginal("acta-grado-" + solicitudId + ".pdf");
+        doc.setNombreAlmacenado(nombreAlmacenado);
+        doc.setContentType("application/pdf");
+        doc.setTamano((long) pdfBytes.length);
+        doc.setFechaSubida(LocalDateTime.now());
+        documentoRepository.save(doc);
+    }
+
+    /**
+     * Devuelve los bytes del acta si ya fue generada y guardada en disco.
+     */
+    public Optional<byte[]> obtenerActa(Long solicitudId) {
+        return documentoRepository.findBySolicitudIdAndTipo(solicitudId, "ACTA")
+                .map(doc -> {
+                    Path ruta = Paths.get(directorioBase, String.valueOf(solicitudId),
+                            doc.getNombreAlmacenado());
+                    try {
+                        return Files.exists(ruta) ? Files.readAllBytes(ruta) : null;
+                    } catch (IOException e) {
+                        return null;
+                    }
+                });
     }
 
     public List<Map<String, Object>> listarDocumentos(Long solicitudId) {
