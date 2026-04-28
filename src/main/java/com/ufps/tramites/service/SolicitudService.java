@@ -1,9 +1,5 @@
 package com.ufps.tramites.service;
 
-import com.ufps.tramites.model.Solicitud;
-import com.ufps.tramites.model.Usuario;
-import com.ufps.tramites.repository.SolicitudRepository;
-import com.ufps.tramites.repository.UsuarioRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -13,15 +9,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import com.ufps.tramites.model.Solicitud;
+import com.ufps.tramites.model.Usuario;
+import com.ufps.tramites.repository.SolicitudRepository;
+import com.ufps.tramites.repository.UsuarioRepository;
 
 @Service
 public class SolicitudService {
 
     // Período habilitado por el calendario académico
     public static final LocalDate CONVOCATORIA_INICIO = LocalDate.of(2026, 4, 7);
-    public static final LocalDate CONVOCATORIA_FIN    = LocalDate.of(2026, 4, 25);
+    public static final LocalDate CONVOCATORIA_FIN    = LocalDate.of(2026, 6, 25);
 
     // Costo fijo del trámite de terminación de materias (COP)
     private static final double COSTO_TERMINACION = 150_000.0;
