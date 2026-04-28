@@ -141,16 +141,16 @@ public class SolicitudController {
         return map;
     }
 
-    @GetMapping("/posgrados/pendientes")
+   @GetMapping("/posgrados/pendientes")
 public ResponseEntity<?> obtenerPendientesValidacion(@RequestParam String cedula) {
-    Usuario posgrados = usuarioService.obtenerUsuarioPorCedula(cedula);
-    if (posgrados == null) {
+    Usuario admin = usuarioService.obtenerUsuarioPorCedula(cedula);
+    if (admin == null) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(error("Usuario no encontrado"));
     }
-    if (!"POSGRADOS".equals(posgrados.getRol()) && !"ADMIN".equals(posgrados.getRol())) {
+    if (!"ADMIN".equals(admin.getRol())) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(error("Acceso restringido a la Unidad de Posgrados"));
+                .body(error("Acceso restringido al administrador"));
     }
     return ResponseEntity.ok(validacionGradoService.obtenerSolicitudesPendientesValidacion());
 }
@@ -162,18 +162,18 @@ public ResponseEntity<?> validarSolicitudGrado(
         @RequestParam String decision,
         @RequestParam(required = false) String observaciones) {
 
-    Usuario posgrados = usuarioService.obtenerUsuarioPorCedula(cedula);
-    if (posgrados == null) {
+    Usuario admin = usuarioService.obtenerUsuarioPorCedula(cedula);
+    if (admin == null) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(error("Usuario no encontrado"));
     }
-    if (!"POSGRADOS".equals(posgrados.getRol()) && !"ADMIN".equals(posgrados.getRol())) {
+    if (!"ADMIN".equals(admin.getRol())) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(error("Acceso restringido a la Unidad de Posgrados"));
+                .body(error("Acceso restringido al administrador"));
     }
     try {
         return ResponseEntity.ok(
-            validacionGradoService.registrarValidacion(id, decision, observaciones, posgrados)
+            validacionGradoService.registrarValidacion(id, decision, observaciones, admin)
         );
     } catch (IllegalArgumentException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
