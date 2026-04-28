@@ -33,5 +33,4 @@ build/
 .vscode/
 
 ### Configuración local con credenciales — no subir al repo ###
-application-local.properties
 src/main/resources/application-local.properties
