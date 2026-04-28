@@ -1,5 +1,10 @@
 package com.ufps.tramites.service;
 
+import com.ufps.tramites.model.Convocatoria;
+import com.ufps.tramites.model.Solicitud;
+import com.ufps.tramites.model.Usuario;
+import com.ufps.tramites.repository.SolicitudRepository;
+import com.ufps.tramites.repository.UsuarioRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -21,12 +26,14 @@ import com.ufps.tramites.repository.UsuarioRepository;
 @Service
 public class SolicitudService {
 
-    // Período habilitado por el calendario académico
-    public static final LocalDate CONVOCATORIA_INICIO = LocalDate.of(2026, 4, 7);
-    public static final LocalDate CONVOCATORIA_FIN    = LocalDate.of(2026, 6, 25);
-
-    // Costo fijo del trámite de terminación de materias (COP)
+    // Costo fijo del trámite de terminación de materias (COP) — valor de prueba
     private static final double COSTO_TERMINACION = 150_000.0;
+
+    // Costo fijo de los derechos de grado (COP) — valor de prueba
+    private static final double COSTO_GRADO = 250_000.0;
+
+    @Autowired
+    private ConvocatoriaService convocatoriaService;
 
     @Autowired
     private SolicitudRepository solicitudRepository;
@@ -58,10 +65,11 @@ public class SolicitudService {
 
         // 2. Validar calendario académico
         LocalDate hoy = LocalDate.now();
-        if (hoy.isBefore(CONVOCATORIA_INICIO) || hoy.isAfter(CONVOCATORIA_FIN)) {
+        if (!convocatoriaService.estaVigente()) {
+            Convocatoria conv = convocatoriaService.getActiva();
             throw new IllegalStateException(
                 "La solicitud está fuera del período habilitado por el calendario académico ("
-                + CONVOCATORIA_INICIO + " al " + CONVOCATORIA_FIN + ")."
+                + conv.getFechaInicio() + " al " + conv.getFechaFin() + ")."
             );
         }
 
@@ -83,6 +91,45 @@ public class SolicitudService {
         solicitud.setFechaSolicitud(hoy);
         solicitud.setCosto(COSTO_TERMINACION);
         solicitud.setObservaciones("Solicitud registrada por el sistema.");
+
+        solicitudRepository.save(solicitud);
+
+        return construirRespuestaSolicitud(solicitud);
+    }
+
+    /**
+     * Crea una solicitud de grado académico.
+     * Requiere que la terminación de materias esté APROBADA y que no exista solicitud de grado activa.
+     */
+    public Map<String, Object> crearSolicitudGrado(Usuario estudiante) {
+        // 1. Verificar que la terminación de materias esté aprobada (requisito previo)
+        Optional<Solicitud> terminacion = solicitudRepository.findFirstByCedulaAndTipo(
+            estudiante.getCedula(), "TERMINACION_MATERIAS"
+        );
+        if (terminacion.isEmpty() || !"APROBADA".equals(terminacion.get().getEstado())) {
+            throw new IllegalStateException(
+                "Debe tener la Terminación de Materias aprobada para solicitar el grado académico."
+            );
+        }
+
+        // 2. Verificar que no exista ya una solicitud de grado activa
+        Optional<Solicitud> existente = solicitudRepository.findFirstByCedulaAndTipo(
+            estudiante.getCedula(), "GRADO"
+        );
+        if (existente.isPresent()) {
+            throw new IllegalStateException(
+                "Ya existe una solicitud de grado con estado: " + existente.get().getEstado()
+            );
+        }
+
+        // 3. Crear y guardar la solicitud
+        Solicitud solicitud = new Solicitud();
+        solicitud.setCedula(estudiante.getCedula());
+        solicitud.setTipo("GRADO");
+        solicitud.setEstado("PENDIENTE_PAGO");
+        solicitud.setFechaSolicitud(LocalDate.now());
+        solicitud.setCosto(COSTO_GRADO);
+        solicitud.setObservaciones("Solicitud de grado registrada por el sistema.");
 
         solicitudRepository.save(solicitud);
 
@@ -216,7 +263,8 @@ public class SolicitudService {
 
     private Map<String, Object> construirLiquidacion(Solicitud s) {
         Map<String, Object> liq = new LinkedHashMap<>();
-        liq.put("concepto", "Trámite de Terminación de Materias");
+        boolean esGrado = "GRADO".equals(s.getTipo());
+        liq.put("concepto", esGrado ? "Derechos de Grado" : "Trámite de Terminación de Materias");
         liq.put("valor", s.getCosto());
         liq.put("fechaLimite", s.getFechaSolicitud() != null
             ? s.getFechaSolicitud().plusDays(5).toString()
