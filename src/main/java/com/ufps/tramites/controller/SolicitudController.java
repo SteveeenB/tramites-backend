@@ -132,4 +132,22 @@ public class SolicitudController {
         map.put("error", mensaje);
         return map;
     }
+
+    /** POST /api/solicitudes/{id}/simular-pago — SOLO PARA PRUEBAS */
+    @PostMapping("/{id}/simular-pago")
+    public ResponseEntity<?> simularPago(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(solicitudService.simularPago(id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
+        }
+    }
+
+    /** POST /api/solicitudes/{id}/resetear — SOLO PARA PRUEBAS */
+    @PostMapping("/{id}/resetear")
+    public ResponseEntity<?> resetear(@PathVariable Long id) {
+        return ResponseEntity.ok(solicitudService.resetearParaPruebas(id));
+    }
 }

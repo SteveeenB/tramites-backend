@@ -19,7 +19,7 @@ public class SolicitudService {
 
     // Período habilitado por el calendario académico
     public static final LocalDate CONVOCATORIA_INICIO = LocalDate.of(2026, 4, 7);
-    public static final LocalDate CONVOCATORIA_FIN    = LocalDate.of(2026, 4, 25);
+    public static final LocalDate CONVOCATORIA_FIN    = LocalDate.of(2026, 4, 30);
 
     // Costo fijo del trámite de terminación de materias (COP)
     private static final double COSTO_TERMINACION = 150_000.0;
@@ -40,12 +40,14 @@ public class SolicitudService {
         int creditosRequeridos = estudiante.getProgramaAcademico() != null
                 ? estudiante.getProgramaAcademico().getTotalCreditos()
                 : Integer.MAX_VALUE;
-        if (creditosAprobados < creditosRequeridos) {
-            throw new IllegalStateException(
-                "No cumple los requisitos académicos: tiene " + creditosAprobados
-                + "/" + creditosRequeridos + " créditos aprobados."
-            );
-        }
+        // ── COMENTADO TEMPORALMENTE PARA PRUEBAS ──────────────────
+        //        if (creditosAprobados < creditosRequeridos) {
+        //    throw new IllegalStateException(
+        //        "No cumple los requisitos académicos: tiene " + creditosAprobados
+        //        + "/" + creditosRequeridos + " créditos aprobados."
+        //    );
+        //}
+        // ──────────────────────────────────────────────────────────
 
         // 2. Validar calendario académico
         LocalDate hoy = LocalDate.now();
@@ -70,7 +72,8 @@ public class SolicitudService {
         Solicitud solicitud = new Solicitud();
         solicitud.setCedula(estudiante.getCedula());
         solicitud.setTipo("TERMINACION_MATERIAS");
-        solicitud.setEstado("PENDIENTE_PAGO");
+        solicitud.setEstado("EN_REVISION");
+        //solicitud.setEstado("PENDIENTE_PAGO");
         solicitud.setFechaSolicitud(hoy);
         solicitud.setCosto(COSTO_TERMINACION);
         solicitud.setObservaciones("Solicitud registrada por el sistema.");
@@ -126,6 +129,10 @@ public class SolicitudService {
             map.put("estado",         s.getEstado());
             map.put("fechaSolicitud", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : null);
             map.put("observaciones",  s.getObservaciones());
+            map.put("decision",              s.getDecision());
+            map.put("observacionesDirector", s.getObservacionesDirector());
+            map.put("fechaDecision",         s.getFechaDecision() != null ? s.getFechaDecision().toString() : null);
+            map.put("cedulaDirector",        s.getCedulaDirector());
 
             Usuario est = porCedula.get(s.getCedula());
             if (est != null) {
@@ -254,5 +261,30 @@ public class SolicitudService {
             }
             return map;
         }).collect(Collectors.toList());
+    }
+
+    /** Simula el pago de un trámite — SOLO PARA PRUEBAS */
+    public Map<String, Object> simularPago(Long id) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"PENDIENTE_PAGO".equals(s.getEstado())) {
+            throw new IllegalStateException("La solicitud no está en estado PENDIENTE_PAGO");
+        }
+        s.setEstado("EN_REVISION");
+        solicitudRepository.save(s);
+        return construirRespuestaSolicitud(s);
+    }
+
+    /** Resetea una solicitud a EN_REVISION — SOLO PARA PRUEBAS */
+    public Map<String, Object> resetearParaPruebas(Long id) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        s.setEstado("EN_REVISION");
+        s.setDecision(null);
+        s.setObservacionesDirector(null);
+        s.setFechaDecision(null);
+        s.setCedulaDirector(null);
+        solicitudRepository.save(s);
+        return construirRespuestaSolicitud(s);
     }
 }
