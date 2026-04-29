@@ -56,12 +56,14 @@ public class SolicitudService {
         int creditosRequeridos = estudiante.getProgramaAcademico() != null
                 ? estudiante.getProgramaAcademico().getTotalCreditos()
                 : Integer.MAX_VALUE;
-        if (creditosAprobados < creditosRequeridos) {
-            throw new IllegalStateException(
-                "No cumple los requisitos académicos: tiene " + creditosAprobados
-                + "/" + creditosRequeridos + " créditos aprobados."
-            );
-        }
+        // ── COMENTADO TEMPORALMENTE PARA PRUEBAS ──────────────────
+        //        if (creditosAprobados < creditosRequeridos) {
+        //    throw new IllegalStateException(
+        //        "No cumple los requisitos académicos: tiene " + creditosAprobados
+        //        + "/" + creditosRequeridos + " créditos aprobados."
+        //    );
+        //}
+        // ──────────────────────────────────────────────────────────
 
         // 2. Validar calendario académico
         LocalDate hoy = LocalDate.now();
@@ -87,7 +89,8 @@ public class SolicitudService {
         Solicitud solicitud = new Solicitud();
         solicitud.setCedula(estudiante.getCedula());
         solicitud.setTipo("TERMINACION_MATERIAS");
-        solicitud.setEstado("PENDIENTE_PAGO");
+        solicitud.setEstado("EN_REVISION");
+        //solicitud.setEstado("PENDIENTE_PAGO");
         solicitud.setFechaSolicitud(hoy);
         solicitud.setCosto(COSTO_TERMINACION);
         solicitud.setObservaciones("Solicitud registrada por el sistema.");

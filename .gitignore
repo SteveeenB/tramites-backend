@@ -34,3 +34,4 @@ build/
 
 ### Configuración local con credenciales — no subir al repo ###
 src/main/resources/application-local.properties
+application-local.properties

@@ -101,6 +101,19 @@ public class SolicitudController {
         }
         return ResponseEntity.ok(solicitudService.obtenerBandejaDirector(director));
     }
+        /**
+     * GET /api/solicitudes/director/en-revision?cedula=...
+     * Lista solo las solicitudes EN_REVISION del programa del director.
+     */
+    @GetMapping("/director/en-revision")
+    public ResponseEntity<?> obtenerSolicitudesEnRevision(@RequestParam String cedula) {
+        Usuario director = usuarioService.obtenerUsuarioPorCedula(cedula);
+        if (director == null)
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Director no encontrado"));
+        if (!"DIRECTOR".equals(director.getRol()))
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores"));
+        return ResponseEntity.ok(solicitudService.obtenerSolicitudesEnRevisionPorDirector(director));
+    }
 
     /** POST /api/solicitudes/{id}/aprobar?cedula=... */
     @PostMapping("/{id}/aprobar")
