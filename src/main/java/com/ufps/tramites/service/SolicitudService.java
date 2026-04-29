@@ -14,8 +14,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import com.ufps.tramites.model.Solicitud;
+import com.ufps.tramites.model.Usuario;
+import com.ufps.tramites.repository.SolicitudRepository;
+import com.ufps.tramites.repository.UsuarioRepository;
 
 @Service
 public class SolicitudService {
