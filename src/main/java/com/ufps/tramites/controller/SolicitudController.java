@@ -1,14 +1,12 @@
 package com.ufps.tramites.controller;
 
-import com.ufps.tramites.model.Usuario;
-import com.ufps.tramites.service.SolicitudService;
-import com.ufps.tramites.service.UsuarioService;
 import java.util.LinkedHashMap;
 import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,12 +14,22 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.ufps.tramites.model.Usuario;
+import com.ufps.tramites.service.SolicitudService;
+import com.ufps.tramites.service.UsuarioService;
+import com.ufps.tramites.service.ValidacionGradoService;
+
+
 @RestController
+
 @RequestMapping("/api/solicitudes")
 public class SolicitudController {
 
     @Autowired
     private SolicitudService solicitudService;
+
+    @Autowired
+    private ValidacionGradoService validacionGradoService;
 
     @Autowired
     private UsuarioService usuarioService;
@@ -150,4 +158,46 @@ public class SolicitudController {
         map.put("error", mensaje);
         return map;
     }
+
+   @GetMapping("/posgrados/pendientes")
+public ResponseEntity<?> obtenerPendientesValidacion(@RequestParam String cedula) {
+    Usuario admin = usuarioService.obtenerUsuarioPorCedula(cedula);
+    if (admin == null) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(error("Usuario no encontrado"));
+    }
+    if (!"ADMIN".equals(admin.getRol())) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(error("Acceso restringido al administrador"));
+    }
+    return ResponseEntity.ok(validacionGradoService.obtenerSolicitudesPendientesValidacion());
+}
+
+@PostMapping("/{id}/validar-grado")
+public ResponseEntity<?> validarSolicitudGrado(
+        @PathVariable Long id,
+        @RequestParam String cedula,
+        @RequestParam String decision,
+        @RequestParam(required = false) String observaciones) {
+
+    Usuario admin = usuarioService.obtenerUsuarioPorCedula(cedula);
+    if (admin == null) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(error("Usuario no encontrado"));
+    }
+    if (!"ADMIN".equals(admin.getRol())) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(error("Acceso restringido al administrador"));
+    }
+    try {
+        return ResponseEntity.ok(
+            validacionGradoService.registrarValidacion(id, decision, observaciones, admin)
+        );
+    } catch (IllegalArgumentException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
+    } catch (IllegalStateException e) {
+        return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
+    }
+}
+
 }
