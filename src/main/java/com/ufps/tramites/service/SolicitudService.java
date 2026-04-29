@@ -182,6 +182,10 @@ public class SolicitudService {
             map.put("estado",         s.getEstado());
             map.put("fechaSolicitud", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : null);
             map.put("observaciones",  s.getObservaciones());
+            map.put("decision",              s.getDecision());
+            map.put("observacionesDirector", s.getObservacionesDirector());
+            map.put("fechaDecision",         s.getFechaDecision() != null ? s.getFechaDecision().toString() : null);
+            map.put("cedulaDirector",        s.getCedulaDirector());
 
             Usuario est = porCedula.get(s.getCedula());
             if (est != null) {
@@ -196,24 +200,26 @@ public class SolicitudService {
         }).collect(Collectors.toList());
     }
 
-    /** Aprueba una solicitud de terminación de materias pendiente. */
-    public Map<String, Object> aprobarSolicitud(Long id) {
+    // En SolicitudService.java — aprobarSolicitud()
+    public Map<String, Object> aprobarSolicitud(Long id, String cedulaDirector) {  // ← agrega parámetro
         Solicitud s = solicitudRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
-        if (!"PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())) {
+        if (!  "PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())) {
             throw new IllegalStateException("Solo se pueden aprobar solicitudes en estado pendiente");
         }
         String estadoAnterior = s.getEstado();
         s.setEstado("APROBADA");
+        s.setDecision("APROBADA");                          // ← nuevo
+        s.setFechaDecision(java.time.LocalDateTime.now());  // ← nuevo
+        s.setCedulaDirector(cedulaDirector);                // ← nuevo
         s.setObservaciones("Aprobada por el director de programa.");
         solicitudRepository.save(s);
-
         notificarEstudiante(s, estadoAnterior);
         return construirRespuestaSolicitud(s);
     }
 
-    /** Rechaza una solicitud de terminación de materias pendiente. */
-    public Map<String, Object> rechazarSolicitud(Long id, String motivo) {
+    // En SolicitudService.java — rechazarSolicitud()
+    public Map<String, Object> rechazarSolicitud(Long id, String motivo, String cedulaDirector) {  // ← agrega parámetro
         Solicitud s = solicitudRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
         if (!"PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())) {
@@ -224,9 +230,12 @@ public class SolicitudService {
         }
         String estadoAnterior = s.getEstado();
         s.setEstado("RECHAZADA");
+        s.setDecision("RECHAZADA");                         // ← nuevo
+        s.setFechaDecision(java.time.LocalDateTime.now());  // ← nuevo
+        s.setCedulaDirector(cedulaDirector);                // ← nuevo
+        s.setObservacionesDirector(motivo);                 // ← nuevo (guarda en el campo del director)
         s.setObservaciones(motivo);
         solicitudRepository.save(s);
-
         notificarEstudiante(s, estadoAnterior);
         return construirRespuestaSolicitud(s);
     }
@@ -255,6 +264,12 @@ public class SolicitudService {
         map.put("fechaSolicitud", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : null);
         map.put("costo", s.getCosto());
         map.put("observaciones", s.getObservaciones());
+        // ── Campos TP-41 ──────────────────────────────────────────────────────
+        map.put("decision", s.getDecision());
+        map.put("observacionesDirector", s.getObservacionesDirector());
+        map.put("fechaDecision", s.getFechaDecision() != null ? s.getFechaDecision().toString() : null);
+        map.put("cedulaDirector", s.getCedulaDirector());
+        // ─────────────────────────────────────────────────────────────────────
         map.put("liquidacion", construirLiquidacion(s));
         map.put("certificadoDisponible",
                 "APROBADA".equals(s.getEstado()) && "TERMINACION_MATERIAS".equals(s.getTipo()));

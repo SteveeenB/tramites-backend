@@ -109,7 +109,7 @@ public class SolicitudController {
         if (director == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Director no encontrado"));
         if (!"DIRECTOR".equals(director.getRol())) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores"));
         try {
-            return ResponseEntity.ok(solicitudService.aprobarSolicitud(id));
+            return ResponseEntity.ok(solicitudService.aprobarSolicitud(id, director.getCedula())); // ← agrega cedula
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
         } catch (IllegalStateException e) {
@@ -125,7 +125,7 @@ public class SolicitudController {
         if (director == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Director no encontrado"));
         if (!"DIRECTOR".equals(director.getRol())) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores"));
         try {
-            return ResponseEntity.ok(solicitudService.rechazarSolicitud(id, motivo));
+            return ResponseEntity.ok(solicitudService.rechazarSolicitud(id, motivo, director.getCedula())); // ← agrega cedula
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
         } catch (IllegalStateException e) {

@@ -43,7 +43,10 @@ INSERT INTO usuario (cedula, codigo, nombre, contrasena, rol, creditos_aprobados
 ('1098765433', '20261002', 'Maria Director', '123456', 'DIRECTOR',   NULL,
     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas')),
 ('1098765434', '20261003', 'Admin User',     '123456', 'ADMIN',      30,
-    (SELECT id FROM programa_academico WHERE nombre = 'Especialización en Estructuras'))
+    (SELECT id FROM programa_academico WHERE nombre = 'Especialización en Estructuras')),
+-- Ana Torres: 77/77 créditos, programa TIC, sin solicitud
+('1098765440', '20261010', 'Ana Torres', '123456', 'ESTUDIANTE', 77,
+    (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Tecnologías de la Información y la Comunicación aplicadas a la Educación'))
 ON CONFLICT (cedula) DO NOTHING;
 
 INSERT INTO solicitud (cedula, tipo, estado, fecha_solicitud, costo, observaciones) VALUES
