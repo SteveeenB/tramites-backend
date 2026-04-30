@@ -4,175 +4,211 @@ import com.ufps.tramites.model.Convocatoria;
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.repository.SolicitudRepository;
+import com.ufps.tramites.repository.UsuarioRepository;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
 public class TramiteService {
 
-    @Autowired
-    private ConvocatoriaService convocatoriaService;
+    @Autowired private ConvocatoriaService  convocatoriaService;
+    @Autowired private SolicitudRepository  solicitudRepository;
+    @Autowired private UsuarioRepository    usuarioRepository;
 
-    @Autowired
-    private SolicitudRepository solicitudRepository;
+    // ── Vista del módulo por rol ──────────────────────────────────────────────
 
     public Map<String, Object> construirModuloPorRol(Usuario usuario) {
-        String rol = usuario.getRol();
-
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("modulo", "TRAMITES");
-        response.put("usuario", construirUsuario(usuario));
-        response.put("sidebar", construirSidebar(rol));
-        response.put("acciones", construirAcciones(rol));
-
-        return response;
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("modulo",   "TRAMITES");
+        resp.put("usuario",  construirUsuario(usuario));
+        resp.put("sidebar",  construirSidebar(usuario.getRol()));
+        resp.put("acciones", construirAcciones(usuario.getRol()));
+        return resp;
     }
+
+    // ── Proceso de grado (vista estudiante) ──────────────────────────────────
 
     public Map<String, Object> construirProcesoDeGrado(Usuario usuario) {
-        int creditosAprobados = usuario.getCreditosAprobados() != null ? usuario.getCreditosAprobados() : 0;
-        int creditosRequeridos = usuario.getProgramaAcademico() != null
+        int aprobados  = usuario.getCreditosAprobados() != null ? usuario.getCreditosAprobados() : 0;
+        int requeridos = usuario.getProgramaAcademico() != null
                 ? usuario.getProgramaAcademico().getTotalCreditos() : Integer.MAX_VALUE;
 
-        boolean enConvocatoria = convocatoriaService.estaVigente();
+        boolean enConvocatoria   = convocatoriaService.estaVigente();
+        boolean etapa1Habilitada = aprobados >= requeridos && enConvocatoria;
 
-        // Etapa 1 se habilita si el estudiante tiene los créditos suficientes
-        // Y la convocatoria académica está vigente
-        boolean etapa1Habilitada = creditosAprobados >= creditosRequeridos && enConvocatoria;
+        Optional<Solicitud> solTerminacion = solicitudRepository
+            .findFirstByCedulaAndTipo(usuario.getCedula(), "TERMINACION_MATERIAS");
+        boolean terminacionAprobada = solTerminacion.isPresent()
+            && "APROBADA".equals(solTerminacion.get().getEstado());
 
-        Optional<Solicitud> solicitudTerminacion = solicitudRepository
-                .findFirstByCedulaAndTipo(usuario.getCedula(), "TERMINACION_MATERIAS");
+        Optional<Solicitud> solGrado = solicitudRepository
+            .findFirstByCedulaAndTipo(usuario.getCedula(), "GRADO");
+        boolean gradoAprobado = solGrado.isPresent()
+            && "APROBADA".equals(solGrado.get().getEstado());
 
-        boolean terminacionAprobada = solicitudTerminacion.isPresent()
-                && "APROBADA".equals(solicitudTerminacion.get().getEstado());
-        boolean etapa2Disponible    = terminacionAprobada;
-        boolean certificadoDisponible = terminacionAprobada;
-
-        Optional<Solicitud> solicitudGrado = solicitudRepository
-                .findFirstByCedulaAndTipo(usuario.getCedula(), "GRADO");
-
-        Map<String, Object> response = new LinkedHashMap<>();
-
-        response.put("creditos", construirCreditos(usuario));
-        response.put("estadoAcademico", "Regular");
-        response.put("convocatoria", construirConvocatoria());
-        response.put("etapa1Completada", etapa1Habilitada);
-        response.put("etapa2Disponible", etapa2Disponible);
-        response.put("certificadoDisponible", certificadoDisponible);
-        response.put("solicitudGrado", solicitudGrado.map(this::construirResumenSolicitudGrado).orElse(null));
-
-        return response;
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("creditos",              construirCreditos(usuario));
+        resp.put("estadoAcademico",       "Regular");
+        resp.put("convocatoria",          construirConvocatoria());
+        resp.put("etapa1Habilitada",      etapa1Habilitada);
+        resp.put("etapa2Disponible",      terminacionAprobada);
+        resp.put("etapa3PazYSalvo",       gradoAprobado);    // muestra sección paz y salvo
+        resp.put("certificadoDisponible", terminacionAprobada);
+        resp.put("solicitudGrado",
+            solGrado.map(this::construirResumenSolicitud).orElse(null));
+        return resp;
     }
 
-    private Map<String, Object> construirUsuario(Usuario usuario) {
-        Map<String, Object> usuarioMap = new LinkedHashMap<>();
-        usuarioMap.put("cedula", usuario.getCedula());
-        usuarioMap.put("nombre", usuario.getNombre());
-        usuarioMap.put("codigo", usuario.getCodigo());
-        usuarioMap.put("rol", usuario.getRol());
-        usuarioMap.put("creditosAprobados", usuario.getCreditosAprobados());
-        usuarioMap.put("programaAcademico", usuario.getProgramaAcademico() != null
-                ? usuario.getProgramaAcademico().getNombre() : null);
-        return usuarioMap;
+    // ── Vista del director: lista de estudiantes con su estado ───────────────
+
+    /**
+     * Devuelve la lista de todos los estudiantes del programa del director,
+     * con su estado actual en el proceso de grado:
+     *   EN_TERMINACION | EN_GRADO | APROBADO_GRADUACION
+     */
+    public List<Map<String, Object>> construirListaEstudiantesDirector(Usuario director) {
+        Long programaId = director.getProgramaAcademico() != null
+                ? director.getProgramaAcademico().getId() : null;
+        if (programaId == null) return List.of();
+
+        List<Usuario> estudiantes = usuarioRepository
+            .findByProgramaAcademicoIdAndRol(programaId, "ESTUDIANTE");
+
+        return estudiantes.stream().map(est -> {
+            Optional<Solicitud> solTerm = solicitudRepository
+                .findFirstByCedulaAndTipo(est.getCedula(), "TERMINACION_MATERIAS");
+            Optional<Solicitud> solGrado = solicitudRepository
+                .findFirstByCedulaAndTipo(est.getCedula(), "GRADO");
+
+            boolean termAprobada  = solTerm.isPresent()  && "APROBADA".equals(solTerm.get().getEstado());
+            boolean gradoAprobado = solGrado.isPresent() && "APROBADA".equals(solGrado.get().getEstado());
+
+            String etapa;
+            String etapaLabel;
+            if (gradoAprobado) {
+                etapa = "APROBADO_GRADUACION";
+                etapaLabel = "Aprobado para graduación";
+            } else if (termAprobada) {
+                etapa = "EN_GRADO";
+                etapaLabel = "En proceso de grado";
+            } else if (solTerm.isPresent()) {
+                etapa = "EN_TERMINACION";
+                etapaLabel = "En proceso de terminación de materias";
+            } else {
+                etapa = "SIN_SOLICITUD";
+                etapaLabel = "Sin solicitud activa";
+            }
+
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("cedula",   est.getCedula());
+            m.put("nombre",   est.getNombre());
+            m.put("codigo",   est.getCodigo() != null ? est.getCodigo() : "—");
+            m.put("programa", est.getProgramaAcademico() != null
+                ? est.getProgramaAcademico().getNombre() : "—");
+            m.put("etapa",       etapa);
+            m.put("etapaLabel",  etapaLabel);
+            m.put("creditosAprobados", est.getCreditosAprobados());
+
+            // Estado detallado de solicitudes
+            m.put("terminacion", solTerm.map(s -> Map.of(
+                "estado",         s.getEstado(),
+                "fechaSolicitud", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : "—"
+            )).orElse(null));
+
+            m.put("grado", solGrado.map(s -> Map.of(
+                "estado",         s.getEstado(),
+                "fechaSolicitud", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : "—"
+            )).orElse(null));
+
+            return m;
+        }).collect(Collectors.toList());
     }
 
-    private Map<String, Object> construirCreditos(Usuario usuario) {
-        Map<String, Object> creditos = new LinkedHashMap<>();
-        int aprobados = usuario.getCreditosAprobados() != null ? usuario.getCreditosAprobados() : 0;
-        int requeridos = usuario.getProgramaAcademico() != null
-                ? usuario.getProgramaAcademico().getTotalCreditos() : 0;
-        creditos.put("aprobados", aprobados);
-        creditos.put("requeridos", requeridos);
-        return creditos;
+    // ── Helpers privados ──────────────────────────────────────────────────────
+
+    private Map<String, Object> construirUsuario(Usuario u) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("cedula",            u.getCedula());
+        m.put("nombre",            u.getNombre());
+        m.put("codigo",            u.getCodigo());
+        m.put("rol",               u.getRol());
+        m.put("creditosAprobados", u.getCreditosAprobados());
+        m.put("programaAcademico", u.getProgramaAcademico() != null
+            ? u.getProgramaAcademico().getNombre() : null);
+        return m;
+    }
+
+    private Map<String, Object> construirCreditos(Usuario u) {
+        int aprobados  = u.getCreditosAprobados() != null ? u.getCreditosAprobados() : 0;
+        int requeridos = u.getProgramaAcademico() != null
+            ? u.getProgramaAcademico().getTotalCreditos() : 0;
+        return Map.of("aprobados", aprobados, "requeridos", requeridos);
     }
 
     private Map<String, Object> construirConvocatoria() {
         Convocatoria c = convocatoriaService.getActiva();
-        Map<String, Object> conv = new LinkedHashMap<>();
-        conv.put("fechaInicio", c.getFechaInicio().toString());
-        conv.put("fechaFin", c.getFechaFin().toString());
-        return conv;
+        return Map.of("fechaInicio", c.getFechaInicio().toString(), "fechaFin", c.getFechaFin().toString());
+    }
+
+    private Map<String, Object> construirResumenSolicitud(Solicitud s) {
+        Map<String, Object> liq = Map.of(
+            "concepto",      "Derechos de Grado",
+            "valor",         s.getCosto(),
+            "instrucciones", "Realiza el pago en Tesorería o por PSE.",
+            "fechaLimite",   s.getFechaSolicitud() != null
+                ? s.getFechaSolicitud().plusDays(5).toString() : "—"
+        );
+        return Map.of(
+            "id",             s.getId(),
+            "tipo",           s.getTipo(),
+            "estado",         s.getEstado(),
+            "fechaSolicitud", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : null,
+            "costo",          s.getCosto(),
+            "observaciones",  s.getObservaciones() != null ? s.getObservaciones() : "",
+            "liquidacion",    liq
+        );
     }
 
     private List<Map<String, Object>> construirSidebar(String rol) {
         List<Map<String, Object>> menu = new ArrayList<>();
-
         menu.add(item("inicio", "Resumen", "/tramites"));
-
         switch (rol) {
             case "ESTUDIANTE":
-                menu.add(item("nueva", "Nueva solicitud", "/tramites/nueva"));
-                menu.add(item("mis", "Mis solicitudes", "/tramites/mis-solicitudes"));
+                menu.add(item("proceso", "Proceso de Grado", "/proceso-de-grado"));
+                menu.add(item("certs",   "Certificados",     "/certificados"));
                 break;
             case "DIRECTOR":
-                menu.add(item("bandeja", "Bandeja de aprobacion", "/tramites/aprobaciones"));
-                menu.add(item("historial", "Historial de decisiones", "/tramites/historial"));
+                menu.add(item("estudiantes", "Estado de Estudiantes", "/tramites/director/estudiantes"));
+                menu.add(item("paz-salvo",   "Mis Paz y Salvos",      "/tramites/director/paz-y-salvo"));
                 break;
             case "ADMIN":
-                menu.add(item("panel", "Panel general", "/tramites/panel"));
-                menu.add(item("config", "Configuracion", "/tramites/configuracion"));
-                menu.add(item("usuarios", "Gestion de usuarios", "/tramites/usuarios"));
+                menu.add(item("panel",  "Panel general",   "/tramites"));
+                menu.add(item("config", "Configuración",   "/tramites/admin/configuracion"));
                 break;
-            default:
-                menu.add(item("consulta", "Consulta", "/tramites/consulta"));
-                break;
+            default: break;
         }
-
         return menu;
     }
 
     private List<Map<String, Object>> construirAcciones(String rol) {
-        List<Map<String, Object>> acciones = new ArrayList<>();
-
-        boolean puedeCrear = "ESTUDIANTE".equals(rol) || "ADMIN".equals(rol);
-        boolean puedeAprobar = "DIRECTOR".equals(rol) || "ADMIN".equals(rol);
-        boolean puedeRechazar = "DIRECTOR".equals(rol) || "ADMIN".equals(rol);
-        boolean puedeGestionar = "ADMIN".equals(rol);
-
-        acciones.add(accion("CREAR_SOLICITUD", "Crear solicitud", puedeCrear));
-        acciones.add(accion("APROBAR_SOLICITUD", "Aprobar", puedeAprobar));
-        acciones.add(accion("RECHAZAR_SOLICITUD", "Rechazar", puedeRechazar));
-        acciones.add(accion("GESTION_TOTAL", "Gestion total", puedeGestionar));
-
-        return acciones;
-    }
-
-    private Map<String, Object> construirResumenSolicitudGrado(Solicitud s) {
-        Map<String, Object> liq = new LinkedHashMap<>();
-        liq.put("concepto", "Derechos de Grado");
-        liq.put("valor", s.getCosto());
-        liq.put("fechaLimite", s.getFechaSolicitud() != null
-                ? s.getFechaSolicitud().plusDays(5).toString() : null);
-        liq.put("instrucciones", "Realiza el pago en la ventanilla de Tesorería o por PSE antes de la fecha límite.");
-
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("id", s.getId());
-        map.put("tipo", s.getTipo());
-        map.put("estado", s.getEstado());
-        map.put("fechaSolicitud", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : null);
-        map.put("costo", s.getCosto());
-        map.put("observaciones", s.getObservaciones());
-        map.put("liquidacion", liq);
-        return map;
+        List<Map<String, Object>> acc = new ArrayList<>();
+        acc.add(accion("CREAR_SOLICITUD",   "Crear solicitud",  "ESTUDIANTE".equals(rol)));
+        acc.add(accion("APROBAR_SOLICITUD", "Aprobar",          "DIRECTOR".equals(rol) || "ADMIN".equals(rol)));
+        acc.add(accion("RECHAZAR_SOLICITUD","Rechazar",         "DIRECTOR".equals(rol) || "ADMIN".equals(rol)));
+        return acc;
     }
 
     private Map<String, Object> item(String id, String label, String ruta) {
-        Map<String, Object> menuItem = new LinkedHashMap<>();
-        menuItem.put("id", id);
-        menuItem.put("label", label);
-        menuItem.put("ruta", ruta);
-        return menuItem;
+        return Map.of("id", id, "label", label, "ruta", ruta);
     }
 
     private Map<String, Object> accion(String codigo, String label, boolean habilitada) {
-        Map<String, Object> accion = new LinkedHashMap<>();
-        accion.put("codigo", codigo);
-        accion.put("label", label);
-        accion.put("habilitada", habilitada);
-        return accion;
+        return Map.of("codigo", codigo, "label", label, "habilitada", habilitada);
     }
 }
