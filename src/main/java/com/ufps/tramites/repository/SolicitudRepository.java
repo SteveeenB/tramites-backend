@@ -21,4 +21,6 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
     // Spring Data genera el SQL automáticamente desde el nombre del método.
     // Equivale a: SELECT * FROM solicitud WHERE estado = 'EN_REVISION'
     List<Solicitud> findByEstado(String estado);
+    // ── HU-09 ─────────────────────────────────────────────────────────────
+    List<Solicitud> findByTipoAndEstado(String tipo, String estado);
 }
