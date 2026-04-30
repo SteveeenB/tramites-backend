@@ -81,4 +81,24 @@ public class Solicitud {
     public void setFechaEnRevision(LocalDateTime fechaEnRevision) {
     this.fechaEnRevision = fechaEnRevision;
 }
+
+// ── HU-09 ─────────────────────────────────────────────────────────────
+private String validacionPosgrados;     // APROBADA | RECHAZADA
+private String observacionesPosgrados;  // motivo de la decisión
+private LocalDateTime fechaValidacion;  // cuándo validó
+private String cedulaPosgrados;         // quién validó
+
+// Getters y setters
+public String getValidacionPosgrados() { return validacionPosgrados; }
+public void setValidacionPosgrados(String v) { this.validacionPosgrados = v; }
+
+public String getObservacionesPosgrados() { return observacionesPosgrados; }
+public void setObservacionesPosgrados(String o) { this.observacionesPosgrados = o; }
+
+public LocalDateTime getFechaValidacion() { return fechaValidacion; }
+public void setFechaValidacion(LocalDateTime f) { this.fechaValidacion = f; }
+
+public String getCedulaPosgrados() { return cedulaPosgrados; }
+public void setCedulaPosgrados(String c) { this.cedulaPosgrados = c; }
+
 }

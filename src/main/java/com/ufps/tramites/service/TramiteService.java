@@ -1,9 +1,9 @@
 package com.ufps.tramites.service;
 
+import com.ufps.tramites.model.Convocatoria;
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.repository.SolicitudRepository;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -14,6 +14,9 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class TramiteService {
+
+    @Autowired
+    private ConvocatoriaService convocatoriaService;
 
     @Autowired
     private SolicitudRepository solicitudRepository;
@@ -35,9 +38,7 @@ public class TramiteService {
         int creditosRequeridos = usuario.getProgramaAcademico() != null
                 ? usuario.getProgramaAcademico().getTotalCreditos() : Integer.MAX_VALUE;
 
-        LocalDate hoy = LocalDate.now();
-        boolean enConvocatoria = !hoy.isBefore(SolicitudService.CONVOCATORIA_INICIO)
-                && !hoy.isAfter(SolicitudService.CONVOCATORIA_FIN);
+        boolean enConvocatoria = convocatoriaService.estaVigente();
 
         // Etapa 1 se habilita si el estudiante tiene los créditos suficientes
         // Y la convocatoria académica está vigente
@@ -51,6 +52,9 @@ public class TramiteService {
         boolean etapa2Disponible    = terminacionAprobada;
         boolean certificadoDisponible = terminacionAprobada;
 
+        Optional<Solicitud> solicitudGrado = solicitudRepository
+                .findFirstByCedulaAndTipo(usuario.getCedula(), "GRADO");
+
         Map<String, Object> response = new LinkedHashMap<>();
 
         response.put("creditos", construirCreditos(usuario));
@@ -59,6 +63,7 @@ public class TramiteService {
         response.put("etapa1Completada", etapa1Habilitada);
         response.put("etapa2Disponible", etapa2Disponible);
         response.put("certificadoDisponible", certificadoDisponible);
+        response.put("solicitudGrado", solicitudGrado.map(this::construirResumenSolicitudGrado).orElse(null));
 
         return response;
     }
@@ -86,10 +91,11 @@ public class TramiteService {
     }
 
     private Map<String, Object> construirConvocatoria() {
-        Map<String, Object> convocatoria = new LinkedHashMap<>();
-        convocatoria.put("fechaInicio", "2026-04-07");
-        convocatoria.put("fechaFin", "2026-04-25");
-        return convocatoria;
+        Convocatoria c = convocatoriaService.getActiva();
+        Map<String, Object> conv = new LinkedHashMap<>();
+        conv.put("fechaInicio", c.getFechaInicio().toString());
+        conv.put("fechaFin", c.getFechaFin().toString());
+        return conv;
     }
 
     private List<Map<String, Object>> construirSidebar(String rol) {
@@ -133,6 +139,25 @@ public class TramiteService {
         acciones.add(accion("GESTION_TOTAL", "Gestion total", puedeGestionar));
 
         return acciones;
+    }
+
+    private Map<String, Object> construirResumenSolicitudGrado(Solicitud s) {
+        Map<String, Object> liq = new LinkedHashMap<>();
+        liq.put("concepto", "Derechos de Grado");
+        liq.put("valor", s.getCosto());
+        liq.put("fechaLimite", s.getFechaSolicitud() != null
+                ? s.getFechaSolicitud().plusDays(5).toString() : null);
+        liq.put("instrucciones", "Realiza el pago en la ventanilla de Tesorería o por PSE antes de la fecha límite.");
+
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("id", s.getId());
+        map.put("tipo", s.getTipo());
+        map.put("estado", s.getEstado());
+        map.put("fechaSolicitud", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : null);
+        map.put("costo", s.getCosto());
+        map.put("observaciones", s.getObservaciones());
+        map.put("liquidacion", liq);
+        return map;
     }
 
     private Map<String, Object> item(String id, String label, String ruta) {
