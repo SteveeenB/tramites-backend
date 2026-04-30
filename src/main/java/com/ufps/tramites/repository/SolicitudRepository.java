@@ -17,8 +17,8 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
 
     List<Solicitud> findByCedulaInAndTipo(List<String> cedulas, String tipo);
 
-    // ── Nuevo para TP-44 ──────────────────────────────────────────────────
-    // Spring Data genera el SQL automáticamente desde el nombre del método.
-    // Equivale a: SELECT * FROM solicitud WHERE estado = 'EN_REVISION'
+    /** Solicitudes de varios estudiantes filtrando por varios tipos a la vez. */
+    List<Solicitud> findByCedulaInAndTipoIn(List<String> cedulas, List<String> tipos);
+
     List<Solicitud> findByEstado(String estado);
 }

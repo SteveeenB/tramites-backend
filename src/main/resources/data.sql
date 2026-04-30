@@ -1,7 +1,6 @@
 -- ============================================================
 -- data.sql  –  datos iniciales para PostgreSQL (Supabase)
 -- Se usa ON CONFLICT DO NOTHING para evitar duplicados
--- cada vez que reinicia la aplicación (ddl-auto=update)
 -- ============================================================
 
 INSERT INTO programa_academico (nombre, tipo, total_creditos) VALUES
@@ -39,6 +38,12 @@ INSERT INTO usuario (cedula, codigo, nombre, contrasena, rol, creditos_aprobados
 -- Estudiante demo: solicitud rechazada
 ('1098765437', '20261007', 'Carlos Rueda',   '123456', 'ESTUDIANTE', 56,
     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas')),
+-- Estudiante demo con GRADO aprobado → puede solicitar Aval Paz y Salvo
+('1098765438', '20261008', 'Ana Torres',     '123456', 'ESTUDIANTE', 56,
+    (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas')),
+-- Estudiante demo con Aval ya aprobado (para probar descarga de documento)
+('1098765439', '20261009', 'Luis Mora',      '123456', 'ESTUDIANTE', 56,
+    (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas')),
 -- Director del mismo programa para que la bandeja tenga datos
 ('1098765433', '20261002', 'Maria Director', '123456', 'DIRECTOR',   NULL,
     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas')),
@@ -52,5 +57,12 @@ INSERT INTO solicitud (cedula, tipo, estado, fecha_solicitud, costo, observacion
 -- Pedro: pendiente de pago → aparece en bandeja como pendiente
 ('1098765436', 'TERMINACION_MATERIAS', 'PENDIENTE_PAGO', '2026-04-12', 150000, 'En espera de pago.'),
 -- Carlos: rechazada → aparece en bandeja como rechazada
-('1098765437', 'TERMINACION_MATERIAS', 'RECHAZADA',      '2026-04-08', 150000, 'No cumple requisitos adicionales del programa.')
+('1098765437', 'TERMINACION_MATERIAS', 'RECHAZADA',      '2026-04-08', 150000, 'No cumple requisitos adicionales del programa.'),
+-- Ana: proceso completo hasta GRADO aprobado → puede solicitar Aval Paz y Salvo
+('1098765438', 'TERMINACION_MATERIAS', 'APROBADA',       '2026-03-15', 150000, 'Aprobada por el director.'),
+('1098765438', 'GRADO',               'APROBADA',        '2026-03-20', 250000, 'Derechos de grado aprobados.'),
+-- Luis: tiene Aval Paz y Salvo ya aprobado (flujo completo demo)
+('1098765439', 'TERMINACION_MATERIAS', 'APROBADA',       '2026-03-01', 150000, 'Aprobada por el director.'),
+('1098765439', 'GRADO',               'APROBADA',        '2026-03-05', 250000, 'Derechos de grado aprobados.'),
+('1098765439', 'AVAL_PAZ_SALVO',      'AVAL_APROBADO',   '2026-03-10', 0,      'Aval Paz y Salvo aprobado por el Director de Programa.')
 ON CONFLICT DO NOTHING;
