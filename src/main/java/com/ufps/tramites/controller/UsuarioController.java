@@ -5,6 +5,7 @@ import com.ufps.tramites.dto.UsuarioResponseDTO;
 import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.service.UsuarioService;
 import jakarta.servlet.http.HttpSession;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -40,6 +41,21 @@ public class UsuarioController {
         return ResponseEntity.status(401).body("Credenciales inválidas");
     }
 */
+    @PostMapping("/login-demo")
+    public ResponseEntity<?> loginDemo(@RequestParam String cedula, HttpSession session) {
+        Usuario usuario = usuarioService.obtenerUsuarioPorCedula(cedula);
+        if (usuario == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Usuario no encontrado: " + cedula));
+        }
+        session.setAttribute("usuarioCedula", cedula);
+        return ResponseEntity.ok(new UsuarioResponseDTO(
+            usuario.getCedula(),
+            usuario.getNombre(),
+            usuario.getCodigo(),
+            usuario.getRol()
+        ));
+    }
+
     @GetMapping("/me")
     public ResponseEntity<?> obtenerUsuarioActual(HttpSession session) {
         String usuarioCedula = (String) session.getAttribute("usuarioCedula");

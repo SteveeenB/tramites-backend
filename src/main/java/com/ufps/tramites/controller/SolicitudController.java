@@ -1,5 +1,10 @@
 package com.ufps.tramites.controller;
 
+import com.ufps.tramites.model.Usuario;
+import com.ufps.tramites.service.DocumentoService;
+import com.ufps.tramites.service.SolicitudService;
+import com.ufps.tramites.service.UsuarioService;
+import java.io.IOException; 
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -13,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.service.SolicitudService;
@@ -33,6 +39,9 @@ public class SolicitudController {
 
     @Autowired
     private UsuarioService usuarioService;
+
+    @Autowired
+    private DocumentoService documentoService;
 
     /**
      * POST /api/solicitudes/terminacion-materias?cedula=...
@@ -130,6 +139,57 @@ public class SolicitudController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
+        }
+    }
+
+    /**
+     * POST /api/solicitudes/{id}/documentos
+     * Sube un archivo de soporte para la solicitud.
+     */
+    @PostMapping(value = "/{id}/documentos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> subirDocumento(
+            @PathVariable Long id,
+            @RequestParam MultipartFile archivo) {
+        try {
+            Map<String, Object> resultado = documentoService.guardarDocumento(id, archivo);
+            return ResponseEntity.status(HttpStatus.CREATED).body(resultado);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error(e.getMessage()));
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(error("Error al guardar el archivo: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * GET /api/solicitudes/{id}/documentos
+     * Lista los documentos subidos para una solicitud.
+     */
+    @GetMapping("/{id}/documentos")
+    public ResponseEntity<?> listarDocumentos(@PathVariable Long id) {
+        return ResponseEntity.ok(documentoService.listarDocumentos(id));
+    }
+
+    /**
+     * GET /api/solicitudes/{id}/acta
+     * Genera (o descarga) el acta de grado en PDF.
+     * Solo disponible cuando la solicitud es de tipo GRADO y está APROBADA.
+     * En la primera llamada actualiza al estudiante como GRADUADO y vincula el PDF al expediente.
+     */
+    @GetMapping("/{id}/acta")
+    public ResponseEntity<byte[]> descargarActa(@PathVariable Long id) {
+        try {
+            byte[] contenido = solicitudService.generarActa(id);
+            return ResponseEntity.ok()
+                    .header("Content-Disposition", "attachment; filename=\"acta-grado-" + id + ".pdf\"")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(contenido);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.valueOf(422)).build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 

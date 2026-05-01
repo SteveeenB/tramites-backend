@@ -17,6 +17,7 @@ public class Usuario {
 
     private Integer creditosAprobados;
     private String correo;
+    private String estadoGrado; // null | "GRADUADO"
 
     @ManyToOne
     @JoinColumn(name = "programa_id")
@@ -47,4 +48,7 @@ public class Usuario {
 
     public ProgramaAcademico getProgramaAcademico() { return programaAcademico; }
     public void setProgramaAcademico(ProgramaAcademico programaAcademico) { this.programaAcademico = programaAcademico; }
+
+    public String getEstadoGrado() { return estadoGrado; }
+    public void setEstadoGrado(String estadoGrado) { this.estadoGrado = estadoGrado; }
 }
