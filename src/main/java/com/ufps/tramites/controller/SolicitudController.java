@@ -20,78 +20,72 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/solicitudes")
 public class SolicitudController {
 
-    @Autowired
-    private SolicitudService solicitudService;
+    @Autowired private SolicitudService solicitudService;
+    @Autowired private UsuarioService usuarioService;
 
-    @Autowired
-    private UsuarioService usuarioService;
-
-    /**
-     * POST /api/solicitudes/terminacion-materias?cedula=...
-     * Crea una solicitud de terminación de materias para el estudiante.
-     */
+    /** POST /api/solicitudes/terminacion-materias?cedula=... */
     @PostMapping("/terminacion-materias")
-    public ResponseEntity<?> crearSolicitudTerminacion(
-            @RequestParam String cedula) {
-
+    public ResponseEntity<?> crearSolicitudTerminacion(@RequestParam String cedula) {
         Usuario estudiante = usuarioService.obtenerUsuarioPorCedula(cedula);
-        if (estudiante == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Estudiante no encontrado"));
-        }
-
+        if (estudiante == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Estudiante no encontrado"));
         try {
-            Map<String, Object> resultado = solicitudService.crearSolicitudTerminacion(estudiante);
-            return ResponseEntity.status(HttpStatus.CREATED).body(resultado);
+            return ResponseEntity.status(HttpStatus.CREATED).body(solicitudService.crearSolicitudTerminacion(estudiante));
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
+            return ResponseEntity.status(422).body(error(e.getMessage()));
         }
     }
 
-    /**
-     * POST /api/solicitudes/grado?cedula=...
-     * Crea una solicitud de grado académico para el estudiante.
-     */
+    /** POST /api/solicitudes/grado?cedula=... */
     @PostMapping("/grado")
     public ResponseEntity<?> crearSolicitudGrado(@RequestParam String cedula) {
         Usuario estudiante = usuarioService.obtenerUsuarioPorCedula(cedula);
-        if (estudiante == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Estudiante no encontrado"));
-        }
+        if (estudiante == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Estudiante no encontrado"));
         try {
-            Map<String, Object> resultado = solicitudService.crearSolicitudGrado(estudiante);
-            return ResponseEntity.status(HttpStatus.CREATED).body(resultado);
+            return ResponseEntity.status(HttpStatus.CREATED).body(solicitudService.crearSolicitudGrado(estudiante));
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
+            return ResponseEntity.status(422).body(error(e.getMessage()));
         }
     }
 
-    /**
-     * GET /api/solicitudes?cedula=...
-     * Retorna todas las solicitudes del estudiante.
-     */
+    /** GET /api/solicitudes?cedula=... */
     @GetMapping
     public ResponseEntity<?> obtenerSolicitudes(@RequestParam String cedula) {
         Usuario estudiante = usuarioService.obtenerUsuarioPorCedula(cedula);
-        if (estudiante == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Estudiante no encontrado"));
-        }
+        if (estudiante == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Estudiante no encontrado"));
         return ResponseEntity.ok(solicitudService.obtenerSolicitudesPorCedula(cedula));
     }
 
-    /**
-     * GET /api/solicitudes/bandeja?cedula=...
-     * Retorna la bandeja del director: solicitudes de su programa agrupadas por estado.
-     */
+    /** GET /api/solicitudes/bandeja?cedula=... — bandeja TERMINACION_MATERIAS del director */
     @GetMapping("/bandeja")
     public ResponseEntity<?> obtenerBandeja(@RequestParam String cedula) {
         Usuario director = usuarioService.obtenerUsuarioPorCedula(cedula);
-        if (director == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Director no encontrado"));
-        }
-        if (!"DIRECTOR".equals(director.getRol())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores de programa"));
-        }
+        if (director == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Director no encontrado"));
+        if (!"DIRECTOR".equals(director.getRol())) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores de programa"));
         return ResponseEntity.ok(solicitudService.obtenerBandejaDirector(director));
+    }
+
+    /** GET /api/solicitudes/bandeja-grado?cedula=... — bandeja GRADO del director */
+    @GetMapping("/bandeja-grado")
+    public ResponseEntity<?> obtenerBandejaGrado(@RequestParam String cedula) {
+        Usuario director = usuarioService.obtenerUsuarioPorCedula(cedula);
+        if (director == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Director no encontrado"));
+        if (!"DIRECTOR".equals(director.getRol())) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores de programa"));
+        return ResponseEntity.ok(solicitudService.obtenerBandejaGrado(director));
+    }
+
+    /**
+     * GET /api/solicitudes/{id}/documentos
+     * Retorna el estado de cada documento requerido para la solicitud de grado.
+     * Paso 1 (carga por el estudiante) irá llenando los cargados=true.
+     */
+    @GetMapping("/{id}/documentos")
+    public ResponseEntity<?> obtenerDocumentos(@PathVariable Long id, @RequestParam String cedula) {
+        Usuario usuario = usuarioService.obtenerUsuarioPorCedula(cedula);
+        if (usuario == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Usuario no encontrado"));
+        if (!"DIRECTOR".equals(usuario.getRol()) && !"ADMIN".equals(usuario.getRol()) && !"ESTUDIANTE".equals(usuario.getRol())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso no autorizado"));
+        }
+        return ResponseEntity.ok(solicitudService.obtenerDocumentosSolicitud(id));
     }
 
     /** POST /api/solicitudes/{id}/aprobar?cedula=... */
@@ -101,11 +95,11 @@ public class SolicitudController {
         if (director == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Director no encontrado"));
         if (!"DIRECTOR".equals(director.getRol())) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores"));
         try {
-            return ResponseEntity.ok(solicitudService.aprobarSolicitud(id));
+            return ResponseEntity.ok(solicitudService.aprobarSolicitud(id, cedula));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
+            return ResponseEntity.status(422).body(error(e.getMessage()));
         }
     }
 
@@ -117,19 +111,15 @@ public class SolicitudController {
         if (director == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Director no encontrado"));
         if (!"DIRECTOR".equals(director.getRol())) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores"));
         try {
-            return ResponseEntity.ok(solicitudService.rechazarSolicitud(id, motivo));
+            return ResponseEntity.ok(solicitudService.rechazarSolicitud(id, motivo, cedula));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
+            return ResponseEntity.status(422).body(error(e.getMessage()));
         }
     }
 
-    /**
-     * GET /api/solicitudes/{id}/certificado
-     * Descarga el certificado de terminacion de materias.
-     * Solo disponible cuando la solicitud esta APROBADA y es de tipo TERMINACION_MATERIAS.
-     */
+    /** GET /api/solicitudes/{id}/certificado */
     @GetMapping("/{id}/certificado")
     public ResponseEntity<byte[]> descargarCertificado(@PathVariable Long id) {
         try {
@@ -141,7 +131,7 @@ public class SolicitudController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.valueOf(422)).build();
+            return ResponseEntity.status(422).build();
         }
     }
 
