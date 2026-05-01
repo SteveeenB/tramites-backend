@@ -3,10 +3,6 @@ package com.ufps.tramites.service;
 import com.ufps.tramites.model.DocumentoSolicitud;
 import com.ufps.tramites.repository.DocumentoSolicitudRepository;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,15 +11,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class DocumentoService {
-
-    @Value("${app.uploads.directorio:./uploads}")
-    private String directorioBase;
 
     private static final Set<String> TIPOS_PERMITIDOS = Set.of(
         "application/pdf",
@@ -39,6 +31,13 @@ public class DocumentoService {
     @Autowired
     private DocumentoSolicitudRepository documentoRepository;
 
+    @Autowired
+    private SupabaseStorageService storageService;
+
+    /**
+     * Valida y sube un documento de soporte al bucket de Supabase.
+     * La ruta en el bucket es: {solicitudId}/{uuid}.{ext}
+     */
     public Map<String, Object> guardarDocumento(Long solicitudId, MultipartFile archivo) throws IOException {
         String contentType = archivo.getContentType() != null ? archivo.getContentType() : "";
         String extension = obtenerExtension(archivo.getOriginalFilename());
@@ -49,11 +48,8 @@ public class DocumentoService {
             );
         }
 
-        Path directorio = Paths.get(directorioBase, String.valueOf(solicitudId));
-        Files.createDirectories(directorio);
-
         String nombreAlmacenado = UUID.randomUUID() + "." + extension;
-        Files.copy(archivo.getInputStream(), directorio.resolve(nombreAlmacenado), StandardCopyOption.REPLACE_EXISTING);
+        storageService.subir(solicitudId + "/" + nombreAlmacenado, archivo.getBytes(), contentType);
 
         DocumentoSolicitud doc = new DocumentoSolicitud();
         doc.setSolicitudId(solicitudId);
@@ -74,15 +70,12 @@ public class DocumentoService {
     }
 
     /**
-     * Guarda el PDF del acta generado como ACTA en el expediente digital.
-     * Si ya existe un acta para esta solicitud, la sobreescribe.
+     * Sube el PDF del acta al bucket y lo registra en la BD como tipo ACTA.
+     * Si ya existe un registro, lo actualiza (upsert).
      */
     public void guardarActaComoDocumento(Long solicitudId, byte[] pdfBytes) throws IOException {
-        Path directorio = Paths.get(directorioBase, String.valueOf(solicitudId));
-        Files.createDirectories(directorio);
-
         String nombreAlmacenado = "acta-grado-" + solicitudId + ".pdf";
-        Files.write(directorio.resolve(nombreAlmacenado), pdfBytes);
+        storageService.subir(solicitudId + "/" + nombreAlmacenado, pdfBytes, "application/pdf");
 
         Optional<DocumentoSolicitud> existente =
                 documentoRepository.findBySolicitudIdAndTipo(solicitudId, "ACTA");
@@ -90,7 +83,7 @@ public class DocumentoService {
         DocumentoSolicitud doc = existente.orElseGet(DocumentoSolicitud::new);
         doc.setSolicitudId(solicitudId);
         doc.setTipo("ACTA");
-        doc.setNombreOriginal("acta-grado-" + solicitudId + ".pdf");
+        doc.setNombreOriginal(nombreAlmacenado);
         doc.setNombreAlmacenado(nombreAlmacenado);
         doc.setContentType("application/pdf");
         doc.setTamano((long) pdfBytes.length);
@@ -99,19 +92,11 @@ public class DocumentoService {
     }
 
     /**
-     * Devuelve los bytes del acta si ya fue generada y guardada en disco.
+     * Descarga el acta desde Supabase si ya fue generada.
      */
     public Optional<byte[]> obtenerActa(Long solicitudId) {
         return documentoRepository.findBySolicitudIdAndTipo(solicitudId, "ACTA")
-                .map(doc -> {
-                    Path ruta = Paths.get(directorioBase, String.valueOf(solicitudId),
-                            doc.getNombreAlmacenado());
-                    try {
-                        return Files.exists(ruta) ? Files.readAllBytes(ruta) : null;
-                    } catch (IOException e) {
-                        return null;
-                    }
-                });
+                .map(doc -> storageService.descargar(solicitudId + "/" + doc.getNombreAlmacenado()));
     }
 
     public List<Map<String, Object>> listarDocumentos(Long solicitudId) {
