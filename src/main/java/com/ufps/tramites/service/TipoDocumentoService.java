@@ -22,11 +22,9 @@ public class TipoDocumentoService {
         if (repository.count() > 0) return;
 
         String[][] defaults = {
-            { "Fotografía 3x4",                  "Fotografía reciente tamaño 3x4 en fondo blanco",              "true",  "1" },
-            { "Acta de grado de bachillerato",    "Fotocopia legible del acta o diploma de bachillerato",        "true",  "2" },
-            { "Fotocopia de cédula de ciudadanía","Fotocopia de la cédula por ambas caras",                      "true",  "3" },
-            { "Certificado de notas",             "Certificado oficial de notas expedido por la secretaría",     "true",  "4" },
-            { "Paz y salvo académico",            "Documento emitido por registro y control que certifica no deudas académicas", "true", "5" },
+            { "Fotografía nueva y actualizada",               "Fotografía reciente en fondo blanco, tamaño 3x4",                                  "true",  "1" },
+            { "Acta original de sustentación",                "Acta original firmada de sustentación del trabajo de grado",                        "true",  "2" },
+            { "Certificado de inglés",                        "Certificado de competencia en inglés (aplica según programa; no obligatorio)",       "false", "3" },
         };
 
         for (String[] d : defaults) {
