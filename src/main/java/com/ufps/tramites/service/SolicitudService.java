@@ -5,12 +5,14 @@ import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.repository.SolicitudRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -46,6 +48,12 @@ public class SolicitudService {
 
     @Autowired
     private NotificacionService notificacionService;
+
+    @Autowired
+    private ActaPdfGeneratorService actaPdfGeneratorService;
+
+    @Autowired
+    private DocumentoService documentoService;
     /**
      * Crea una solicitud de terminación de materias.
      * Valida: período de convocatoria, créditos aprobados y duplicados.
@@ -271,6 +279,65 @@ public class SolicitudService {
             : null);
         liq.put("instrucciones", "Realiza el pago en la ventanilla de Tesorería o por PSE antes de la fecha límite.");
         return liq;
+    }
+
+    /**
+     * Genera (o reutiliza) el acta de grado en PDF.
+     * En la primera llamada:
+     *   1. Genera el PDF con datos institucionales.
+     *   2. Marca al estudiante como GRADUADO en la base de datos.
+     *   3. Vincula el PDF al expediente digital (DocumentoSolicitud tipo ACTA).
+     * En llamadas posteriores devuelve el PDF ya guardado en disco.
+     */
+    public byte[] generarActa(Long id) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"APROBADA".equals(s.getEstado())) {
+            throw new IllegalStateException("El acta solo está disponible para solicitudes aprobadas");
+        }
+        if (!"GRADO".equals(s.getTipo())) {
+            throw new IllegalStateException("Este endpoint es solo para solicitudes de tipo GRADO");
+        }
+
+        // Si el acta ya fue generada, devolver la versión guardada en disco
+        Optional<byte[]> actaExistente = documentoService.obtenerActa(id);
+        if (actaExistente.isPresent() && actaExistente.get() != null) {
+            return actaExistente.get();
+        }
+
+        // Primera generación: construir PDF
+        Usuario est = usuarioRepository.findById(s.getCedula()).orElse(null);
+        String nombre   = est != null ? est.getNombre()   : "Estudiante";
+        String cedula   = s.getCedula();
+        String codigo   = est != null ? est.getCodigo()   : "-";
+        String programa = est != null && est.getProgramaAcademico() != null
+                ? est.getProgramaAcademico().getNombre() : "-";
+
+        Locale es = new Locale("es", "CO");
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy", es);
+        String fechaAprobacion = s.getFechaDecision() != null
+                ? s.getFechaDecision().toLocalDate().format(fmt)
+                : (s.getFechaSolicitud() != null ? s.getFechaSolicitud().format(fmt)
+                    : LocalDate.now().format(fmt));
+        String fechaExpedicion = LocalDate.now().format(fmt);
+
+        try {
+            byte[] pdfBytes = actaPdfGeneratorService.generar(
+                    nombre, cedula, codigo, programa, fechaAprobacion, fechaExpedicion);
+
+            // Actualizar estado del estudiante a GRADUADO
+            if (est != null && !"GRADUADO".equals(est.getEstadoGrado())) {
+                est.setEstadoGrado("GRADUADO");
+                usuarioRepository.save(est);
+            }
+
+            // Vincular PDF al expediente digital
+            documentoService.guardarActaComoDocumento(id, pdfBytes);
+
+            return pdfBytes;
+        } catch (IOException e) {
+            throw new RuntimeException("Error al generar el PDF del acta de grado", e);
+        }
     }
 
     /**
