@@ -61,20 +61,33 @@ public class SolicitudController {
     }
 
     /**
-     * POST /api/solicitudes/grado?cedula=...
-     * Crea una solicitud de grado académico para el estudiante.
+     * POST /api/solicitudes/grado (multipart/form-data)
+     * Crea una solicitud de grado con detalle académico y documentos adjuntos.
      */
-    @PostMapping("/grado")
-    public ResponseEntity<?> crearSolicitudGrado(@RequestParam String cedula) {
+    @PostMapping(value = "/grado", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> crearSolicitudGrado(
+            @RequestParam String cedula,
+            @RequestParam String tituloProyecto,
+            @RequestParam String resumen,
+            @RequestParam String tipoProyecto,
+            @RequestParam MultipartFile foto,
+            @RequestParam MultipartFile actaSustentacion,
+            @RequestParam(required = false) MultipartFile certificadoIngles) {
+
         Usuario estudiante = usuarioService.obtenerUsuarioPorCedula(cedula);
         if (estudiante == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Estudiante no encontrado"));
         }
         try {
-            Map<String, Object> resultado = solicitudService.crearSolicitudGrado(estudiante);
+            Map<String, Object> resultado = solicitudService.crearSolicitudGrado(
+                    estudiante, tituloProyecto, resumen, tipoProyecto,
+                    foto, actaSustentacion, certificadoIngles);
             return ResponseEntity.status(HttpStatus.CREATED).body(resultado);
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(error("Error al procesar los archivos: " + e.getMessage()));
         }
     }
 
@@ -107,6 +120,78 @@ public class SolicitudController {
         return ResponseEntity.ok(solicitudService.obtenerBandejaDirector(director));
     }
 
+    /**
+     * GET /api/solicitudes/bandeja-grado?cedula=...
+     * Retorna la bandeja del director: solicitudes de GRADO de su programa agrupadas por estado.
+     */
+    @GetMapping("/bandeja-grado")
+    public ResponseEntity<?> obtenerBandejaGrado(@RequestParam String cedula) {
+        Usuario director = usuarioService.obtenerUsuarioPorCedula(cedula);
+        if (director == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Director no encontrado"));
+        }
+        if (!"DIRECTOR".equals(director.getRol())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores de programa"));
+        }
+        return ResponseEntity.ok(solicitudService.obtenerBandejaGrado(director));
+    }
+
+    /**
+     * POST /api/solicitudes/{id}/documentos
+     * Sube un archivo de soporte para la solicitud.
+     */
+    @PostMapping(value = "/{id}/documentos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> subirDocumento(
+            @PathVariable Long id,
+            @RequestParam MultipartFile archivo) {
+        try {
+            Map<String, Object> resultado = documentoService.guardarDocumento(id, archivo);
+            return ResponseEntity.status(HttpStatus.CREATED).body(resultado);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error(e.getMessage()));
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(error("Error al guardar el archivo: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * GET /api/solicitudes/{id}/documentos
+     * Lista los documentos subidos para una solicitud.
+     */
+    @GetMapping("/{id}/documentos")
+    public ResponseEntity<?> listarDocumentos(@PathVariable Long id) {
+        return ResponseEntity.ok(documentoService.listarDocumentos(id));
+    }
+
+    /**
+     * GET /api/solicitudes/{id}/documentos/{docId}/file
+     * Descarga un archivo desde Supabase Storage y lo transmite al cliente.
+     * Funciona con buckets privados usando el service-role-key.
+     */
+    @GetMapping("/{id}/documentos/{docId}/file")
+    public ResponseEntity<byte[]> descargarArchivo(
+            @PathVariable Long id,
+            @PathVariable Long docId) {
+        try {
+            var resultado = documentoService.obtenerArchivo(id, docId);
+            if (resultado == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            }
+            String nombreOriginal = (String) resultado.get("nombreOriginal");
+            String contentType    = (String) resultado.get("contentType");
+            byte[] bytes          = (byte[]) resultado.get("bytes");
+
+            return ResponseEntity.ok()
+                    .header("Content-Disposition", "inline; filename=\"" + nombreOriginal + "\"")
+                    .contentType(org.springframework.http.MediaType.parseMediaType(
+                            contentType != null ? contentType : "application/octet-stream"))
+                    .body(bytes);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+    }
+
     /** POST /api/solicitudes/{id}/aprobar?cedula=... */
     @PostMapping("/{id}/aprobar")
     public ResponseEntity<?> aprobarSolicitud(@PathVariable Long id, @RequestParam String cedula) {
@@ -136,34 +221,6 @@ public class SolicitudController {
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
         }
-    }
-
-    /**
-     * POST /api/solicitudes/{id}/documentos
-     * Sube un archivo de soporte para la solicitud.
-     */
-    @PostMapping(value = "/{id}/documentos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> subirDocumento(
-            @PathVariable Long id,
-            @RequestParam MultipartFile archivo) {
-        try {
-            Map<String, Object> resultado = documentoService.guardarDocumento(id, archivo);
-            return ResponseEntity.status(HttpStatus.CREATED).body(resultado);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error(e.getMessage()));
-        } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(error("Error al guardar el archivo: " + e.getMessage()));
-        }
-    }
-
-    /**
-     * GET /api/solicitudes/{id}/documentos
-     * Lista los documentos subidos para una solicitud.
-     */
-    @GetMapping("/{id}/documentos")
-    public ResponseEntity<?> listarDocumentos(@PathVariable Long id) {
-        return ResponseEntity.ok(documentoService.listarDocumentos(id));
     }
 
     /**
