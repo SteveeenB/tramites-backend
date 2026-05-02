@@ -4,10 +4,11 @@ import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.service.DocumentoService;
 import com.ufps.tramites.service.SolicitudService;
 import com.ufps.tramites.service.UsuarioService;
-import java.io.IOException; 
+import com.ufps.tramites.service.ValidacionGradoService;
+import java.io.IOException;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -20,11 +21,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.ufps.tramites.model.Usuario;
-import com.ufps.tramites.service.SolicitudService;
-import com.ufps.tramites.service.UsuarioService;
-import com.ufps.tramites.service.ValidacionGradoService;
-
 
 @RestController
 
@@ -35,13 +31,13 @@ public class SolicitudController {
     private SolicitudService solicitudService;
 
     @Autowired
-    private ValidacionGradoService validacionGradoService;
-
-    @Autowired
     private UsuarioService usuarioService;
 
     @Autowired
     private DocumentoService documentoService;
+
+    @Autowired
+    private ValidacionGradoService validacionGradoService;
 
     /**
      * POST /api/solicitudes/terminacion-materias?cedula=...

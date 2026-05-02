@@ -255,6 +255,11 @@ public class SolicitudService {
         return resultado;
     }
 
+    public Solicitud obtenerSolicitudPorId(Long id) {
+        return solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+    }
+
     private Map<String, Object> construirRespuestaSolicitud(Solicitud s) {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("id", s.getId());
