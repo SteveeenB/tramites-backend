@@ -3,6 +3,7 @@ package com.ufps.tramites.service;
 import com.ufps.tramites.model.Convocatoria;
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
+import com.ufps.tramites.repository.DocumentoSolicitudRepository;
 import com.ufps.tramites.repository.SolicitudRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
 import java.io.IOException;
@@ -19,11 +20,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import com.ufps.tramites.model.Solicitud;
-import com.ufps.tramites.model.Usuario;
-import com.ufps.tramites.repository.SolicitudRepository;
-import com.ufps.tramites.repository.UsuarioRepository;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class SolicitudService {
@@ -54,6 +51,10 @@ public class SolicitudService {
 
     @Autowired
     private DocumentoService documentoService;
+
+    @Autowired
+    private DocumentoSolicitudRepository documentoSolicitudRepository;
+
     /**
      * Crea una solicitud de terminación de materias.
      * Valida: período de convocatoria, créditos aprobados y duplicados.
@@ -106,10 +107,18 @@ public class SolicitudService {
     }
 
     /**
-     * Crea una solicitud de grado académico.
+     * Crea una solicitud de grado académico con su detalle y documentos adjuntos.
      * Requiere que la terminación de materias esté APROBADA y que no exista solicitud de grado activa.
      */
-    public Map<String, Object> crearSolicitudGrado(Usuario estudiante) {
+    public Map<String, Object> crearSolicitudGrado(
+            Usuario estudiante,
+            String tituloProyecto,
+            String resumen,
+            String tipoProyecto,
+            MultipartFile foto,
+            MultipartFile actaSustentacion,
+            MultipartFile certificadoIngles) throws IOException {
+
         // 1. Verificar que la terminación de materias esté aprobada (requisito previo)
         Optional<Solicitud> terminacion = solicitudRepository.findFirstByCedulaAndTipo(
             estudiante.getCedula(), "TERMINACION_MATERIAS"
@@ -130,16 +139,27 @@ public class SolicitudService {
             );
         }
 
-        // 3. Crear y guardar la solicitud
+        // 3. Crear y guardar la solicitud con los datos del proyecto
         Solicitud solicitud = new Solicitud();
         solicitud.setCedula(estudiante.getCedula());
         solicitud.setTipo("GRADO");
-        solicitud.setEstado("PENDIENTE_PAGO");
+        solicitud.setEstado("EN_REVISION");
         solicitud.setFechaSolicitud(LocalDate.now());
         solicitud.setCosto(COSTO_GRADO);
         solicitud.setObservaciones("Solicitud de grado registrada por el sistema.");
-
+        solicitud.setTituloProyecto(tituloProyecto);
+        solicitud.setResumenProyecto(resumen);
+        solicitud.setTipoProyecto(tipoProyecto);
         solicitudRepository.save(solicitud);
+
+        // 4. Subir documentos obligatorios
+        documentoService.guardarDocumento(solicitud.getId(), foto, "FOTO_ESTUDIANTE");
+        documentoService.guardarDocumento(solicitud.getId(), actaSustentacion, "ACTA_SUSTENTACION");
+
+        // 6. Certificado de inglés es opcional
+        if (certificadoIngles != null && !certificadoIngles.isEmpty()) {
+            documentoService.guardarDocumento(solicitud.getId(), certificadoIngles, "CERTIFICADO_INGLES");
+        }
 
         return construirRespuestaSolicitud(solicitud);
     }
@@ -179,6 +199,73 @@ public class SolicitudService {
         response.put("aprobadas",  mapearConEstudiante(aprobadas,  porCedula));
         response.put("rechazadas", mapearConEstudiante(rechazadas, porCedula));
         return response;
+    }
+
+    /**
+     * Retorna la bandeja del director agrupada por estado, solo solicitudes de GRADO
+     * de los estudiantes del mismo programa académico del director.
+     */
+    public Map<String, Object> obtenerBandejaGrado(Usuario director) {
+        Long programaId = director.getProgramaAcademico() != null
+                ? director.getProgramaAcademico().getId() : null;
+
+        if (programaId == null) {
+            return Map.of("pendientes", List.of(), "aprobadas", List.of(), "rechazadas", List.of());
+        }
+
+        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRol(programaId, "ESTUDIANTE");
+        List<String> cedulas = estudiantes.stream().map(Usuario::getCedula).collect(Collectors.toList());
+        Map<String, Usuario> porCedula = estudiantes.stream()
+                .collect(Collectors.toMap(Usuario::getCedula, u -> u));
+
+        List<Solicitud> todas = solicitudRepository.findByCedulaInAndTipo(cedulas, "GRADO");
+
+        List<Solicitud> pendientes = todas.stream()
+                .filter(s -> "EN_REVISION".equals(s.getEstado()) || "PENDIENTE_PAGO".equals(s.getEstado()))
+                .collect(Collectors.toList());
+        List<Solicitud> aprobadas = todas.stream()
+                .filter(s -> "APROBADA".equals(s.getEstado()))
+                .collect(Collectors.toList());
+        List<Solicitud> rechazadas = todas.stream()
+                .filter(s -> "RECHAZADA".equals(s.getEstado()))
+                .collect(Collectors.toList());
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("pendientes", mapearGradoConEstudiante(pendientes, porCedula));
+        response.put("aprobadas",  mapearGradoConEstudiante(aprobadas,  porCedula));
+        response.put("rechazadas", mapearGradoConEstudiante(rechazadas, porCedula));
+        return response;
+    }
+
+    private List<Map<String, Object>> mapearGradoConEstudiante(
+            List<Solicitud> solicitudes, Map<String, Usuario> porCedula) {
+        return solicitudes.stream().map(s -> {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("id",                    s.getId());
+            map.put("tipo",                  s.getTipo());
+            map.put("estado",                s.getEstado());
+            map.put("fechaSolicitud",        s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : null);
+            map.put("observacionesDirector", s.getObservacionesDirector());
+            map.put("tituloProyecto",        s.getTituloProyecto());
+            map.put("tipoProyecto",          s.getTipoProyecto());
+            map.put("resumenProyecto",       s.getResumenProyecto());
+            map.put("documentosCargados",    documentoSolicitudRepository.countBySolicitudId(s.getId()));
+            map.put("documentosRequeridos",  2);
+
+            Usuario est = porCedula.get(s.getCedula());
+            if (est != null) {
+                Map<String, Object> estMap = new LinkedHashMap<>();
+                estMap.put("cedula",              est.getCedula());
+                estMap.put("nombre",              est.getNombre());
+                estMap.put("programa",            est.getProgramaAcademico() != null
+                        ? est.getProgramaAcademico().getNombre() : null);
+                estMap.put("creditosAprobados",   est.getCreditosAprobados());
+                estMap.put("creditosRequeridos",  est.getProgramaAcademico() != null
+                        ? est.getProgramaAcademico().getTotalCreditos() : null);
+                map.put("estudiante", estMap);
+            }
+            return map;
+        }).collect(Collectors.toList());
     }
 
     private List<Map<String, Object>> mapearConEstudiante(List<Solicitud> solicitudes,
@@ -271,6 +358,13 @@ public class SolicitudService {
         map.put("liquidacion", construirLiquidacion(s));
         map.put("certificadoDisponible",
                 "APROBADA".equals(s.getEstado()) && "TERMINACION_MATERIAS".equals(s.getTipo()));
+
+        if ("GRADO".equals(s.getTipo())) {
+            map.put("tituloProyecto",  s.getTituloProyecto());
+            map.put("resumenProyecto", s.getResumenProyecto());
+            map.put("tipoProyecto",    s.getTipoProyecto());
+        }
+
         return map;
     }
 

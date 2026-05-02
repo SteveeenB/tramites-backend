@@ -156,7 +156,11 @@ public class TramiteService {
         map.put("fechaSolicitud", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : null);
         map.put("costo", s.getCosto());
         map.put("observaciones", s.getObservaciones());
-        map.put("liquidacion", liq);
+        map.put("liquidacion",      liq);
+        map.put("tituloProyecto",   s.getTituloProyecto());
+        map.put("resumenProyecto",  s.getResumenProyecto());
+        map.put("tipoProyecto",     s.getTipoProyecto());
+
         return map;
     }
 
