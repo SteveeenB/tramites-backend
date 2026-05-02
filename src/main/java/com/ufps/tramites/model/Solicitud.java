@@ -82,6 +82,22 @@ public class Solicitud {
     this.fechaEnRevision = fechaEnRevision;
 }
 
+// ── Solicitud de Grado ────────────────────────────────────────────────
+private String tituloProyecto;
+private String tipoProyecto;   // INVESTIGACION | MONOGRAFIA | SISTEMATIZACION | TRABAJO_DIRIGIDO | PASANTIA
+
+@jakarta.persistence.Column(columnDefinition = "TEXT")
+private String resumenProyecto;
+
+public String getTituloProyecto() { return tituloProyecto; }
+public void setTituloProyecto(String tituloProyecto) { this.tituloProyecto = tituloProyecto; }
+
+public String getTipoProyecto() { return tipoProyecto; }
+public void setTipoProyecto(String tipoProyecto) { this.tipoProyecto = tipoProyecto; }
+
+public String getResumenProyecto() { return resumenProyecto; }
+public void setResumenProyecto(String resumenProyecto) { this.resumenProyecto = resumenProyecto; }
+
 // ── HU-09 ─────────────────────────────────────────────────────────────
 private String validacionPosgrados;     // APROBADA | RECHAZADA
 private String observacionesPosgrados;  // motivo de la decisión

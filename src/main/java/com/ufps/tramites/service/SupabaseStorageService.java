@@ -1,6 +1,7 @@
 package com.ufps.tramites.service;
 
 import jakarta.annotation.PostConstruct;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -56,5 +57,29 @@ public class SupabaseStorageService {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /**
+     * Genera una URL firmada con expiración de 1 hora.
+     * Funciona tanto con buckets públicos como privados.
+     * Si la firma falla por cualquier motivo, cae al URL público como fallback.
+     */
+    @SuppressWarnings("unchecked")
+    public String obtenerUrl(String path) {
+        try {
+            Map<String, Object> resp = restClient.post()
+                    .uri(supabaseUrl + "/storage/v1/object/sign/" + bucket + "/" + path)
+                    .header("Authorization", "Bearer " + serviceRoleKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("expiresIn", 3600))
+                    .retrieve()
+                    .body(Map.class);
+
+            if (resp != null && resp.get("signedURL") != null) {
+                return supabaseUrl + resp.get("signedURL");
+            }
+        } catch (Exception ignored) {}
+
+        return supabaseUrl + "/storage/v1/object/public/" + bucket + "/" + path;
     }
 }
