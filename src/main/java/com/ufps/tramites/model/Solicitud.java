@@ -81,4 +81,52 @@ public class Solicitud {
     public void setFechaEnRevision(LocalDateTime fechaEnRevision) {
     this.fechaEnRevision = fechaEnRevision;
 }
+
+// ── Solicitud de Grado ────────────────────────────────────────────────
+private String tituloProyecto;
+private String tipoProyecto;   // INVESTIGACION | MONOGRAFIA | SISTEMATIZACION | TRABAJO_DIRIGIDO | PASANTIA
+
+@jakarta.persistence.Column(columnDefinition = "TEXT")
+private String resumenProyecto;
+
+public String getTituloProyecto() { return tituloProyecto; }
+public void setTituloProyecto(String tituloProyecto) { this.tituloProyecto = tituloProyecto; }
+
+public String getTipoProyecto() { return tipoProyecto; }
+public void setTipoProyecto(String tipoProyecto) { this.tipoProyecto = tipoProyecto; }
+
+public String getResumenProyecto() { return resumenProyecto; }
+public void setResumenProyecto(String resumenProyecto) { this.resumenProyecto = resumenProyecto; }
+
+// ── HU-09 ─────────────────────────────────────────────────────────────
+private String validacionPosgrados;     // APROBADA | RECHAZADA
+private String observacionesPosgrados;  // motivo de la decisión
+private LocalDateTime fechaValidacion;  // cuándo validó
+private String cedulaPosgrados;         // quién validó
+
+// Getters y setters
+public String getValidacionPosgrados() { return validacionPosgrados; }
+public void setValidacionPosgrados(String v) { this.validacionPosgrados = v; }
+
+public String getObservacionesPosgrados() { return observacionesPosgrados; }
+public void setObservacionesPosgrados(String o) { this.observacionesPosgrados = o; }
+
+public LocalDateTime getFechaValidacion() { return fechaValidacion; }
+public void setFechaValidacion(LocalDateTime f) { this.fechaValidacion = f; }
+
+public String getCedulaPosgrados() { return cedulaPosgrados; }
+public void setCedulaPosgrados(String c) { this.cedulaPosgrados = c; }
+
+// ── Pago y fecha de grado ──────────────────────────────────────────────
+private Boolean pagoGradoRealizado = false;
+private java.time.LocalDate fechaGrado;
+
+public Boolean getPagoGradoRealizado() { return pagoGradoRealizado; }
+public void setPagoGradoRealizado(Boolean pagoGradoRealizado) {
+    this.pagoGradoRealizado = pagoGradoRealizado;
+}
+
+public java.time.LocalDate getFechaGrado() { return fechaGrado; }
+public void setFechaGrado(java.time.LocalDate fechaGrado) { this.fechaGrado = fechaGrado; }
+
 }

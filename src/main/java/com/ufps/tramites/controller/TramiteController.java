@@ -9,69 +9,67 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/tramites")
 public class TramiteController {
 
-    @Autowired private TramiteService tramiteService;
-    @Autowired private UsuarioService usuarioService;
+    @Autowired
+    private TramiteService tramiteService;
+
+    @Autowired
+    private UsuarioService usuarioService;
 
     @GetMapping
-    public ResponseEntity<?> obtenerModulo(
+    public ResponseEntity<?> obtenerModuloTramites(
             @RequestParam(required = false) String cedula,
             @RequestParam(required = false) String codigo) {
-        Usuario u = resolver(cedula, codigo);
-        if (u == null) return notFound("Usuario no encontrado");
-        return ResponseEntity.ok(tramiteService.construirModuloPorRol(u));
+        Usuario usuario;
+
+        if (cedula != null && !cedula.isBlank()) {
+            usuario = usuarioService.obtenerUsuarioPorCedula(cedula);
+        } else if (codigo != null && !codigo.isBlank()) {
+            usuario = usuarioService.obtenerUsuarioPorCodigo(codigo);
+        } else {
+            usuario = usuarioService.obtenerPrimerUsuario();
+        }
+
+        if (usuario == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(error("Usuario no encontrado"));
+        }
+
+        return ResponseEntity.ok(tramiteService.construirModuloPorRol(usuario));
     }
 
     @GetMapping("/proceso-grado")
-    public ResponseEntity<?> obtenerProcesoGrado(
+    public ResponseEntity<?> obtenerProcesoDeGrado(
             @RequestParam(required = false) String cedula,
             @RequestParam(required = false) String codigo) {
-        Usuario u = resolver(cedula, codigo);
-        if (u == null) return notFound("Usuario no encontrado");
-        return ResponseEntity.ok(tramiteService.construirProcesoDeGrado(u));
-    }
+        Usuario usuario;
 
-    /**
-     * GET /api/tramites/director/estudiantes?cedula=...
-     * Lista de todos los estudiantes del programa del director con su estado
-     * en el proceso de grado.
-     * Solo accesible por el rol DIRECTOR.
-     */
-    @GetMapping("/director/estudiantes")
-    public ResponseEntity<?> obtenerEstudiantesDirector(@RequestParam String cedula) {
-        Usuario director = usuarioService.obtenerUsuarioPorCedula(cedula);
-        if (director == null) return notFound("Director no encontrado");
-        if (!"DIRECTOR".equals(director.getRol())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(error("Acceso restringido a directores de programa"));
+        if (cedula != null && !cedula.isBlank()) {
+            usuario = usuarioService.obtenerUsuarioPorCedula(cedula);
+        } else if (codigo != null && !codigo.isBlank()) {
+            usuario = usuarioService.obtenerUsuarioPorCodigo(codigo);
+        } else {
+            usuario = usuarioService.obtenerPrimerUsuario();
         }
-        return ResponseEntity.ok(tramiteService.construirListaEstudiantesDirector(director));
+
+        if (usuario == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(error("Usuario no encontrado"));
+        }
+
+        return ResponseEntity.ok(tramiteService.construirProcesoDeGrado(usuario));
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private Usuario resolver(String cedula, String codigo) {
-        if (cedula != null && !cedula.isBlank())
-            return usuarioService.obtenerUsuarioPorCedula(cedula);
-        if (codigo != null && !codigo.isBlank())
-            return usuarioService.obtenerUsuarioPorCodigo(codigo);
-        return usuarioService.obtenerPrimerUsuario();
-    }
-
-    private ResponseEntity<?> notFound(String msg) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(msg));
-    }
-
-    private Map<String, Object> error(String msg) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("error", msg);
-        return m;
+    private Map<String, Object> error(String mensaje) {
+        Map<String, Object> error = new LinkedHashMap<>();
+        error.put("error", mensaje);
+        return error;
     }
 }
