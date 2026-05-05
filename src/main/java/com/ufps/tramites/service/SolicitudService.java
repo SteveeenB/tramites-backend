@@ -476,7 +476,6 @@ public class SolicitudService {
 
         Locale es = new Locale("es", "CO");
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy", es);
-
         String fechaAprobacion = s.getFechaDecision() != null
                 ? s.getFechaDecision().toLocalDate().format(fmt)
                 : (s.getFechaSolicitud() != null ? s.getFechaSolicitud().format(fmt)
