@@ -117,4 +117,16 @@ public void setFechaValidacion(LocalDateTime f) { this.fechaValidacion = f; }
 public String getCedulaPosgrados() { return cedulaPosgrados; }
 public void setCedulaPosgrados(String c) { this.cedulaPosgrados = c; }
 
+// ── Pago y fecha de grado ──────────────────────────────────────────────
+private Boolean pagoGradoRealizado = false;
+private java.time.LocalDate fechaGrado;
+
+public Boolean getPagoGradoRealizado() { return pagoGradoRealizado; }
+public void setPagoGradoRealizado(Boolean pagoGradoRealizado) {
+    this.pagoGradoRealizado = pagoGradoRealizado;
+}
+
+public java.time.LocalDate getFechaGrado() { return fechaGrado; }
+public void setFechaGrado(java.time.LocalDate fechaGrado) { this.fechaGrado = fechaGrado; }
+
 }
