@@ -30,9 +30,20 @@ public class ActaPdfGeneratorService {
     private static final DeviceRgb COLOR_FILA    = new DeviceRgb(235, 242, 252);
     private static final DeviceRgb COLOR_BORDE   = new DeviceRgb(180, 200, 225);
 
+    /**
+     * Genera el PDF del acta de grado.
+     *
+     * @param nombre           Nombre completo del graduando
+     * @param cedula           Cédula del graduando
+     * @param codigo           Código estudiantil
+     * @param programa         Nombre del programa académico
+     * @param fechaAprobacion  Fecha en que el director aprobó la solicitud (formato textual)
+     * @param fechaExpedicion  Fecha de expedición del acta (hoy, formato textual)
+     * @param fechaGrado       Fecha de la ceremonia de grado elegida por el estudiante (formato textual)
+     */
     public byte[] generar(String nombre, String cedula, String codigo,
                           String programa, String fechaAprobacion,
-                          String fechaExpedicion) throws IOException {
+                          String fechaExpedicion, String fechaGrado) throws IOException {
 
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             PdfDocument pdf = new PdfDocument(new PdfWriter(baos));
@@ -41,7 +52,7 @@ public class ActaPdfGeneratorService {
 
             agregarEncabezado(doc);
             agregarTitulo(doc);
-            agregarCuerpo(doc, fechaAprobacion);
+            agregarCuerpo(doc, fechaAprobacion, fechaGrado);
             agregarTabla(doc, nombre, cedula, codigo, programa);
             agregarLugarFecha(doc, fechaExpedicion);
             agregarFirmas(doc);
@@ -87,12 +98,13 @@ public class ActaPdfGeneratorService {
                 .setMarginTop(24).setMarginBottom(20));
     }
 
-    private void agregarCuerpo(Document doc, String fechaAprobacion) {
+    private void agregarCuerpo(Document doc, String fechaAprobacion, String fechaGrado) {
         doc.add(new Paragraph(
                 "Se certifica que el/la candidato(a) a grado, identificado(a) con los datos "
                 + "relacionados en el presente documento, ha cumplido satisfactoriamente con todos "
                 + "los requisitos académicos y administrativos establecidos por la institución para "
-                + "optar al título de grado, según resolución aprobada el " + fechaAprobacion + ".")
+                + "optar al título de grado, según resolución aprobada el " + fechaAprobacion
+                + ". La ceremonia de grado se encuentra programada para el " + fechaGrado + ".")
                 .setFontSize(11)
                 .setTextAlignment(TextAlignment.JUSTIFIED)
                 .setMarginBottom(18));

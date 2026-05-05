@@ -21,6 +21,8 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.context.annotation.Lazy;
+import com.ufps.tramites.service.PazYSalvoService;
 
 @Service
 public class SolicitudService {
@@ -54,6 +56,10 @@ public class SolicitudService {
 
     @Autowired
     private DocumentoSolicitudRepository documentoSolicitudRepository;
+
+    @Autowired
+    @Lazy
+    private PazYSalvoService pazYSalvoService;
 
     /**
      * Crea una solicitud de terminación de materias.
@@ -156,7 +162,7 @@ public class SolicitudService {
         documentoService.guardarDocumento(solicitud.getId(), foto, "FOTO_ESTUDIANTE");
         documentoService.guardarDocumento(solicitud.getId(), actaSustentacion, "ACTA_SUSTENTACION");
 
-        // 6. Certificado de inglés es opcional
+        // 5. Certificado de inglés es opcional
         if (certificadoIngles != null && !certificadoIngles.isEmpty()) {
             documentoService.guardarDocumento(solicitud.getId(), certificadoIngles, "CERTIFICADO_INGLES");
         }
@@ -293,6 +299,10 @@ public class SolicitudService {
 
     /** Aprueba una solicitud de terminación de materias pendiente. */
     public Map<String, Object> aprobarSolicitud(Long id) {
+        return aprobarSolicitudConDirector(id, null);
+    }
+
+    public Map<String, Object> aprobarSolicitudConDirector(Long id, String cedulaDirector) {
         Solicitud s = solicitudRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
         if (!"PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())) {
@@ -304,6 +314,22 @@ public class SolicitudService {
         solicitudRepository.save(s);
 
         notificarEstudiante(s, estadoAnterior);
+
+        // Si es solicitud de GRADO: marcar estadoGrado del estudiante e iniciar paz y salvo
+        if ("GRADO".equals(s.getTipo())) {
+            // Marcar al estudiante con pago de grado pendiente
+            usuarioRepository.findById(s.getCedula()).ifPresent(est -> {
+                est.setEstadoGrado("PAGO_GRADO_PENDIENTE");
+                usuarioRepository.save(est);
+            });
+            // Iniciar proceso de paz y salvo
+            if (cedulaDirector != null) {
+                usuarioRepository.findById(cedulaDirector).ifPresent(director ->
+                    pazYSalvoService.iniciarProcesoPazYSalvo(s, director)
+                );
+            }
+        }
+
         return construirRespuestaSolicitud(s);
     }
 
@@ -360,9 +386,12 @@ public class SolicitudService {
                 "APROBADA".equals(s.getEstado()) && "TERMINACION_MATERIAS".equals(s.getTipo()));
 
         if ("GRADO".equals(s.getTipo())) {
-            map.put("tituloProyecto",  s.getTituloProyecto());
-            map.put("resumenProyecto", s.getResumenProyecto());
-            map.put("tipoProyecto",    s.getTipoProyecto());
+            map.put("tituloProyecto",      s.getTituloProyecto());
+            map.put("resumenProyecto",     s.getResumenProyecto());
+            map.put("tipoProyecto",        s.getTipoProyecto());
+            // Campos de progreso del proceso de grado
+            map.put("pagoGradoRealizado",  s.getPagoGradoRealizado() != null && s.getPagoGradoRealizado());
+            map.put("fechaGrado",          s.getFechaGrado() != null ? s.getFechaGrado().toString() : null);
         }
 
         return map;
@@ -381,9 +410,42 @@ public class SolicitudService {
     }
 
     /**
+     * Registra el pago de derechos de grado (demo).
+     * Marca el campo pagoGradoRealizado = true en la solicitud.
+     */
+    public Map<String, Object> registrarPagoGrado(Long id) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"APROBADA".equals(s.getEstado()) || !"GRADO".equals(s.getTipo())) {
+            throw new IllegalStateException("La solicitud no es una solicitud de grado aprobada");
+        }
+        s.setPagoGradoRealizado(true);
+        solicitudRepository.save(s);
+        return construirRespuestaSolicitud(s);
+    }
+
+    /**
+     * Registra la fecha de graduación elegida por el estudiante.
+     * Requiere que el pago ya esté registrado.
+     */
+    public Map<String, Object> registrarFechaGrado(Long id, LocalDate fechaGrado) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"APROBADA".equals(s.getEstado()) || !"GRADO".equals(s.getTipo())) {
+            throw new IllegalStateException("La solicitud no es una solicitud de grado aprobada");
+        }
+        if (s.getPagoGradoRealizado() == null || !s.getPagoGradoRealizado()) {
+            throw new IllegalStateException("El pago de grado no ha sido registrado");
+        }
+        s.setFechaGrado(fechaGrado);
+        solicitudRepository.save(s);
+        return construirRespuestaSolicitud(s);
+    }
+
+    /**
      * Genera (o reutiliza) el acta de grado en PDF.
      * En la primera llamada:
-     *   1. Genera el PDF con datos institucionales.
+     *   1. Genera el PDF con datos institucionales y fecha de grado elegida.
      *   2. Marca al estudiante como GRADUADO en la base de datos.
      *   3. Vincula el PDF al expediente digital (DocumentoSolicitud tipo ACTA).
      * En llamadas posteriores devuelve el PDF ya guardado en disco.
@@ -418,11 +480,18 @@ public class SolicitudService {
                 ? s.getFechaDecision().toLocalDate().format(fmt)
                 : (s.getFechaSolicitud() != null ? s.getFechaSolicitud().format(fmt)
                     : LocalDate.now().format(fmt));
+
         String fechaExpedicion = LocalDate.now().format(fmt);
+
+        // Fecha de grado elegida por el estudiante (o fecha de expedición como fallback)
+        String fechaGradoStr = s.getFechaGrado() != null
+                ? s.getFechaGrado().format(fmt)
+                : fechaExpedicion;
 
         try {
             byte[] pdfBytes = actaPdfGeneratorService.generar(
-                    nombre, cedula, codigo, programa, fechaAprobacion, fechaExpedicion);
+                    nombre, cedula, codigo, programa,
+                    fechaAprobacion, fechaExpedicion, fechaGradoStr);
 
             // Actualizar estado del estudiante a GRADUADO
             if (est != null && !"GRADUADO".equals(est.getEstadoGrado())) {

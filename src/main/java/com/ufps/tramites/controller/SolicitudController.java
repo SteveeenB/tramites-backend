@@ -199,7 +199,7 @@ public class SolicitudController {
         if (director == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Director no encontrado"));
         if (!"DIRECTOR".equals(director.getRol())) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores"));
         try {
-            return ResponseEntity.ok(solicitudService.aprobarSolicitud(id));
+            return ResponseEntity.ok(solicitudService.aprobarSolicitudConDirector(id, cedula));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
         } catch (IllegalStateException e) {
@@ -306,6 +306,40 @@ public ResponseEntity<?> validarSolicitudGrado(
         return ResponseEntity.ok(
             validacionGradoService.registrarValidacion(id, decision, observaciones, admin)
         );
+    } catch (IllegalArgumentException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
+    } catch (IllegalStateException e) {
+        return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
+    }
+}
+/**
+ * POST /api/solicitudes/{id}/pagar-grado
+ * Registra el pago demo de derechos de grado.
+ */
+@PostMapping("/{id}/pagar-grado")
+public ResponseEntity<?> pagarGrado(@PathVariable Long id) {
+    try {
+        return ResponseEntity.ok(solicitudService.registrarPagoGrado(id));
+    } catch (IllegalArgumentException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
+    } catch (IllegalStateException e) {
+        return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
+    }
+}
+
+/**
+ * POST /api/solicitudes/{id}/fecha-grado?fecha=2026-08-15
+ * Registra la fecha de grado elegida por el estudiante.
+ */
+@PostMapping("/{id}/fecha-grado")
+public ResponseEntity<?> registrarFechaGrado(
+        @PathVariable Long id,
+        @RequestParam String fecha) {
+    try {
+        java.time.LocalDate fechaGrado = java.time.LocalDate.parse(fecha);
+        return ResponseEntity.ok(solicitudService.registrarFechaGrado(id, fechaGrado));
+    } catch (java.time.format.DateTimeParseException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error("Formato de fecha inválido. Use YYYY-MM-DD"));
     } catch (IllegalArgumentException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
     } catch (IllegalStateException e) {
