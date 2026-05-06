@@ -15,25 +15,42 @@ public class Solicitud {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String cedula;          // cédula del estudiante
-    private String tipo;            // TERMINACION_MATERIAS | GRADO | CERTIFICADO
-    private String estado;          // PENDIENTE_PAGO | EN_REVISION | APROBADA | RECHAZADA
+    private String cedula;
+    private String tipo;
+    private String estado;
     private LocalDate fechaSolicitud;
     private Double costo;
-    private String observaciones;   // observaciones del estudiante (no tocar)
+    private String observaciones;
 
-    // ── Campos nuevos TP-41 ───────────────────────────────────────────────
+    // ── TP-41 ─────────────────────────────────────────────────────────────
+    private String decision;
+    private String observacionesDirector;
+    private LocalDateTime fechaDecision;
+    private String cedulaDirector;
 
-    private String decision;              // APROBADA | RECHAZADA  (null mientras no decide)
-    private String observacionesDirector; // motivo de aprobación o rechazo del director
-    private LocalDateTime fechaDecision;  // cuándo decidió — base para alerta de plazo (TP-44)
-    private String cedulaDirector;        // quién decidió — sigue tu convención de cédula como FK ligera
+    private LocalDateTime fechaEnRevision;
+
+    // ── Solicitud de Grado ────────────────────────────────────────────────
+    private String tituloProyecto;
+    private String tipoProyecto;
+
+    @jakarta.persistence.Column(columnDefinition = "TEXT")
+    private String resumenProyecto;
+
+    // ── HU-09 ─────────────────────────────────────────────────────────────
+    private String validacionPosgrados;
+    private String observacionesPosgrados;
+    private LocalDateTime fechaValidacion;
+    private String cedulaPosgrados;
+
+    // ── Proceso de Grado (pago y fecha) ───────────────────────────────────
+    private String estadoPagoGrado;   // null | APROBADO
+    private LocalDate fechaGrado;
 
     // ── Constructor ───────────────────────────────────────────────────────
-
     public Solicitud() {}
 
-    // ── Getters y setters existentes (sin cambios) ────────────────────────
+    // ── Getters y setters ─────────────────────────────────────────────────
 
     public Long getId() { return id; }
 
@@ -55,8 +72,6 @@ public class Solicitud {
     public String getObservaciones() { return observaciones; }
     public void setObservaciones(String observaciones) { this.observaciones = observaciones; }
 
-    // ── Getters y setters nuevos TP-41 ────────────────────────────────────
-
     public String getDecision() { return decision; }
     public void setDecision(String decision) { this.decision = decision; }
 
@@ -71,62 +86,33 @@ public class Solicitud {
     public String getCedulaDirector() { return cedulaDirector; }
     public void setCedulaDirector(String cedulaDirector) { this.cedulaDirector = cedulaDirector; }
 
-    // campo
-    private LocalDateTime fechaEnRevision;
-
-    // getter
     public LocalDateTime getFechaEnRevision() { return fechaEnRevision; }
+    public void setFechaEnRevision(LocalDateTime fechaEnRevision) { this.fechaEnRevision = fechaEnRevision; }
 
-    // setter
-    public void setFechaEnRevision(LocalDateTime fechaEnRevision) {
-    this.fechaEnRevision = fechaEnRevision;
-}
+    public String getTituloProyecto() { return tituloProyecto; }
+    public void setTituloProyecto(String tituloProyecto) { this.tituloProyecto = tituloProyecto; }
 
-// ── Solicitud de Grado ────────────────────────────────────────────────
-private String tituloProyecto;
-private String tipoProyecto;   // INVESTIGACION | MONOGRAFIA | SISTEMATIZACION | TRABAJO_DIRIGIDO | PASANTIA
+    public String getTipoProyecto() { return tipoProyecto; }
+    public void setTipoProyecto(String tipoProyecto) { this.tipoProyecto = tipoProyecto; }
 
-@jakarta.persistence.Column(columnDefinition = "TEXT")
-private String resumenProyecto;
+    public String getResumenProyecto() { return resumenProyecto; }
+    public void setResumenProyecto(String resumenProyecto) { this.resumenProyecto = resumenProyecto; }
 
-public String getTituloProyecto() { return tituloProyecto; }
-public void setTituloProyecto(String tituloProyecto) { this.tituloProyecto = tituloProyecto; }
+    public String getValidacionPosgrados() { return validacionPosgrados; }
+    public void setValidacionPosgrados(String v) { this.validacionPosgrados = v; }
 
-public String getTipoProyecto() { return tipoProyecto; }
-public void setTipoProyecto(String tipoProyecto) { this.tipoProyecto = tipoProyecto; }
+    public String getObservacionesPosgrados() { return observacionesPosgrados; }
+    public void setObservacionesPosgrados(String o) { this.observacionesPosgrados = o; }
 
-public String getResumenProyecto() { return resumenProyecto; }
-public void setResumenProyecto(String resumenProyecto) { this.resumenProyecto = resumenProyecto; }
+    public LocalDateTime getFechaValidacion() { return fechaValidacion; }
+    public void setFechaValidacion(LocalDateTime f) { this.fechaValidacion = f; }
 
-// ── HU-09 ─────────────────────────────────────────────────────────────
-private String validacionPosgrados;     // APROBADA | RECHAZADA
-private String observacionesPosgrados;  // motivo de la decisión
-private LocalDateTime fechaValidacion;  // cuándo validó
-private String cedulaPosgrados;         // quién validó
+    public String getCedulaPosgrados() { return cedulaPosgrados; }
+    public void setCedulaPosgrados(String c) { this.cedulaPosgrados = c; }
 
-// Getters y setters
-public String getValidacionPosgrados() { return validacionPosgrados; }
-public void setValidacionPosgrados(String v) { this.validacionPosgrados = v; }
+    public String getEstadoPagoGrado() { return estadoPagoGrado; }
+    public void setEstadoPagoGrado(String estadoPagoGrado) { this.estadoPagoGrado = estadoPagoGrado; }
 
-public String getObservacionesPosgrados() { return observacionesPosgrados; }
-public void setObservacionesPosgrados(String o) { this.observacionesPosgrados = o; }
-
-public LocalDateTime getFechaValidacion() { return fechaValidacion; }
-public void setFechaValidacion(LocalDateTime f) { this.fechaValidacion = f; }
-
-public String getCedulaPosgrados() { return cedulaPosgrados; }
-public void setCedulaPosgrados(String c) { this.cedulaPosgrados = c; }
-
-// ── Pago y fecha de grado ──────────────────────────────────────────────
-private Boolean pagoGradoRealizado = false;
-private java.time.LocalDate fechaGrado;
-
-public Boolean getPagoGradoRealizado() { return pagoGradoRealizado; }
-public void setPagoGradoRealizado(Boolean pagoGradoRealizado) {
-    this.pagoGradoRealizado = pagoGradoRealizado;
-}
-
-public java.time.LocalDate getFechaGrado() { return fechaGrado; }
-public void setFechaGrado(java.time.LocalDate fechaGrado) { this.fechaGrado = fechaGrado; }
-
+    public LocalDate getFechaGrado() { return fechaGrado; }
+    public void setFechaGrado(LocalDate fechaGrado) { this.fechaGrado = fechaGrado; }
 }
