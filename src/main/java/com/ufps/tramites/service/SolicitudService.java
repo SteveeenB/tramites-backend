@@ -390,7 +390,7 @@ public class SolicitudService {
             map.put("resumenProyecto",     s.getResumenProyecto());
             map.put("tipoProyecto",        s.getTipoProyecto());
             // Campos de progreso del proceso de grado
-            map.put("pagoGradoRealizado",  s.getPagoGradoRealizado() != null && s.getPagoGradoRealizado());
+            map.put("estadoPagoGrado", s.getEstadoPagoGrado());
             map.put("fechaGrado",          s.getFechaGrado() != null ? s.getFechaGrado().toString() : null);
         }
 
@@ -419,7 +419,7 @@ public class SolicitudService {
         if (!"APROBADA".equals(s.getEstado()) || !"GRADO".equals(s.getTipo())) {
             throw new IllegalStateException("La solicitud no es una solicitud de grado aprobada");
         }
-        s.setPagoGradoRealizado(true);
+        s.setEstadoPagoGrado("APROBADO");
         solicitudRepository.save(s);
         return construirRespuestaSolicitud(s);
     }
@@ -434,7 +434,7 @@ public class SolicitudService {
         if (!"APROBADA".equals(s.getEstado()) || !"GRADO".equals(s.getTipo())) {
             throw new IllegalStateException("La solicitud no es una solicitud de grado aprobada");
         }
-        if (s.getPagoGradoRealizado() == null || !s.getPagoGradoRealizado()) {
+        if (!"APROBADO".equals(s.getEstadoPagoGrado())) {
             throw new IllegalStateException("El pago de grado no ha sido registrado");
         }
         s.setFechaGrado(fechaGrado);
