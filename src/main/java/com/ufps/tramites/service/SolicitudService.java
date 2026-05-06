@@ -88,15 +88,17 @@ public class SolicitudService {
             );
         }
 
-        // 3. Verificar que no exista una solicitud activa del mismo tipo
-        Optional<Solicitud> existente = solicitudRepository.findFirstByCedulaAndTipo(
-            estudiante.getCedula(), "TERMINACION_MATERIAS"
-        );
-        if (existente.isPresent()) {
-            throw new IllegalStateException(
-                "Ya existe una solicitud de terminación de materias con estado: " + existente.get().getEstado()
-            );
-        }
+         // 3. Verificar que no exista una solicitud activa del mismo tipo (pendiente o en revisión)
+         Optional<Solicitud> existente = solicitudRepository.findFirstByCedulaAndTipo(
+             estudiante.getCedula(), "TERMINACION_MATERIAS"
+         );
+         if (existente.isPresent() && 
+             ("PENDIENTE_PAGO".equals(existente.get().getEstado()) || 
+              "EN_REVISION".equals(existente.get().getEstado()))) {
+             throw new IllegalStateException(
+                 "Ya existe una solicitud de terminación de materias con estado: " + existente.get().getEstado()
+             );
+         }
 
         // 4. Crear y guardar la solicitud
         Solicitud solicitud = new Solicitud();
