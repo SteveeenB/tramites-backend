@@ -20,7 +20,7 @@ public class ConvocatoriaService {
         if (convocatoriaRepository.count() == 0) {
             Convocatoria c = new Convocatoria();
             c.setFechaInicio(LocalDate.of(2026, 4, 7));
-            c.setFechaFin(LocalDate.of(2026, 4, 25));
+            c.setFechaFin(LocalDate.of(2026, 6, 26));
             convocatoriaRepository.save(c);
         }
     }
