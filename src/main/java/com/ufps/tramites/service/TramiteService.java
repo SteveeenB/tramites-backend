@@ -160,7 +160,9 @@ public class TramiteService {
         map.put("tituloProyecto",   s.getTituloProyecto());
         map.put("resumenProyecto",  s.getResumenProyecto());
         map.put("tipoProyecto",     s.getTipoProyecto());
-
+        map.put("estadoPagoGrado",  s.getEstadoPagoGrado());
+        map.put("fechaGrado",       s.getFechaGrado() != null ? s.getFechaGrado().toString() : null);
+        map.put("fechaDecision",    s.getFechaDecision() != null ? s.getFechaDecision().toString() : null);
         return map;
     }
 
