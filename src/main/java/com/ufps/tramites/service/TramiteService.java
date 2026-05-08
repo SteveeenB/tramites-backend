@@ -38,11 +38,7 @@ public class TramiteService {
         int creditosRequeridos = usuario.getProgramaAcademico() != null
                 ? usuario.getProgramaAcademico().getTotalCreditos() : Integer.MAX_VALUE;
 
-        boolean enConvocatoria = convocatoriaService.estaVigente();
-
-        // Etapa 1 se habilita si el estudiante tiene los créditos suficientes
-        // Y la convocatoria académica está vigente
-        boolean etapa1Habilitada = creditosAprobados >= creditosRequeridos && enConvocatoria;
+        boolean etapa1Habilitada = creditosAprobados >= creditosRequeridos;
 
         Optional<Solicitud> solicitudTerminacion = solicitudRepository
                 .findFirstByCedulaAndTipo(usuario.getCedula(), "TERMINACION_MATERIAS");
@@ -59,7 +55,7 @@ public class TramiteService {
 
         response.put("creditos", construirCreditos(usuario));
         response.put("estadoAcademico", "Regular");
-        response.put("convocatoria", construirConvocatoria());
+        //response.put("convocatoria", construirConvocatoria());
         response.put("etapa1Completada", etapa1Habilitada);
         response.put("etapa2Disponible", etapa2Disponible);
         response.put("certificadoDisponible", certificadoDisponible);
