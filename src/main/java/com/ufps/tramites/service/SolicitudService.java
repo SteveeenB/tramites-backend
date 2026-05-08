@@ -1,6 +1,5 @@
 package com.ufps.tramites.service;
 
-import com.ufps.tramites.model.Convocatoria;
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.repository.DocumentoSolicitudRepository;
@@ -33,8 +32,8 @@ public class SolicitudService {
     // Costo fijo de los derechos de grado (COP) — valor de prueba
     private static final double COSTO_GRADO = 250_000.0;
 
-    @Autowired
-    private ConvocatoriaService convocatoriaService;
+    private static final org.slf4j.Logger log
+            = org.slf4j.LoggerFactory.getLogger(SolicitudService.class);
 
     @Autowired
     private SolicitudRepository solicitudRepository;
@@ -64,6 +63,9 @@ public class SolicitudService {
     @Autowired
     CertificadoPdfService certificadoPdfService;
 
+    @Autowired
+    private CorreoCertificadoService correoService;
+
     /**
      * Crea una solicitud de terminación de materias. Valida: período de
      * convocatoria, créditos aprobados y duplicados.
@@ -81,15 +83,7 @@ public class SolicitudService {
             );
         }
 
-        // 2. Validar calendario académico
         LocalDate hoy = LocalDate.now();
-        if (!convocatoriaService.estaVigente()) {
-            Convocatoria conv = convocatoriaService.getActiva();
-            throw new IllegalStateException(
-                    "La solicitud está fuera del período habilitado por el calendario académico ("
-                    + conv.getFechaInicio() + " al " + conv.getFechaFin() + ")."
-            );
-        }
 
         // 3. Verificar que no exista una solicitud activa del mismo tipo
         Optional<Solicitud> existente = solicitudRepository.findFirstByCedulaAndTipo(
@@ -143,7 +137,7 @@ public class SolicitudService {
         Optional<Solicitud> existente = solicitudRepository.findFirstByCedulaAndTipo(
                 estudiante.getCedula(), "GRADO"
         );
-        if (existente.isPresent()) {
+        if (existente.isPresent() && !"RECHAZADA".equals(existente.get().getEstado())) {
             throw new IllegalStateException(
                     "Ya existe una solicitud de grado con estado: " + existente.get().getEstado()
             );
@@ -587,6 +581,16 @@ public class SolicitudService {
         s.setEstado("APROBADA");
         solicitudRepository.save(s);
         notificarEstudiante(s, "APROBADA_DIRECTOR");
+        try {
+            byte[] pdfBytes = generarCertificadoPdf(id);
+            usuarioRepository.findById(s.getCedula()).ifPresent(est -> {
+                if (est.getCorreo() != null && !est.getCorreo().isBlank()) {
+                    correoService.enviarCertificadoPorCorreo(est, pdfBytes, id);
+                }
+            });
+        } catch (Exception e) {
+            log.warn("[POSGRADOS] No se pudo enviar el certificado por correo: {}", e.getMessage());
+        }
         return construirRespuestaSolicitud(s);
     }
 
