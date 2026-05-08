@@ -61,9 +61,12 @@ public class SolicitudService {
     @Lazy
     private PazYSalvoService pazYSalvoService;
 
+    @Autowired
+    CertificadoPdfService certificadoPdfService;
+
     /**
-     * Crea una solicitud de terminación de materias.
-     * Valida: período de convocatoria, créditos aprobados y duplicados.
+     * Crea una solicitud de terminación de materias. Valida: período de
+     * convocatoria, créditos aprobados y duplicados.
      */
     public Map<String, Object> crearSolicitudTerminacion(Usuario estudiante) {
         // 1. Validar créditos (requisito reglamentario)
@@ -73,8 +76,8 @@ public class SolicitudService {
                 : Integer.MAX_VALUE;
         if (creditosAprobados < creditosRequeridos) {
             throw new IllegalStateException(
-                "No cumple los requisitos académicos: tiene " + creditosAprobados
-                + "/" + creditosRequeridos + " créditos aprobados."
+                    "No cumple los requisitos académicos: tiene " + creditosAprobados
+                    + "/" + creditosRequeridos + " créditos aprobados."
             );
         }
 
@@ -83,22 +86,20 @@ public class SolicitudService {
         if (!convocatoriaService.estaVigente()) {
             Convocatoria conv = convocatoriaService.getActiva();
             throw new IllegalStateException(
-                "La solicitud está fuera del período habilitado por el calendario académico ("
-                + conv.getFechaInicio() + " al " + conv.getFechaFin() + ")."
+                    "La solicitud está fuera del período habilitado por el calendario académico ("
+                    + conv.getFechaInicio() + " al " + conv.getFechaFin() + ")."
             );
         }
 
-         // 3. Verificar que no exista una solicitud activa del mismo tipo (pendiente o en revisión)
-         Optional<Solicitud> existente = solicitudRepository.findFirstByCedulaAndTipo(
-             estudiante.getCedula(), "TERMINACION_MATERIAS"
-         );
-         if (existente.isPresent() && 
-             ("PENDIENTE_PAGO".equals(existente.get().getEstado()) || 
-              "EN_REVISION".equals(existente.get().getEstado()))) {
-             throw new IllegalStateException(
-                 "Ya existe una solicitud de terminación de materias con estado: " + existente.get().getEstado()
-             );
-         }
+        // 3. Verificar que no exista una solicitud activa del mismo tipo
+        Optional<Solicitud> existente = solicitudRepository.findFirstByCedulaAndTipo(
+                estudiante.getCedula(), "TERMINACION_MATERIAS"
+        );
+        if (existente.isPresent()) {
+            throw new IllegalStateException(
+                    "Ya existe una solicitud de terminación de materias con estado: " + existente.get().getEstado()
+            );
+        }
 
         // 4. Crear y guardar la solicitud
         Solicitud solicitud = new Solicitud();
@@ -115,8 +116,9 @@ public class SolicitudService {
     }
 
     /**
-     * Crea una solicitud de grado académico con su detalle y documentos adjuntos.
-     * Requiere que la terminación de materias esté APROBADA y que no exista solicitud de grado activa.
+     * Crea una solicitud de grado académico con su detalle y documentos
+     * adjuntos. Requiere que la terminación de materias esté APROBADA y que no
+     * exista solicitud de grado activa.
      */
     public Map<String, Object> crearSolicitudGrado(
             Usuario estudiante,
@@ -129,21 +131,21 @@ public class SolicitudService {
 
         // 1. Verificar que la terminación de materias esté aprobada (requisito previo)
         Optional<Solicitud> terminacion = solicitudRepository.findFirstByCedulaAndTipo(
-            estudiante.getCedula(), "TERMINACION_MATERIAS"
+                estudiante.getCedula(), "TERMINACION_MATERIAS"
         );
         if (terminacion.isEmpty() || !"APROBADA".equals(terminacion.get().getEstado())) {
             throw new IllegalStateException(
-                "Debe tener la Terminación de Materias aprobada para solicitar el grado académico."
+                    "Debe tener la Terminación de Materias aprobada para solicitar el grado académico."
             );
         }
 
         // 2. Verificar que no exista ya una solicitud de grado activa
         Optional<Solicitud> existente = solicitudRepository.findFirstByCedulaAndTipo(
-            estudiante.getCedula(), "GRADO"
+                estudiante.getCedula(), "GRADO"
         );
         if (existente.isPresent()) {
             throw new IllegalStateException(
-                "Ya existe una solicitud de grado con estado: " + existente.get().getEstado()
+                    "Ya existe una solicitud de grado con estado: " + existente.get().getEstado()
             );
         }
 
@@ -173,9 +175,9 @@ public class SolicitudService {
     }
 
     /**
-     * Retorna la bandeja del director agrupada por estado.
-     * Incluye todas las solicitudes de TERMINACION_MATERIAS de los estudiantes
-     * del mismo programa académico del director.
+     * Retorna la bandeja del director agrupada por estado. Incluye todas las
+     * solicitudes de TERMINACION_MATERIAS de los estudiantes del mismo programa
+     * académico del director.
      */
     public Map<String, Object> obtenerBandejaDirector(Usuario director) {
         Long programaId = director.getProgramaAcademico() != null
@@ -195,7 +197,7 @@ public class SolicitudService {
         List<Solicitud> pendientes = todas.stream()
                 .filter(s -> "PENDIENTE_PAGO".equals(s.getEstado()) || "EN_REVISION".equals(s.getEstado()))
                 .collect(Collectors.toList());
-        List<Solicitud> aprobadas  = todas.stream()
+        List<Solicitud> aprobadas = todas.stream()
                 .filter(s -> "APROBADA".equals(s.getEstado()))
                 .collect(Collectors.toList());
         List<Solicitud> rechazadas = todas.stream()
@@ -204,14 +206,14 @@ public class SolicitudService {
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("pendientes", mapearConEstudiante(pendientes, porCedula));
-        response.put("aprobadas",  mapearConEstudiante(aprobadas,  porCedula));
+        response.put("aprobadas", mapearConEstudiante(aprobadas, porCedula));
         response.put("rechazadas", mapearConEstudiante(rechazadas, porCedula));
         return response;
     }
 
     /**
-     * Retorna la bandeja del director agrupada por estado, solo solicitudes de GRADO
-     * de los estudiantes del mismo programa académico del director.
+     * Retorna la bandeja del director agrupada por estado, solo solicitudes de
+     * GRADO de los estudiantes del mismo programa académico del director.
      */
     public Map<String, Object> obtenerBandejaGrado(Usuario director) {
         Long programaId = director.getProgramaAcademico() != null
@@ -240,7 +242,7 @@ public class SolicitudService {
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("pendientes", mapearGradoConEstudiante(pendientes, porCedula));
-        response.put("aprobadas",  mapearGradoConEstudiante(aprobadas,  porCedula));
+        response.put("aprobadas", mapearGradoConEstudiante(aprobadas, porCedula));
         response.put("rechazadas", mapearGradoConEstudiante(rechazadas, porCedula));
         return response;
     }
@@ -249,26 +251,26 @@ public class SolicitudService {
             List<Solicitud> solicitudes, Map<String, Usuario> porCedula) {
         return solicitudes.stream().map(s -> {
             Map<String, Object> map = new LinkedHashMap<>();
-            map.put("id",                    s.getId());
-            map.put("tipo",                  s.getTipo());
-            map.put("estado",                s.getEstado());
-            map.put("fechaSolicitud",        s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : null);
+            map.put("id", s.getId());
+            map.put("tipo", s.getTipo());
+            map.put("estado", s.getEstado());
+            map.put("fechaSolicitud", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : null);
             map.put("observacionesDirector", s.getObservacionesDirector());
-            map.put("tituloProyecto",        s.getTituloProyecto());
-            map.put("tipoProyecto",          s.getTipoProyecto());
-            map.put("resumenProyecto",       s.getResumenProyecto());
-            map.put("documentosCargados",    documentoSolicitudRepository.countBySolicitudId(s.getId()));
-            map.put("documentosRequeridos",  2);
+            map.put("tituloProyecto", s.getTituloProyecto());
+            map.put("tipoProyecto", s.getTipoProyecto());
+            map.put("resumenProyecto", s.getResumenProyecto());
+            map.put("documentosCargados", documentoSolicitudRepository.countBySolicitudId(s.getId()));
+            map.put("documentosRequeridos", 2);
 
             Usuario est = porCedula.get(s.getCedula());
             if (est != null) {
                 Map<String, Object> estMap = new LinkedHashMap<>();
-                estMap.put("cedula",              est.getCedula());
-                estMap.put("nombre",              est.getNombre());
-                estMap.put("programa",            est.getProgramaAcademico() != null
+                estMap.put("cedula", est.getCedula());
+                estMap.put("nombre", est.getNombre());
+                estMap.put("programa", est.getProgramaAcademico() != null
                         ? est.getProgramaAcademico().getNombre() : null);
-                estMap.put("creditosAprobados",   est.getCreditosAprobados());
-                estMap.put("creditosRequeridos",  est.getProgramaAcademico() != null
+                estMap.put("creditosAprobados", est.getCreditosAprobados());
+                estMap.put("creditosRequeridos", est.getProgramaAcademico() != null
                         ? est.getProgramaAcademico().getTotalCreditos() : null);
                 map.put("estudiante", estMap);
             }
@@ -277,20 +279,20 @@ public class SolicitudService {
     }
 
     private List<Map<String, Object>> mapearConEstudiante(List<Solicitud> solicitudes,
-                                                          Map<String, Usuario> porCedula) {
+            Map<String, Usuario> porCedula) {
         return solicitudes.stream().map(s -> {
             Map<String, Object> map = new LinkedHashMap<>();
-            map.put("id",             s.getId());
-            map.put("tipo",           s.getTipo());
-            map.put("estado",         s.getEstado());
+            map.put("id", s.getId());
+            map.put("tipo", s.getTipo());
+            map.put("estado", s.getEstado());
             map.put("fechaSolicitud", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : null);
-            map.put("observaciones",  s.getObservaciones());
+            map.put("observaciones", s.getObservaciones());
 
             Usuario est = porCedula.get(s.getCedula());
             if (est != null) {
                 Map<String, Object> estMap = new LinkedHashMap<>();
-                estMap.put("cedula",   est.getCedula());
-                estMap.put("nombre",   est.getNombre());
+                estMap.put("cedula", est.getCedula());
+                estMap.put("nombre", est.getNombre());
                 estMap.put("programa", est.getProgramaAcademico() != null
                         ? est.getProgramaAcademico().getNombre() : null);
                 map.put("estudiante", estMap);
@@ -299,7 +301,9 @@ public class SolicitudService {
         }).collect(Collectors.toList());
     }
 
-    /** Aprueba una solicitud de terminación de materias pendiente. */
+    /**
+     * Aprueba una solicitud de terminación de materias pendiente.
+     */
     public Map<String, Object> aprobarSolicitud(Long id) {
         return aprobarSolicitudConDirector(id, null);
     }
@@ -311,8 +315,13 @@ public class SolicitudService {
             throw new IllegalStateException("Solo se pueden aprobar solicitudes en estado pendiente");
         }
         String estadoAnterior = s.getEstado();
-        s.setEstado("APROBADA");
+        String nuevoEstado = "TERMINACION_MATERIAS".equals(s.getTipo())
+                ? "APROBADA_DIRECTOR"
+                : "APROBADA";
+        s.setEstado(nuevoEstado);
         s.setObservaciones("Aprobada por el director de programa.");
+        s.setObservaciones("Aprobada por el director de programa.");
+
         solicitudRepository.save(s);
 
         notificarEstudiante(s, estadoAnterior);
@@ -326,8 +335,8 @@ public class SolicitudService {
             });
             // Iniciar proceso de paz y salvo
             if (cedulaDirector != null) {
-                usuarioRepository.findById(cedulaDirector).ifPresent(director ->
-                    pazYSalvoService.iniciarProcesoPazYSalvo(s, director)
+                usuarioRepository.findById(cedulaDirector).ifPresent(director
+                        -> pazYSalvoService.iniciarProcesoPazYSalvo(s, director)
                 );
             }
         }
@@ -335,11 +344,14 @@ public class SolicitudService {
         return construirRespuestaSolicitud(s);
     }
 
-    /** Rechaza una solicitud de terminación de materias pendiente. */
+    /**
+     * Rechaza una solicitud de terminación de materias pendiente.
+     */
     public Map<String, Object> rechazarSolicitud(Long id, String motivo) {
         Solicitud s = solicitudRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
-        if (!"PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())) {
+        if (!"PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())
+                && !"APROBADA_DIRECTOR".equals(s.getEstado())) {
             throw new IllegalStateException("Solo se pueden rechazar solicitudes en estado pendiente");
         }
         if (motivo == null || motivo.isBlank()) {
@@ -360,7 +372,9 @@ public class SolicitudService {
                 .ifPresent(est -> notificacionService.notificarEstudianteCambioEstado(s, est));
     }
 
-    /** Retorna todas las solicitudes de un estudiante. */
+    /**
+     * Retorna todas las solicitudes de un estudiante.
+     */
     public List<Map<String, Object>> obtenerSolicitudesPorCedula(String cedula) {
         List<Solicitud> solicitudes = solicitudRepository.findByCedula(cedula);
         List<Map<String, Object>> resultado = new ArrayList<>();
@@ -388,12 +402,12 @@ public class SolicitudService {
                 "APROBADA".equals(s.getEstado()) && "TERMINACION_MATERIAS".equals(s.getTipo()));
 
         if ("GRADO".equals(s.getTipo())) {
-            map.put("tituloProyecto",      s.getTituloProyecto());
-            map.put("resumenProyecto",     s.getResumenProyecto());
-            map.put("tipoProyecto",        s.getTipoProyecto());
+            map.put("tituloProyecto", s.getTituloProyecto());
+            map.put("resumenProyecto", s.getResumenProyecto());
+            map.put("tipoProyecto", s.getTipoProyecto());
             // Campos de progreso del proceso de grado
             map.put("estadoPagoGrado", s.getEstadoPagoGrado());
-            map.put("fechaGrado",          s.getFechaGrado() != null ? s.getFechaGrado().toString() : null);
+            map.put("fechaGrado", s.getFechaGrado() != null ? s.getFechaGrado().toString() : null);
         }
 
         return map;
@@ -405,15 +419,15 @@ public class SolicitudService {
         liq.put("concepto", esGrado ? "Derechos de Grado" : "Trámite de Terminación de Materias");
         liq.put("valor", s.getCosto());
         liq.put("fechaLimite", s.getFechaSolicitud() != null
-            ? s.getFechaSolicitud().plusDays(5).toString()
-            : null);
+                ? s.getFechaSolicitud().plusDays(5).toString()
+                : null);
         liq.put("instrucciones", "Realiza el pago en la ventanilla de Tesorería o por PSE antes de la fecha límite.");
         return liq;
     }
 
     /**
-     * Registra el pago de derechos de grado (demo).
-     * Marca el campo pagoGradoRealizado = true en la solicitud.
+     * Registra el pago de derechos de grado (demo). Marca el campo
+     * pagoGradoRealizado = true en la solicitud.
      */
     public Map<String, Object> registrarPagoGrado(Long id) {
         Solicitud s = solicitudRepository.findById(id)
@@ -427,8 +441,8 @@ public class SolicitudService {
     }
 
     /**
-     * Registra la fecha de graduación elegida por el estudiante.
-     * Requiere que el pago ya esté registrado.
+     * Registra la fecha de graduación elegida por el estudiante. Requiere que
+     * el pago ya esté registrado.
      */
     public Map<String, Object> registrarFechaGrado(Long id, LocalDate fechaGrado) {
         Solicitud s = solicitudRepository.findById(id)
@@ -445,12 +459,11 @@ public class SolicitudService {
     }
 
     /**
-     * Genera (o reutiliza) el acta de grado en PDF.
-     * En la primera llamada:
-     *   1. Genera el PDF con datos institucionales y fecha de grado elegida.
-     *   2. Marca al estudiante como GRADUADO en la base de datos.
-     *   3. Vincula el PDF al expediente digital (DocumentoSolicitud tipo ACTA).
-     * En llamadas posteriores devuelve el PDF ya guardado en disco.
+     * Genera (o reutiliza) el acta de grado en PDF. En la primera llamada: 1.
+     * Genera el PDF con datos institucionales y fecha de grado elegida. 2.
+     * Marca al estudiante como GRADUADO en la base de datos. 3. Vincula el PDF
+     * al expediente digital (DocumentoSolicitud tipo ACTA). En llamadas
+     * posteriores devuelve el PDF ya guardado en disco.
      */
     public byte[] generarActa(Long id) {
         Solicitud s = solicitudRepository.findById(id)
@@ -470,9 +483,9 @@ public class SolicitudService {
 
         // Primera generación: construir PDF
         Usuario est = usuarioRepository.findById(s.getCedula()).orElse(null);
-        String nombre   = est != null ? est.getNombre()   : "Estudiante";
-        String cedula   = s.getCedula();
-        String codigo   = est != null ? est.getCodigo()   : "-";
+        String nombre = est != null ? est.getNombre() : "Estudiante";
+        String cedula = s.getCedula();
+        String codigo = est != null ? est.getCodigo() : "-";
         String programa = est != null && est.getProgramaAcademico() != null
                 ? est.getProgramaAcademico().getNombre() : "-";
 
@@ -481,7 +494,7 @@ public class SolicitudService {
         String fechaAprobacion = s.getFechaDecision() != null
                 ? s.getFechaDecision().toLocalDate().format(fmt)
                 : (s.getFechaSolicitud() != null ? s.getFechaSolicitud().format(fmt)
-                    : LocalDate.now().format(fmt));
+                : LocalDate.now().format(fmt));
 
         String fechaExpedicion = LocalDate.now().format(fmt);
 
@@ -511,8 +524,76 @@ public class SolicitudService {
     }
 
     /**
+     * Retorna bandeja unificada para el rol POSGRADOS.
+     */
+    public Map<String, Object> getBandejaPosgrados() {
+        List<Solicitud> terminacion = solicitudRepository.findByTipo("TERMINACION_MATERIAS");
+        List<Solicitud> grado = solicitudRepository.findByTipo("GRADO");
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("terminacion", terminacion.stream().map(s -> enriquecerConEstudiante(s)).collect(Collectors.toList()));
+        resp.put("grado", grado.stream().map(s -> enriquecerConEstudiante(s)).collect(Collectors.toList()));
+        return resp;
+    }
+
+    private Map<String, Object> enriquecerConEstudiante(Solicitud s) {
+        Map<String, Object> m = construirRespuestaSolicitud(s);
+        usuarioRepository.findById(s.getCedula()).ifPresent(est -> {
+            m.put("nombreEstudiante", est.getNombre());
+            m.put("cedulaEstudiante", est.getCedula());
+            m.put("codigoEstudiante", est.getCodigo());
+            m.put("programa", est.getProgramaAcademico() != null ? est.getProgramaAcademico().getNombre() : null);
+        });
+        return m;
+    }
+
+    /**
+     * Genera el certificado de terminación en PDF con QR de verificación.
+     */
+    public byte[] generarCertificadoPdf(Long id) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"APROBADA".equals(s.getEstado())) {
+            throw new IllegalStateException("El certificado solo está disponible para solicitudes aprobadas");
+        }
+        if (!"TERMINACION_MATERIAS".equals(s.getTipo())) {
+            throw new IllegalStateException("Este tipo de solicitud no genera certificado");
+        }
+        Usuario est = usuarioRepository.findById(s.getCedula()).orElse(null);
+        String nombre = est != null ? est.getNombre() : "Estudiante";
+        String codigo = est != null ? est.getCodigo() : "-";
+        String programa = est != null && est.getProgramaAcademico() != null ? est.getProgramaAcademico().getNombre() : "-";
+        Locale es = new Locale("es", "CO");
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy", es);
+        String fechaAprobacion = s.getFechaSolicitud() != null ? s.getFechaSolicitud().format(fmt) : LocalDate.now().format(fmt);
+        String fechaExpedicion = LocalDate.now().format(fmt);
+        try {
+            return certificadoPdfService.generar(nombre, s.getCedula(), codigo, programa, fechaAprobacion, fechaExpedicion, id);
+        } catch (IOException e) {
+            throw new RuntimeException("Error generando el PDF del certificado", e);
+        }
+    }
+
+    public Map<String, Object> aprobarPosgrados(Long id) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"APROBADA_DIRECTOR".equals(s.getEstado())) {
+            throw new IllegalStateException(
+                    "La solicitud debe estar en estado 'Aprobada por director' para que posgrados pueda aprobarla. "
+                    + "Estado actual: " + s.getEstado());
+        }
+        if (!"TERMINACION_MATERIAS".equals(s.getTipo())) {
+            throw new IllegalStateException("Este endpoint solo aplica para solicitudes de terminación de materias.");
+        }
+        s.setEstado("APROBADA");
+        solicitudRepository.save(s);
+        notificarEstudiante(s, "APROBADA_DIRECTOR");
+        return construirRespuestaSolicitud(s);
+    }
+
+    /**
      * Genera el contenido de texto del certificado de terminación de materias.
-     * Valida que la solicitud exista, sea de tipo TERMINACION_MATERIAS y esté APROBADA.
+     * Valida que la solicitud exista, sea de tipo TERMINACION_MATERIAS y esté
+     * APROBADA.
      */
     public byte[] generarCertificado(Long id) {
         Solicitud s = solicitudRepository.findById(id)
@@ -525,39 +606,39 @@ public class SolicitudService {
         }
 
         Usuario est = usuarioRepository.findById(s.getCedula()).orElse(null);
-        String nombre   = est != null ? est.getNombre() : "Estudiante";
-        String cedula   = s.getCedula();
-        String codigo   = est != null ? est.getCodigo() : "-";
+        String nombre = est != null ? est.getNombre() : "Estudiante";
+        String cedula = s.getCedula();
+        String codigo = est != null ? est.getCodigo() : "-";
         String programa = est != null && est.getProgramaAcademico() != null
                 ? est.getProgramaAcademico().getNombre() : "-";
-        String fecha    = s.getFechaSolicitud() != null
+        String fecha = s.getFechaSolicitud() != null
                 ? s.getFechaSolicitud().format(DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy",
                         new java.util.Locale("es", "CO")))
                 : LocalDate.now().toString();
 
-        String contenido =
-            "================================================================\n" +
-            "       UNIVERSIDAD FRANCISCO DE PAULA SANTANDER\n" +
-            "         SISTEMA DE TRAMITES DE POSGRADO\n" +
-            "================================================================\n\n" +
-            "         CERTIFICADO DE TERMINACION DE MATERIAS\n\n" +
-            "Se certifica que el/la estudiante:\n\n" +
-            "  Nombre:             " + nombre   + "\n" +
-            "  Cedula:             " + cedula   + "\n" +
-            "  Codigo estudiantil: " + codigo   + "\n" +
-            "  Programa:           " + programa + "\n\n" +
-            "Ha cumplido satisfactoriamente con los requisitos academicos\n" +
-            "establecidos para la Terminacion de Materias, segun resolucion\n" +
-            "aprobada el " + fecha + ".\n\n" +
-            "Expedido el: " + LocalDate.now().format(
-                    DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy",
-                            new java.util.Locale("es", "CO"))) + "\n\n" +
-            "================================================================\n" +
-            "  UNIVERSIDAD FRANCISCO DE PAULA SANTANDER\n" +
-            "  San Jose de Cucuta, Colombia\n" +
-            "  Este documento es valido ante la oficina de\n" +
-            "  Registro y Control Academico.\n" +
-            "================================================================\n";
+        String contenido
+                = "================================================================\n"
+                + "       UNIVERSIDAD FRANCISCO DE PAULA SANTANDER\n"
+                + "         SISTEMA DE TRAMITES DE POSGRADO\n"
+                + "================================================================\n\n"
+                + "         CERTIFICADO DE TERMINACION DE MATERIAS\n\n"
+                + "Se certifica que el/la estudiante:\n\n"
+                + "  Nombre:             " + nombre + "\n"
+                + "  Cedula:             " + cedula + "\n"
+                + "  Codigo estudiantil: " + codigo + "\n"
+                + "  Programa:           " + programa + "\n\n"
+                + "Ha cumplido satisfactoriamente con los requisitos academicos\n"
+                + "establecidos para la Terminacion de Materias, segun resolucion\n"
+                + "aprobada el " + fecha + ".\n\n"
+                + "Expedido el: " + LocalDate.now().format(
+                        DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy",
+                                new java.util.Locale("es", "CO"))) + "\n\n"
+                + "================================================================\n"
+                + "  UNIVERSIDAD FRANCISCO DE PAULA SANTANDER\n"
+                + "  San Jose de Cucuta, Colombia\n"
+                + "  Este documento es valido ante la oficina de\n"
+                + "  Registro y Control Academico.\n"
+                + "================================================================\n";
 
         return contenido.getBytes(StandardCharsets.UTF_8);
     }
