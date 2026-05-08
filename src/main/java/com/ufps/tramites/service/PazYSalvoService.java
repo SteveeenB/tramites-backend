@@ -14,6 +14,7 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -220,9 +221,18 @@ public class PazYSalvoService {
         if (solicitudGrado.isPresent()) {
             String estado = solicitudGrado.get().getEstado();
             if ("APROBADA".equals(estado)) {
-                info.put("etapa",      "GRADUADO");
-                info.put("etapaLabel", "Graduado");
-            } else if ("RECHAZADA".equals(estado)) {
+    LocalDate fechaGrado = solicitudGrado.get().getFechaGrado();
+    if (fechaGrado != null) {
+        String fechaFmt = fechaGrado.format(
+            java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        info.put("etapa",      "FECHA_GRADO_ASIGNADA");
+        info.put("etapaLabel", "Fecha prevista: " + fechaFmt);
+        info.put("fechaGrado", fechaGrado.toString());
+    } else {
+        info.put("etapa",      "SOLICITUD_GRADO_APROBADA");
+        info.put("etapaLabel", "Grado aprobado");
+    }
+} else if ("RECHAZADA".equals(estado)) {
                 info.put("etapa",      "SOLICITUD_GRADO_RECHAZADA");
                 info.put("etapaLabel", "Solicitud de grado rechazada");
             } else {
