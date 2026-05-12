@@ -394,6 +394,7 @@ public class SolicitudService {
         map.put("liquidacion", construirLiquidacion(s));
         map.put("certificadoDisponible",
                 "APROBADA".equals(s.getEstado()) && "TERMINACION_MATERIAS".equals(s.getTipo()));
+        map.put("actaGenerada", s.isActaGenerada());
 
         if ("GRADO".equals(s.getTipo())) {
             map.put("tituloProyecto", s.getTituloProyecto());
@@ -540,6 +541,12 @@ public class SolicitudService {
         return m;
     }
 
+    public boolean perteneceAEstudiante(Long solicitudId, String cedula) {
+        return solicitudRepository.findById(solicitudId)
+                .map(s -> cedula.equals(s.getCedula()))
+                .orElse(false);
+    }
+
     /**
      * Genera el certificado de terminación en PDF con QR de verificación.
      */
@@ -561,13 +568,16 @@ public class SolicitudService {
         String fechaAprobacion = s.getFechaSolicitud() != null ? s.getFechaSolicitud().format(fmt) : LocalDate.now().format(fmt);
         String fechaExpedicion = LocalDate.now().format(fmt);
         try {
-            return certificadoPdfService.generar(nombre, s.getCedula(), codigo, programa, fechaAprobacion, fechaExpedicion, id);
+            byte[] pdf = certificadoPdfService.generar(nombre, s.getCedula(), codigo, programa, fechaAprobacion, fechaExpedicion, id);
+            s.setActaGenerada(true);
+            solicitudRepository.save(s);
+            return pdf;
         } catch (IOException e) {
             throw new RuntimeException("Error generando el PDF del certificado", e);
         }
     }
 
-    public Map<String, Object> aprobarPosgrados(Long id) {
+    public byte[] aprobarPosgrados(Long id) {
         Solicitud s = solicitudRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
         if (!"APROBADA_DIRECTOR".equals(s.getEstado())) {
@@ -581,8 +591,8 @@ public class SolicitudService {
         s.setEstado("APROBADA");
         solicitudRepository.save(s);
         notificarEstudiante(s, "APROBADA_DIRECTOR");
+        byte[] pdfBytes = generarCertificadoPdf(id); // sets actaGenerada=true
         try {
-            byte[] pdfBytes = generarCertificadoPdf(id);
             usuarioRepository.findById(s.getCedula()).ifPresent(est -> {
                 if (est.getCorreo() != null && !est.getCorreo().isBlank()) {
                     correoService.enviarCertificadoPorCorreo(est, pdfBytes, id);
@@ -591,7 +601,7 @@ public class SolicitudService {
         } catch (Exception e) {
             log.warn("[POSGRADOS] No se pudo enviar el certificado por correo: {}", e.getMessage());
         }
-        return construirRespuestaSolicitud(s);
+        return pdfBytes;
     }
 
     /**
