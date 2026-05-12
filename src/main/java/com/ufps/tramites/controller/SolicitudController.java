@@ -360,7 +360,11 @@ public ResponseEntity<?> getBandejaPosgrados(@RequestParam String cedula) {
 @GetMapping("/{id}/certificado-pdf")
 public ResponseEntity<byte[]> descargarCertificadoPdf(@PathVariable Long id, @RequestParam String cedula) {
     Usuario u = usuarioService.obtenerUsuarioPorCedula(cedula);
-    if (u == null || !"POSGRADOS".equals(u.getRol()))
+    if (u == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    boolean esPosgrados = "POSGRADOS".equals(u.getRol());
+    boolean esEstudianteDueno = "ESTUDIANTE".equals(u.getRol()) &&
+            solicitudService.perteneceAEstudiante(id, cedula);
+    if (!esPosgrados && !esEstudianteDueno)
         return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
     try {
         byte[] pdf = solicitudService.generarCertificadoPdf(id);
@@ -386,16 +390,20 @@ public ResponseEntity<?> rechazarPosgrados(@PathVariable Long id,
 }
 
 @PostMapping("/{id}/aprobar-posgrados")
-public ResponseEntity<?> aprobarPosgrados(@PathVariable Long id, @RequestParam String cedula) {
+public ResponseEntity<byte[]> aprobarPosgrados(@PathVariable Long id, @RequestParam String cedula) {
     Usuario u = usuarioService.obtenerUsuarioPorCedula(cedula);
     if (u == null || !"POSGRADOS".equals(u.getRol()))
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido"));
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
     try {
-        return ResponseEntity.ok(solicitudService.aprobarPosgrados(id));
+        byte[] pdf = solicitudService.aprobarPosgrados(id);
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"acta-terminacion-" + id + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     } catch (IllegalArgumentException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     } catch (IllegalStateException e) {
-        return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
+        return ResponseEntity.status(HttpStatus.valueOf(422)).build();
     }
 }
 
