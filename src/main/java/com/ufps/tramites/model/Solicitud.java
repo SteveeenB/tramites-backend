@@ -43,6 +43,9 @@ public class Solicitud {
     private LocalDateTime fechaValidacion;
     private String cedulaPosgrados;
 
+    // ── Acta de terminación ────────────────────────────────────────────────
+    private Boolean actaGenerada;
+
     // ── Proceso de Grado (pago y fecha) ───────────────────────────────────
     private String estadoPagoGrado;   // null | APROBADO
     private LocalDate fechaGrado;
@@ -109,6 +112,9 @@ public class Solicitud {
 
     public String getCedulaPosgrados() { return cedulaPosgrados; }
     public void setCedulaPosgrados(String c) { this.cedulaPosgrados = c; }
+
+    public boolean isActaGenerada() { return Boolean.TRUE.equals(actaGenerada); }
+    public void setActaGenerada(boolean actaGenerada) { this.actaGenerada = actaGenerada; }
 
     public String getEstadoPagoGrado() { return estadoPagoGrado; }
     public void setEstadoPagoGrado(String estadoPagoGrado) { this.estadoPagoGrado = estadoPagoGrado; }
