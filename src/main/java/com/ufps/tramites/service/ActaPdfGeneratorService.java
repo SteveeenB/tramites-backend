@@ -43,7 +43,8 @@ public class ActaPdfGeneratorService {
      */
     public byte[] generar(String nombre, String cedula, String codigo,
                           String programa, String fechaAprobacion,
-                          String fechaExpedicion, String fechaGrado) throws IOException {
+                          String fechaExpedicion, String fechaGrado,
+                          String radicado) throws IOException {
 
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             PdfDocument pdf = new PdfDocument(new PdfWriter(baos));
@@ -53,7 +54,7 @@ public class ActaPdfGeneratorService {
             agregarEncabezado(doc);
             agregarTitulo(doc);
             agregarCuerpo(doc, fechaAprobacion, fechaGrado);
-            agregarTabla(doc, nombre, cedula, codigo, programa);
+            agregarTabla(doc, nombre, cedula, codigo, programa, radicado);
             agregarLugarFecha(doc, fechaExpedicion);
             agregarFirmas(doc);
 
@@ -111,13 +112,14 @@ public class ActaPdfGeneratorService {
     }
 
     private void agregarTabla(Document doc, String nombre, String cedula,
-                               String codigo, String programa) {
+                               String codigo, String programa, String radicado) {
         float[] widths = {38f, 62f};
         Table tabla = new Table(UnitValue.createPercentArray(widths))
                 .setWidth(UnitValue.createPercentValue(88))
                 .setHorizontalAlignment(HorizontalAlignment.CENTER)
                 .setMarginBottom(24);
 
+        if (radicado != null) agregarFila(tabla, "N.° de radicado", radicado);
         agregarFila(tabla, "Nombre completo", nombre);
         agregarFila(tabla, "Cédula de ciudadanía", cedula);
         agregarFila(tabla, "Código estudiantil", codigo);

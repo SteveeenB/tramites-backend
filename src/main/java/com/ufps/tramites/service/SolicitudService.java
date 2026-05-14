@@ -105,6 +105,8 @@ public class SolicitudService {
         solicitud.setObservaciones("Solicitud registrada por el sistema.");
 
         solicitudRepository.save(solicitud);
+        solicitud.setRadicado(generarRadicado(solicitud));
+        solicitudRepository.save(solicitud);
 
         return construirRespuestaSolicitud(solicitud);
     }
@@ -154,6 +156,8 @@ public class SolicitudService {
         solicitud.setTituloProyecto(tituloProyecto);
         solicitud.setResumenProyecto(resumen);
         solicitud.setTipoProyecto(tipoProyecto);
+        solicitudRepository.save(solicitud);
+        solicitud.setRadicado(generarRadicado(solicitud));
         solicitudRepository.save(solicitud);
 
         // 4. Subir documentos obligatorios
@@ -246,6 +250,7 @@ public class SolicitudService {
         return solicitudes.stream().map(s -> {
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("id", s.getId());
+            map.put("radicado", s.getRadicado());
             map.put("tipo", s.getTipo());
             map.put("estado", s.getEstado());
             map.put("fechaSolicitud", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : null);
@@ -277,6 +282,7 @@ public class SolicitudService {
         return solicitudes.stream().map(s -> {
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("id", s.getId());
+            map.put("radicado", s.getRadicado());
             map.put("tipo", s.getTipo());
             map.put("estado", s.getEstado());
             map.put("fechaSolicitud", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : null);
@@ -383,9 +389,16 @@ public class SolicitudService {
                 .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
     }
 
+    private String generarRadicado(Solicitud s) {
+        int anio = s.getFechaSolicitud() != null ? s.getFechaSolicitud().getYear() : LocalDate.now().getYear();
+        String tipo = "GRADO".equals(s.getTipo()) ? "GR" : "TM";
+        return String.format("UFPS-%d-%s-%05d", anio, tipo, s.getId());
+    }
+
     private Map<String, Object> construirRespuestaSolicitud(Solicitud s) {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("id", s.getId());
+        map.put("radicado", s.getRadicado());
         map.put("tipo", s.getTipo());
         map.put("estado", s.getEstado());
         map.put("fechaSolicitud", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : null);
@@ -501,7 +514,7 @@ public class SolicitudService {
         try {
             byte[] pdfBytes = actaPdfGeneratorService.generar(
                     nombre, cedula, codigo, programa,
-                    fechaAprobacion, fechaExpedicion, fechaGradoStr);
+                    fechaAprobacion, fechaExpedicion, fechaGradoStr, s.getRadicado());
 
             // Actualizar estado del estudiante a GRADUADO
             if (est != null && !"GRADUADO".equals(est.getEstadoGrado())) {
