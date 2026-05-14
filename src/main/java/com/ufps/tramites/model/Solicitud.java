@@ -46,6 +46,10 @@ public class Solicitud {
     // ── Acta de terminación ────────────────────────────────────────────────
     private Boolean actaGenerada;
 
+    // ── Radicado ──────────────────────────────────────────────────────────
+    @jakarta.persistence.Column(unique = true)
+    private String radicado;
+
     // ── Proceso de Grado (pago y fecha) ───────────────────────────────────
     private String estadoPagoGrado;   // null | APROBADO
     private LocalDate fechaGrado;
@@ -115,6 +119,9 @@ public class Solicitud {
 
     public boolean isActaGenerada() { return Boolean.TRUE.equals(actaGenerada); }
     public void setActaGenerada(boolean actaGenerada) { this.actaGenerada = actaGenerada; }
+
+    public String getRadicado() { return radicado; }
+    public void setRadicado(String radicado) { this.radicado = radicado; }
 
     public String getEstadoPagoGrado() { return estadoPagoGrado; }
     public void setEstadoPagoGrado(String estadoPagoGrado) { this.estadoPagoGrado = estadoPagoGrado; }
