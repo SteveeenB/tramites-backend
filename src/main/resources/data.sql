@@ -83,3 +83,9 @@ INSERT INTO solicitud (cedula, tipo, estado, fecha_solicitud, costo, observacion
 ('2000000010', 'TERMINACION_MATERIAS', 'APROBADA', '2026-04-15', 150000, 'Aprobada por el director.')
 ON CONFLICT DO NOTHING;
  
+-- ── Tipos de certificado ──────────────────────────────────────────────
+INSERT INTO tipo_certificado (codigo, label, precio_digital, precio_fisico, activo) VALUES
+('CONSTANCIA_REGISTRO_CALIFICADO', 'CONSTANCIA REGISTRO CALIFICADO DE UN PROGRAMA ACADEMICO', 8800, 12500, true),
+('CONSTANCIA_MATRICULA', 'CONSTANCIA MATRICULA ACADEMICA POSGRADO', 6500, 9800, true),
+('CONSTANCIA_BUENA_CONDUCTA', 'CONSTANCIA BUENA CONDUCTA POSGRADO', 7200, 11000, true)
+ON CONFLICT (codigo) DO NOTHING;
