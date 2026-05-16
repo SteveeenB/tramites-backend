@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ufps.tramites.model.Usuario;
+import com.ufps.tramites.repository.TipoCertificadoRepository;
 import com.ufps.tramites.service.CertificadoService;
 import com.ufps.tramites.service.UsuarioService;
 
@@ -100,4 +101,17 @@ public ResponseEntity<?> simularPago(
         return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
     }
 }
+
+@Autowired
+private TipoCertificadoRepository tipoCertificadoRepository;
+
+/**
+ * GET /api/certificados/tipos
+ * Retorna los tipos de certificado activos desde la BD.
+ */
+@GetMapping("/tipos")
+public ResponseEntity<?> obtenerTipos() {
+    return ResponseEntity.ok(tipoCertificadoRepository.findByActivoTrue());
+}
+
 }
