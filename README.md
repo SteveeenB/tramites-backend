@@ -528,4 +528,4 @@ Para generar reporte HTML en `target/site/surefire-report.html`:
 |---|---|---|
 | `PazYSalvoService` | Sin prueba unitaria | Mocking de dependencias externas no implementado |
 | `ValidacionGradoService` | Sin prueba unitaria | Validación de posgrados HU-09 |
-| `POST /pagos/confirmar` | Endpoint pendiente (TP-37) | Integración Wompi — bloqueante para HU-03 |
+| `POST /pagos/confirmar` | Endpoint pendiente (TP-37) | Integración Wompi — bloqueante para HU-03 |.
