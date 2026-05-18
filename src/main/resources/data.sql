@@ -84,8 +84,25 @@ INSERT INTO solicitud (cedula, tipo, estado, fecha_solicitud, costo, observacion
 ON CONFLICT DO NOTHING;
  
 -- ── Tipos de certificado ──────────────────────────────────────────────
-INSERT INTO tipo_certificado (codigo, label, precio_digital, precio_fisico, activo) VALUES
-('CONSTANCIA_REGISTRO_CALIFICADO', 'CONSTANCIA REGISTRO CALIFICADO DE UN PROGRAMA ACADEMICO', 8800, 12500, true),
-('CONSTANCIA_MATRICULA', 'CONSTANCIA MATRICULA ACADEMICA POSGRADO', 6500, 9800, true),
-('CONSTANCIA_BUENA_CONDUCTA', 'CONSTANCIA BUENA CONDUCTA POSGRADO', 7200, 11000, true)
-ON CONFLICT (codigo) DO NOTHING;
+-- precio_digital      = precio base del documento
+-- costo_logistica_fisica = delta adicional cuando se elige modalidad física (impresión + sello + manejo)
+-- dependencia_cedula  = FK lógica a usuario.cedula con rol = 'DEPENDENCIA'
+INSERT INTO tipo_certificado (codigo, label, descripcion, precio_digital, costo_logistica_fisica,
+                              dependencia_cedula, direccion_oficina, tiempo_entrega_dias, activo) VALUES
+('CONSTANCIA_REGISTRO_CALIFICADO', 'CONSTANCIA REGISTRO CALIFICADO DE UN PROGRAMA ACADEMICO',
+    'Constancia oficial del registro calificado vigente del programa académico de posgrado.',
+    8800, 3700, '3000000003', 'Bloque A - Oficina Admisiones y Registro', 2, true),
+('CONSTANCIA_MATRICULA', 'CONSTANCIA MATRICULA ACADEMICA POSGRADO',
+    'Constancia de matrícula académica vigente para el periodo actual.',
+    6500, 3300, '3000000003', 'Bloque A - Oficina Admisiones y Registro', 2, true),
+('CONSTANCIA_BUENA_CONDUCTA', 'CONSTANCIA BUENA CONDUCTA POSGRADO',
+    'Constancia de comportamiento disciplinario y académico del estudiante.',
+    7200, 3800, '3000000003', 'Bloque A - Oficina Admisiones y Registro', 3, true)
+ON CONFLICT (codigo) DO UPDATE SET
+    label                  = EXCLUDED.label,
+    descripcion            = EXCLUDED.descripcion,
+    precio_digital         = EXCLUDED.precio_digital,
+    costo_logistica_fisica = EXCLUDED.costo_logistica_fisica,
+    dependencia_cedula     = EXCLUDED.dependencia_cedula,
+    direccion_oficina      = EXCLUDED.direccion_oficina,
+    tiempo_entrega_dias    = EXCLUDED.tiempo_entrega_dias;
