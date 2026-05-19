@@ -1,10 +1,5 @@
 package com.ufps.tramites.service;
 
-import com.ufps.tramites.model.Solicitud;
-import com.ufps.tramites.model.Usuario;
-import com.ufps.tramites.repository.DocumentoSolicitudRepository;
-import com.ufps.tramites.repository.SolicitudRepository;
-import com.ufps.tramites.repository.UsuarioRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -18,10 +13,15 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.context.annotation.Lazy;
-import com.ufps.tramites.service.PazYSalvoService;
+
+import com.ufps.tramites.model.Solicitud;
+import com.ufps.tramites.model.Usuario;
+import com.ufps.tramites.repository.DocumentoSolicitudRepository;
+import com.ufps.tramites.repository.SolicitudRepository;
+import com.ufps.tramites.repository.UsuarioRepository;
 
 @Service
 public class SolicitudService {
@@ -416,6 +416,8 @@ public class SolicitudService {
             // Campos de progreso del proceso de grado
             map.put("estadoPagoGrado", s.getEstadoPagoGrado());
             map.put("fechaGrado", s.getFechaGrado() != null ? s.getFechaGrado().toString() : null);
+            map.put("modalidadGrado", s.getModalidadGrado());
+            map.put("pagoModalidadRealizado", s.getPagoModalidadRealizado() != null && s.getPagoModalidadRealizado());
         }
 
         return map;
@@ -464,6 +466,72 @@ public class SolicitudService {
         s.setFechaGrado(fechaGrado);
         solicitudRepository.save(s);
         return construirRespuestaSolicitud(s);
+    }
+
+    public Map<String, Object> registrarModalidadGrado(Long id, String modalidad) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"APROBADO".equals(s.getEstadoPagoGrado())) {
+            throw new IllegalStateException("El pago de grado no ha sido completado");
+        }
+        if (!"CEREMONIA".equals(modalidad) && !"SECRETARIA".equals(modalidad)) {
+            throw new IllegalArgumentException("Modalidad inválida. Use CEREMONIA o SECRETARIA");
+        }
+        s.setModalidadGrado(modalidad);
+        if ("SECRETARIA".equals(modalidad)) {
+            s.setPagoModalidadRealizado(true);
+        }
+        solicitudRepository.save(s);
+        return construirRespuestaSolicitud(s);
+    }
+
+    public Map<String, Object> registrarPagoModalidad(Long id) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"CEREMONIA".equals(s.getModalidadGrado())) {
+            throw new IllegalStateException("Solo aplica para modalidad CEREMONIA");
+        }
+        s.setPagoModalidadRealizado(true);
+        solicitudRepository.save(s);
+        return construirRespuestaSolicitud(s);
+    }
+
+    public Map<String, Object> verificarCertificado(String codigo) {
+        // Formato: UFPS-TM-{id}-{last4cedula}
+        try {
+            String[] partes = codigo.split("-");
+            Long solicitudId = Long.parseLong(partes[2]);
+            String last4 = partes[3];
+            Solicitud s = solicitudRepository.findById(solicitudId).orElse(null);
+            if (s == null || !"APROBADA".equals(s.getEstado()) || !"TERMINACION_MATERIAS".equals(s.getTipo())) {
+                Map<String, Object> r = new java.util.LinkedHashMap<>();
+                r.put("valido", false);
+                r.put("mensaje", "Certificado no encontrado o no válido.");
+                return r;
+            }
+            String cedulaReal = s.getCedula();
+            if (!cedulaReal.endsWith(last4)) {
+                Map<String, Object> r = new java.util.LinkedHashMap<>();
+                r.put("valido", false);
+                r.put("mensaje", "El código de verificación no coincide.");
+                return r;
+            }
+            Usuario est = usuarioRepository.findById(cedulaReal).orElse(null);
+            Map<String, Object> r = new java.util.LinkedHashMap<>();
+            r.put("valido", true);
+            r.put("codigo", codigo);
+            r.put("nombre", est != null ? est.getNombre() : "—");
+            r.put("cedula", cedulaReal);
+            r.put("programa", est != null && est.getProgramaAcademico() != null ? est.getProgramaAcademico().getNombre() : "—");
+            r.put("fechaAprobacion", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : "—");
+            r.put("mensaje", "Certificado válido y auténtico.");
+            return r;
+        } catch (Exception e) {
+            Map<String, Object> r = new java.util.LinkedHashMap<>();
+            r.put("valido", false);
+            r.put("mensaje", "Código de verificación inválido.");
+            return r;
+        }
     }
 
     /**
