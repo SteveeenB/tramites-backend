@@ -128,4 +128,14 @@ public class Solicitud {
 
     public LocalDate getFechaGrado() { return fechaGrado; }
     public void setFechaGrado(LocalDate fechaGrado) { this.fechaGrado = fechaGrado; }
+
+    // ── Modalidad de grado ─────────────────────────────────────────────────
+    private String modalidadGrado;         // CEREMONIA | SECRETARIA
+    private Boolean pagoModalidadRealizado = false;
+    
+    public String getModalidadGrado() { return modalidadGrado; }
+    public void setModalidadGrado(String modalidadGrado) { this.modalidadGrado = modalidadGrado; }
+    
+    public Boolean getPagoModalidadRealizado() { return pagoModalidadRealizado; }
+    public void setPagoModalidadRealizado(Boolean v) { this.pagoModalidadRealizado = v; }
 }
