@@ -34,6 +34,7 @@ public class CertificadoService {
     @Autowired private CertificadoConstanciaPdfService pdfService;
     @Autowired private CorreoConstanciaService correoService;
     @Autowired private SupabaseStorageService storage;
+    @Autowired private FirmaDigitalService firmaDigitalService;
 
     // ── 1) SOLICITUD ──────────────────────────────────────────────────────────
 
@@ -157,17 +158,19 @@ public class CertificadoService {
             throw new IllegalStateException("No se pudo generar el certificado PDF. Intenta de nuevo en unos minutos.");
         }
 
-        String hash = sha256Hex(pdfBytes);
+        String hash  = sha256Hex(pdfBytes);
+        String firma = firmaDigitalService.firmar(pdfBytes);
+
         String path = "certificados/" + s.getCedula() + "/constancia-" + s.getId() + ".pdf";
         try {
             storage.subir(path, pdfBytes, "application/pdf");
             s.setUrlPdf(path);
         } catch (Exception e) {
             log.warn("[CONSTANCIA] Fallback: storage no disponible para solicitud {}: {}", solicitudId, e.getMessage());
-            // Sin storage configurado: continuar — el PDF se puede re-generar bajo demanda.
         }
 
         s.setHashPdf(hash);
+        s.setFirmaDigital(firma);
         s.setEstado("GENERADO");
         s.setFechaGeneracion(LocalDateTime.now());
         s.setObservaciones("Certificado generado y notificado por correo.");
@@ -214,6 +217,74 @@ public class CertificadoService {
         } catch (Exception e) {
             throw new IllegalStateException("No se pudo recuperar el certificado: " + e.getMessage());
         }
+    }
+
+    // ── 6) VERIFICACIÓN DE AUTENTICIDAD ──────────────────────────────────────
+
+    /**
+     * Endpoint público: verifica que el PDF almacenado no fue alterado y que la
+     * firma RSA es válida. La cédula se enmascara en la respuesta.
+     *
+     * La verificación requiere que el PDF esté en Supabase Storage (urlPdf != null).
+     * Si storage no está disponible se informa sin exponer error interno.
+     */
+    public Map<String, Object> verificarAutenticidad(Long id) {
+        SolicitudCertificado s = certificadoRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Certificado no encontrado con id: " + id));
+
+        TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(s.getTipoCertificado()).orElse(null);
+        Usuario estudiante   = usuarioRepository.findById(s.getCedula()).orElse(null);
+
+        Map<String, Object> resp = new java.util.LinkedHashMap<>();
+        resp.put("id",             s.getId());
+        resp.put("tipoCertificado", s.getTipoCertificado());
+        resp.put("tipoLabel",      tipo != null ? tipo.getLabel() : null);
+        resp.put("nombre",         estudiante != null ? estudiante.getNombre() : null);
+        resp.put("cedula",         enmascarar(s.getCedula()));
+        resp.put("programa",       estudiante != null && estudiante.getProgramaAcademico() != null
+                                       ? estudiante.getProgramaAcademico().getNombre() : null);
+        resp.put("fechaGeneracion", s.getFechaGeneracion() != null ? s.getFechaGeneracion().toString() : null);
+        resp.put("estado",         s.getEstado());
+        resp.put("hashSha256",     s.getHashPdf());
+        resp.put("algoritmoFirma", "RSA-2048 / SHA256withRSA");
+        resp.put("clavePublica",   firmaDigitalService.getClavePublicaBase64());
+
+        if (s.getFirmaDigital() == null) {
+            resp.put("firmaValida",   false);
+            resp.put("mensaje", "Este certificado no tiene firma digital registrada.");
+            return resp;
+        }
+
+        if (s.getUrlPdf() == null) {
+            resp.put("firmaValida",   null);
+            resp.put("mensaje", "El documento no está disponible en almacenamiento para verificación.");
+            return resp;
+        }
+
+        try {
+            byte[] pdfBytes = storage.descargar(s.getUrlPdf());
+            if (pdfBytes == null || pdfBytes.length == 0) {
+                resp.put("firmaValida", null);
+                resp.put("mensaje", "No se pudo recuperar el documento del almacenamiento.");
+                return resp;
+            }
+            boolean valida = firmaDigitalService.verificar(pdfBytes, s.getFirmaDigital());
+            resp.put("firmaValida", valida);
+            resp.put("mensaje", valida
+                ? "Este certificado es auténtico y su contenido no ha sido modificado."
+                : "ADVERTENCIA: La firma no coincide. El documento pudo haber sido alterado.");
+        } catch (Exception e) {
+            log.error("[FIRMA] Error verificando autenticidad de solicitud {}: {}", id, e.getMessage());
+            resp.put("firmaValida", null);
+            resp.put("mensaje", "No se pudo verificar la firma en este momento.");
+        }
+
+        return resp;
+    }
+
+    private String enmascarar(String cedula) {
+        if (cedula == null || cedula.length() <= 4) return "****";
+        return "*".repeat(cedula.length() - 4) + cedula.substring(cedula.length() - 4);
     }
 
     private boolean estadoPermiteDescarga(String estado) {

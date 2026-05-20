@@ -33,6 +33,7 @@ public class SolicitudCertificado {
 
     private String urlPdf;
     private String hashPdf;
+    private String firmaDigital;   // Base64 RSA-2048/SHA256withRSA sobre los bytes del PDF
 
     public SolicitudCertificado() {}
 
@@ -80,4 +81,7 @@ public class SolicitudCertificado {
 
     public String getHashPdf() { return hashPdf; }
     public void setHashPdf(String hashPdf) { this.hashPdf = hashPdf; }
+
+    public String getFirmaDigital() { return firmaDigital; }
+    public void setFirmaDigital(String firmaDigital) { this.firmaDigital = firmaDigital; }
 }

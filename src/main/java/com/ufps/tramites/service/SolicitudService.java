@@ -66,6 +66,12 @@ public class SolicitudService {
     @Autowired
     private CorreoCertificadoService correoService;
 
+    @Autowired
+    private FirmaDigitalService firmaDigitalService;
+
+    @Autowired
+    private SupabaseStorageService supabaseStorageService;
+
     /**
      * Crea una solicitud de terminación de materias. Valida: período de
      * convocatoria, créditos aprobados y duplicados.
@@ -593,6 +599,10 @@ public class SolicitudService {
             // Vincular PDF al expediente digital
             documentoService.guardarActaComoDocumento(id, pdfBytes);
 
+            s.setHashPdf(sha256Hex(pdfBytes));
+            s.setFirmaDigital(firmaDigitalService.firmar(pdfBytes));
+            solicitudRepository.save(s);
+
             return pdfBytes;
         } catch (IOException e) {
             throw new RuntimeException("Error al generar el PDF del acta de grado", e);
@@ -630,6 +640,8 @@ public class SolicitudService {
 
     /**
      * Genera el certificado de terminación en PDF con QR de verificación.
+     * Primera llamada: genera, firma, guarda en Supabase y persiste hash+firma.
+     * Llamadas posteriores: devuelve el PDF guardado (bytes idénticos → firma válida).
      */
     public byte[] generarCertificadoPdf(Long id) {
         Solicitud s = solicitudRepository.findById(id)
@@ -640,6 +652,17 @@ public class SolicitudService {
         if (!"TERMINACION_MATERIAS".equals(s.getTipo())) {
             throw new IllegalStateException("Este tipo de solicitud no genera certificado");
         }
+
+        // Si ya fue generado y está en storage, devolver los mismos bytes
+        if (s.getUrlPdf() != null) {
+            try {
+                byte[] stored = supabaseStorageService.descargar(s.getUrlPdf());
+                if (stored != null && stored.length > 0) return stored;
+            } catch (Exception ex) {
+                log.warn("[CERT-TM] Storage no devolvió PDF para solicitud {}, regenerando.", id);
+            }
+        }
+
         Usuario est = usuarioRepository.findById(s.getCedula()).orElse(null);
         String nombre = est != null ? est.getNombre() : "Estudiante";
         String codigo = est != null ? est.getCodigo() : "-";
@@ -650,6 +673,18 @@ public class SolicitudService {
         String fechaExpedicion = LocalDate.now().format(fmt);
         try {
             byte[] pdf = certificadoPdfService.generar(nombre, s.getCedula(), codigo, programa, fechaAprobacion, fechaExpedicion, id);
+
+            // Guardar en storage para que la verificación posterior use los mismos bytes
+            String path = "solicitudes/" + s.getCedula() + "/certificado-tm-" + id + ".pdf";
+            try {
+                supabaseStorageService.subir(path, pdf, "application/pdf");
+                s.setUrlPdf(path);
+            } catch (Exception ex) {
+                log.warn("[CERT-TM] No se pudo guardar en storage solicitud {}: {}", id, ex.getMessage());
+            }
+
+            s.setHashPdf(sha256Hex(pdf));
+            s.setFirmaDigital(firmaDigitalService.firmar(pdf));
             s.setActaGenerada(true);
             solicitudRepository.save(s);
             return pdf;
@@ -736,5 +771,91 @@ public class SolicitudService {
                 + "================================================================\n";
 
         return contenido.getBytes(StandardCharsets.UTF_8);
+    }
+
+    // ── Verificación de autenticidad (pública) ────────────────────────────────
+
+    /**
+     * Verifica la firma digital del PDF asociado a una solicitud.
+     * Funciona para TERMINACION_MATERIAS (urlPdf en Solicitud) y para GRADO
+     * (PDF almacenado como DocumentoSolicitud tipo ACTA).
+     */
+    public Map<String, Object> verificarSolicitud(Long id) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada con id: " + id));
+
+        Usuario est = usuarioRepository.findById(s.getCedula()).orElse(null);
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("id",         s.getId());
+        resp.put("radicado",   s.getRadicado());
+        resp.put("tipo",       s.getTipo());
+        resp.put("estado",     s.getEstado());
+        resp.put("nombre",     est != null ? est.getNombre() : null);
+        resp.put("cedula",     enmascarar(s.getCedula()));
+        resp.put("programa",   est != null && est.getProgramaAcademico() != null
+                                   ? est.getProgramaAcademico().getNombre() : null);
+        resp.put("hashSha256",     s.getHashPdf());
+        resp.put("algoritmoFirma", "RSA-2048 / SHA256withRSA");
+        resp.put("clavePublica",   firmaDigitalService.getClavePublicaBase64());
+
+        if (s.getFirmaDigital() == null) {
+            resp.put("firmaValida", false);
+            resp.put("mensaje", "Este documento no tiene firma digital registrada.");
+            return resp;
+        }
+
+        byte[] pdfBytes = obtenerPdfParaVerificacion(s);
+        if (pdfBytes == null) {
+            resp.put("firmaValida", null);
+            resp.put("mensaje", "El documento no está disponible en almacenamiento para verificación.");
+            return resp;
+        }
+
+        boolean valida = firmaDigitalService.verificar(pdfBytes, s.getFirmaDigital());
+        resp.put("firmaValida", valida);
+        resp.put("mensaje", valida
+            ? "Este documento es auténtico y su contenido no ha sido modificado."
+            : "ADVERTENCIA: La firma no coincide. El documento pudo haber sido alterado.");
+        return resp;
+    }
+
+    private byte[] obtenerPdfParaVerificacion(Solicitud s) {
+        // TERMINACION_MATERIAS: PDF guardado en urlPdf
+        if ("TERMINACION_MATERIAS".equals(s.getTipo()) && s.getUrlPdf() != null) {
+            try {
+                byte[] bytes = supabaseStorageService.descargar(s.getUrlPdf());
+                if (bytes != null && bytes.length > 0) return bytes;
+            } catch (Exception e) {
+                log.warn("[FIRMA] No se pudo descargar PDF de verificación para solicitud {}", s.getId());
+            }
+        }
+        // GRADO: PDF guardado como DocumentoSolicitud tipo ACTA
+        if ("GRADO".equals(s.getTipo())) {
+            try {
+                Optional<byte[]> acta = documentoService.obtenerActa(s.getId());
+                if (acta.isPresent() && acta.get().length > 0) return acta.get();
+            } catch (Exception e) {
+                log.warn("[FIRMA] No se pudo descargar acta para solicitud {}", s.getId());
+            }
+        }
+        return null;
+    }
+
+    private String enmascarar(String cedula) {
+        if (cedula == null || cedula.length() <= 4) return "****";
+        return "*".repeat(cedula.length() - 4) + cedula.substring(cedula.length() - 4);
+    }
+
+    private static String sha256Hex(byte[] bytes) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(bytes);
+            StringBuilder hex = new StringBuilder(hash.length * 2);
+            for (byte b : hash) hex.append(String.format("%02x", b));
+            return hex.toString();
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

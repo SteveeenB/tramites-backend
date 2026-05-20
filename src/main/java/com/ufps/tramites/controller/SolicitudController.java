@@ -447,6 +447,16 @@ public class SolicitudController {
         return ResponseEntity.ok(solicitudService.verificarCertificado(codigo));
     }
 
+    /** Verifica la firma digital RSA del PDF de una solicitud. Endpoint público (sin auth). */
+    @GetMapping("/{id}/verificar")
+    public ResponseEntity<?> verificarFirma(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(solicitudService.verificarSolicitud(id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
+        }
+    }
+
     @PostMapping("/{id}/modalidad-grado")
     public ResponseEntity<?> registrarModalidad(@PathVariable Long id, @RequestParam String modalidad) {
         try {
