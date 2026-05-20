@@ -1,0 +1,22 @@
+{
+  "properties": [
+    {
+      "name": "app.backend-url",
+      "type": "java.lang.String",
+      "description": "URL pública del backend, usada en los códigos QR de los PDFs. En producción: APP_BACKEND_URL=https://tramites-backend.onrender.com",
+      "defaultValue": "http://localhost:8080"
+    },
+    {
+      "name": "app.firma.clave-privada",
+      "type": "java.lang.String",
+      "description": "Clave privada RSA-2048 en Base64 PKCS8. Si está vacía se genera un par en memoria (solo para desarrollo). En producción: APP_FIRMA_CLAVE_PRIVADA=<base64>",
+      "defaultValue": ""
+    },
+    {
+      "name": "app.firma.clave-publica",
+      "type": "java.lang.String",
+      "description": "Clave pública RSA-2048 en Base64 X.509. Debe estar acompañada de app.firma.clave-privada. En producción: APP_FIRMA_CLAVE_PUBLICA=<base64>",
+      "defaultValue": ""
+    }
+  ]
+}

@@ -103,6 +103,17 @@ public class CertificadoController {
         }
     }
 
+    // ── Verificación de autenticidad (pública, sin auth) ────────────────────
+
+    @GetMapping("/{id}/verificar")
+    public ResponseEntity<?> verificarAutenticidad(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(certificadoService.verificarAutenticidad(id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
+        }
+    }
+
     // ── Bandeja de la dependencia ────────────────────────────────────────────
 
     @GetMapping("/dependencia/{cedulaDependencia}")

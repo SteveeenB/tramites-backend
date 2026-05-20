@@ -132,10 +132,24 @@ public class Solicitud {
     // ── Modalidad de grado ─────────────────────────────────────────────────
     private String modalidadGrado;         // CEREMONIA | SECRETARIA
     private Boolean pagoModalidadRealizado = false;
+
+    // ── Integridad del PDF generado ─────────────────────────────────────────
+    private String urlPdf;        // ruta en Supabase Storage del PDF de terminación
+    private String hashPdf;       // SHA-256 hex del PDF en su primera generación
+    private String firmaDigital;  // Base64 RSA-2048/SHA256withRSA sobre los bytes del PDF
     
     public String getModalidadGrado() { return modalidadGrado; }
     public void setModalidadGrado(String modalidadGrado) { this.modalidadGrado = modalidadGrado; }
-    
+
     public Boolean getPagoModalidadRealizado() { return pagoModalidadRealizado; }
     public void setPagoModalidadRealizado(Boolean v) { this.pagoModalidadRealizado = v; }
+
+    public String getUrlPdf() { return urlPdf; }
+    public void setUrlPdf(String urlPdf) { this.urlPdf = urlPdf; }
+
+    public String getHashPdf() { return hashPdf; }
+    public void setHashPdf(String hashPdf) { this.hashPdf = hashPdf; }
+
+    public String getFirmaDigital() { return firmaDigital; }
+    public void setFirmaDigital(String firmaDigital) { this.firmaDigital = firmaDigital; }
 }

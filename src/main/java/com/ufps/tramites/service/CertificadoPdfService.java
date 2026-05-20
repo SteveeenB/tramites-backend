@@ -21,6 +21,7 @@ import com.itextpdf.layout.properties.HorizontalAlignment;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import com.itextpdf.io.image.ImageDataFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
@@ -32,6 +33,9 @@ import java.util.Map;
 
 @Service
 public class CertificadoPdfService {
+
+    @Value("${app.backend-url:http://localhost:8080}")
+    private String backendUrl;
 
     private static final DeviceRgb COLOR_UFPS  = new DeviceRgb(0, 71, 133);
     private static final DeviceRgb COLOR_FILA  = new DeviceRgb(235, 242, 252);
@@ -143,9 +147,7 @@ public class CertificadoPdfService {
 
     private void agregarSeccionVerificacion(Document doc, Long solicitudId,
                                              String cedula, String fechaExpedicion) {
-        // Código de verificación legible
-        String codigoVerif = "UFPS-TM-" + solicitudId + "-" + cedula.substring(Math.max(0, cedula.length() - 4));
-        String urlVerif    = "https://tramites.ufps.edu.co/verificar?codigo=" + codigoVerif;
+        String urlVerif = backendUrl + "/api/solicitudes/" + solicitudId + "/verificar";
 
         // ── Tabla con QR a la izquierda y texto a la derecha ──────────────
         float[] widths = {28f, 72f};
@@ -169,10 +171,10 @@ public class CertificadoPdfService {
         Cell celdaTexto = new Cell()
                 .add(new Paragraph("Verificación de autenticidad").setBold().setFontSize(10)
                         .setFontColor(COLOR_UFPS).setMarginBottom(3))
-                .add(new Paragraph("Escanea el código QR o ingresa el siguiente código en el portal "
-                        + "de trámites de la UFPS para verificar la autenticidad de este certificado.")
+                .add(new Paragraph("Escanea el código QR para verificar la firma digital y autenticidad "
+                        + "de este certificado en el portal de trámites de la UFPS.")
                         .setFontSize(9).setFontColor(ColorConstants.DARK_GRAY).setMarginBottom(5))
-                .add(new Paragraph("Código: " + codigoVerif)
+                .add(new Paragraph("ID solicitud: " + solicitudId)
                         .setBold().setFontSize(10).setFontColor(COLOR_UFPS))
                 .add(new Paragraph("Expedido el: " + fechaExpedicion)
                         .setFontSize(9).setFontColor(ColorConstants.GRAY).setMarginTop(3))
