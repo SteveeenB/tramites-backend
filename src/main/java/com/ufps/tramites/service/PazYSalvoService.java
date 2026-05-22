@@ -42,11 +42,11 @@ public class PazYSalvoService {
      */
     public void iniciarProcesoPazYSalvo(Solicitud solicitud, Usuario director) {
         // Obtener datos del estudiante para el correo
-        Usuario estudiante = usuarioRepository.findById(solicitud.getCedula()).orElse(null);
+        Usuario estudiante = usuarioRepository.findByCedula(solicitud.getCedula()).orElse(null);
         String nombreEstudiante = estudiante != null ? estudiante.getNombre() : solicitud.getCedula();
 
         // Buscar todos los usuarios con rol DEPENDENCIA
-        List<Usuario> dependencias = usuarioRepository.findByRol("DEPENDENCIA");
+        List<Usuario> dependencias = usuarioRepository.findByRolNombre("DEPENDENCIA");
 
         List<PazYSalvo> nuevos = new ArrayList<>();
 
@@ -192,7 +192,7 @@ public class PazYSalvoService {
                 ? director.getProgramaAcademico().getId() : null;
         if (programaId == null) return List.of();
 
-        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRol(programaId, "ESTUDIANTE");
+        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRolNombre(programaId, "ESTUDIANTE");
         List<Map<String, Object>> resultado = new ArrayList<>();
         for (Usuario est : estudiantes) {
             resultado.add(calcularEstadoEstudiante(est));
@@ -281,7 +281,7 @@ public class PazYSalvoService {
 
     private Map<String, Object> mapearPazYSalvoConEstudiante(PazYSalvo ps) {
         Map<String, Object> m = mapearPazYSalvo(ps);
-        usuarioRepository.findById(ps.getCedulaEstudiante()).ifPresent(est -> {
+        usuarioRepository.findByCedula(ps.getCedulaEstudiante()).ifPresent(est -> {
             m.put("nombreEstudiante", est.getNombre());
             m.put("codigoEstudiante", est.getCodigo());
             m.put("programa", est.getProgramaAcademico() != null
