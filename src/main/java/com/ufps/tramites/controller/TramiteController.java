@@ -8,8 +8,8 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -17,54 +17,26 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/tramites")
 public class TramiteController {
 
-    @Autowired
-    private TramiteService tramiteService;
-
-    @Autowired
-    private UsuarioService usuarioService;
+    @Autowired private TramiteService tramiteService;
+    @Autowired private UsuarioService usuarioService;
 
     @GetMapping
-    public ResponseEntity<?> obtenerModuloTramites(
-            @RequestParam(required = false) String cedula,
-            @RequestParam(required = false) String codigo) {
-        Usuario usuario;
-
-        if (cedula != null && !cedula.isBlank()) {
-            usuario = usuarioService.obtenerUsuarioPorCedula(cedula);
-        } else if (codigo != null && !codigo.isBlank()) {
-            usuario = usuarioService.obtenerUsuarioPorCodigo(codigo);
-        } else {
-            usuario = usuarioService.obtenerPrimerUsuario();
-        }
-
-        if (usuario == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(error("Usuario no encontrado"));
-        }
-
+    public ResponseEntity<?> obtenerModuloTramites(Authentication auth) {
+        Usuario usuario = resolverUsuario(auth);
+        if (usuario == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
         return ResponseEntity.ok(tramiteService.construirModuloPorRol(usuario));
     }
 
     @GetMapping("/proceso-grado")
-    public ResponseEntity<?> obtenerProcesoDeGrado(
-            @RequestParam(required = false) String cedula,
-            @RequestParam(required = false) String codigo) {
-        Usuario usuario;
-
-        if (cedula != null && !cedula.isBlank()) {
-            usuario = usuarioService.obtenerUsuarioPorCedula(cedula);
-        } else if (codigo != null && !codigo.isBlank()) {
-            usuario = usuarioService.obtenerUsuarioPorCodigo(codigo);
-        } else {
-            usuario = usuarioService.obtenerPrimerUsuario();
-        }
-
-        if (usuario == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(error("Usuario no encontrado"));
-        }
-
+    public ResponseEntity<?> obtenerProcesoDeGrado(Authentication auth) {
+        Usuario usuario = resolverUsuario(auth);
+        if (usuario == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
         return ResponseEntity.ok(tramiteService.construirProcesoDeGrado(usuario));
+    }
+
+    private Usuario resolverUsuario(Authentication auth) {
+        if (auth == null) return null;
+        return usuarioService.obtenerUsuarioPorCedula(auth.getName());
     }
 
     private Map<String, Object> error(String mensaje) {
