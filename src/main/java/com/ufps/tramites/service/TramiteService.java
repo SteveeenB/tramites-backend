@@ -22,7 +22,7 @@ public class TramiteService {
     private SolicitudRepository solicitudRepository;
 
     public Map<String, Object> construirModuloPorRol(Usuario usuario) {
-        String rol = usuario.getRol();
+        String rol = usuario.getRolNombre();
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("modulo", "TRAMITES");
@@ -69,7 +69,7 @@ public class TramiteService {
         usuarioMap.put("cedula", usuario.getCedula());
         usuarioMap.put("nombre", usuario.getNombre());
         usuarioMap.put("codigo", usuario.getCodigo());
-        usuarioMap.put("rol", usuario.getRol());
+        usuarioMap.put("rol", usuario.getRolNombre());
         usuarioMap.put("creditosAprobados", usuario.getCreditosAprobados());
         usuarioMap.put("programaAcademico", usuario.getProgramaAcademico() != null
                 ? usuario.getProgramaAcademico().getNombre() : null);
