@@ -5,6 +5,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +24,8 @@ import com.ufps.tramites.repository.UsuarioRepository;
  * (rol ADMIN / POSGRADOS). La distinción entre tipos vive en filas, no en
  * código: añadir un tipo nuevo no requiere desplegar nada.
  */
+@Tag(name = "Admin – Tipos de Certificado",
+     description = "CRUD del catálogo de tipos de certificado. Requiere rol ADMIN o POSGRADOS.")
 @RestController
 @RequestMapping("/api/admin/tipos-certificado")
 public class AdminTipoCertificadoController {
@@ -26,6 +33,9 @@ public class AdminTipoCertificadoController {
     @Autowired private TipoCertificadoRepository repository;
     @Autowired private UsuarioRepository usuarioRepository;
 
+    @Operation(summary = "Listar todos los tipos de certificado",
+               description = "Devuelve el catálogo completo (activos e inactivos) con el nombre de la dependencia responsable.")
+    @ApiResponse(responseCode = "200", description = "Lista de tipos de certificado")
     @GetMapping
     public ResponseEntity<List<Map<String, Object>>> listar() {
         List<Map<String, Object>> data = repository.findAll().stream()
@@ -34,6 +44,11 @@ public class AdminTipoCertificadoController {
         return ResponseEntity.ok(data);
     }
 
+    @Operation(summary = "Obtener un tipo de certificado por ID")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Tipo de certificado encontrado"),
+        @ApiResponse(responseCode = "404", description = "Tipo no encontrado")
+    })
     @GetMapping("/{id}")
     public ResponseEntity<?> obtener(@PathVariable Long id) {
         return repository.findById(id)
@@ -42,6 +57,13 @@ public class AdminTipoCertificadoController {
                         .body(Map.of("error", "Tipo no encontrado")));
     }
 
+    @Operation(summary = "Crear un nuevo tipo de certificado",
+               description = "El campo `codigo` es obligatorio y debe ser único. `precioDigital` es el precio base; `costoLogisticaFisica` es el delta para entrega física.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "201", description = "Tipo creado exitosamente"),
+        @ApiResponse(responseCode = "409", description = "Ya existe un tipo con ese código"),
+        @ApiResponse(responseCode = "422", description = "El campo código es obligatorio")
+    })
     @PostMapping
     public ResponseEntity<?> crear(@RequestBody Map<String, Object> body) {
         String codigo = strOrNull(body.get("codigo"));
@@ -61,6 +83,12 @@ public class AdminTipoCertificadoController {
         return ResponseEntity.status(HttpStatus.CREATED).body(toMap(t));
     }
 
+    @Operation(summary = "Actualizar un tipo de certificado",
+               description = "Permite modificar cualquier campo excepto `codigo`. Solo se aplican los campos presentes en el body.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Tipo actualizado"),
+        @ApiResponse(responseCode = "404", description = "Tipo no encontrado")
+    })
     @PutMapping("/{id}")
     public ResponseEntity<?> editar(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         return repository.findById(id).<ResponseEntity<?>>map(t -> {
@@ -71,8 +99,16 @@ public class AdminTipoCertificadoController {
                 .body(Map.of("error", "Tipo no encontrado")));
     }
 
+    @Operation(summary = "Activar o desactivar un tipo de certificado",
+               description = "Usa `?valor=true` para activar y `?valor=false` para desactivar. Los tipos inactivos no aparecen al estudiante.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Estado actualizado"),
+        @ApiResponse(responseCode = "404", description = "Tipo no encontrado")
+    })
     @PatchMapping("/{id}/activo")
-    public ResponseEntity<?> setActivo(@PathVariable Long id, @RequestParam boolean valor) {
+    public ResponseEntity<?> setActivo(
+            @PathVariable Long id,
+            @Parameter(description = "true = activo, false = inactivo") @RequestParam boolean valor) {
         return repository.findById(id).<ResponseEntity<?>>map(t -> {
             t.setActivo(valor);
             repository.save(t);

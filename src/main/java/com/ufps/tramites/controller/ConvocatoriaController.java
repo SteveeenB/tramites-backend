@@ -4,6 +4,11 @@ import com.ufps.tramites.model.Convocatoria;
 import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.service.ConvocatoriaService;
 import com.ufps.tramites.service.UsuarioService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
@@ -17,6 +22,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "Admin – Convocatoria",
+     description = "Gestión de la ventana de convocatoria académica (registro único). Lectura pública; escritura solo ADMIN o POSGRADOS.")
 @RestController
 @RequestMapping("/api/convocatorias")
 public class ConvocatoriaController {
@@ -27,17 +34,25 @@ public class ConvocatoriaController {
     @Autowired
     private UsuarioService usuarioService;
 
-    /** GET /api/convocatorias/activa — cualquier usuario autenticado */
+    @Operation(summary = "Obtener la convocatoria activa",
+               description = "Devuelve las fechas de inicio y fin de la ventana vigente. Disponible para todos los roles.")
+    @ApiResponse(responseCode = "200", description = "Convocatoria vigente con fechaInicio y fechaFin (formato YYYY-MM-DD)")
     @GetMapping("/activa")
     public ResponseEntity<?> getActiva() {
         Convocatoria c = convocatoriaService.getActiva();
         return ResponseEntity.ok(mapear(c));
     }
 
-    /** PUT /api/convocatorias?cedula=... — solo ADMIN */
+    @Operation(summary = "Actualizar las fechas de convocatoria",
+               description = "Reemplaza las fechas de la convocatoria activa. Solo permitido para rol ADMIN o POSGRADOS. Body: `{ fechaInicio: 'YYYY-MM-DD', fechaFin: 'YYYY-MM-DD' }`.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Convocatoria actualizada"),
+        @ApiResponse(responseCode = "400", description = "Fechas ausentes o con formato inválido"),
+        @ApiResponse(responseCode = "403", description = "El usuario no tiene rol ADMIN o POSGRADOS")
+    })
     @PutMapping
     public ResponseEntity<?> actualizar(
-            @RequestParam String cedula,
+            @Parameter(description = "Cédula del usuario ADMIN o POSGRADOS que realiza el cambio") @RequestParam String cedula,
             @RequestBody Map<String, String> body) {
 
         Usuario usuario = usuarioService.obtenerUsuarioPorCedula(cedula);
