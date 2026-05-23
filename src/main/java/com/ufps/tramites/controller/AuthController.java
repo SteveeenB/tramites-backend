@@ -55,11 +55,8 @@ public class AuthController {
                     .body(Map.of("error", "Credenciales inválidas"));
         }
 
-        // Soporta contraseñas en texto plano (data.sql demo) y hasheadas con BCrypt
-        boolean passwordValida = usuario.getPassword() != null && (
-                passwordEncoder.matches(request.getContrasena(), usuario.getPassword())
-                || request.getContrasena().equals(usuario.getPassword())
-        );
+        boolean passwordValida = usuario.getPassword() != null &&
+                passwordEncoder.matches(request.getContrasena(), usuario.getPassword());
 
         if (!passwordValida) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

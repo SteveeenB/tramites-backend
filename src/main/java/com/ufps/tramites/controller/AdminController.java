@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -29,9 +30,10 @@ public class AdminController {
     @Autowired private UsuarioRepository usuarioRepository;
 
     // ── /dependencias ────────────────────────────────────────────────
+    @PreAuthorize("hasAnyRole('ADMIN', 'POSGRADOS')")
     @GetMapping("/dependencias")
     public List<Map<String, Object>> listarDependencias() {
-        return usuarioRepository.findByRolNombre("DEPENDENCIA").stream()
+        return usuarioRepository.findByRol_Nombre("DEPENDENCIA").stream()
                 .map(this::mapearDep)
                 .collect(Collectors.toList());
     }
@@ -45,6 +47,7 @@ public class AdminController {
     }
 
     // ── /admin/tipos-certificado ─────────────────────────────────────
+    @PreAuthorize("hasAnyRole('ADMIN', 'POSGRADOS')")
     @GetMapping("/admin/tipos-certificado")
     public List<Map<String, Object>> listarTipos() {
         return tipoCertificadoRepository.findAll().stream()
@@ -52,6 +55,7 @@ public class AdminController {
                 .collect(Collectors.toList());
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/admin/tipos-certificado")
     public ResponseEntity<?> crearTipo(@RequestBody TipoCertificado tipo) {
         if (tipo.getCodigo() == null || tipo.getCodigo().isBlank()) {
@@ -66,6 +70,7 @@ public class AdminController {
         return ResponseEntity.status(HttpStatus.CREATED).body(mapearTipo(guardado));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/admin/tipos-certificado/{id}")
     public ResponseEntity<?> actualizarTipo(@PathVariable Long id, @RequestBody TipoCertificado datos) {
         TipoCertificado tipo = tipoCertificadoRepository.findById(id).orElse(null);
@@ -83,6 +88,7 @@ public class AdminController {
         return ResponseEntity.ok(mapearTipo(tipoCertificadoRepository.save(tipo)));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/admin/tipos-certificado/{id}/activo")
     public ResponseEntity<?> toggleActivo(@PathVariable Long id, @RequestParam boolean valor) {
         TipoCertificado tipo = tipoCertificadoRepository.findById(id).orElse(null);
