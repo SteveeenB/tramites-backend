@@ -46,7 +46,7 @@ public class PazYSalvoService {
         String nombreEstudiante = estudiante != null ? estudiante.getNombre() : solicitud.getCedula();
 
         // Buscar todos los usuarios con rol DEPENDENCIA
-        List<Usuario> dependencias = usuarioRepository.findByRolNombre("DEPENDENCIA");
+        List<Usuario> dependencias = usuarioRepository.findByRol_Nombre("DEPENDENCIA");
 
         List<PazYSalvo> nuevos = new ArrayList<>();
 
@@ -192,7 +192,7 @@ public class PazYSalvoService {
                 ? director.getProgramaAcademico().getId() : null;
         if (programaId == null) return List.of();
 
-        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRolNombre(programaId, "ESTUDIANTE");
+        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRol_Nombre(programaId, "ESTUDIANTE");
         List<Map<String, Object>> resultado = new ArrayList<>();
         for (Usuario est : estudiantes) {
             resultado.add(calcularEstadoEstudiante(est));

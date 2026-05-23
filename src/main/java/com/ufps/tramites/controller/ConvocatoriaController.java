@@ -1,15 +1,14 @@
 package com.ufps.tramites.controller;
 
 import com.ufps.tramites.model.Convocatoria;
-import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.service.ConvocatoriaService;
-import com.ufps.tramites.service.UsuarioService;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -22,7 +21,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class ConvocatoriaController {
 
     @Autowired private ConvocatoriaService convocatoriaService;
-    @Autowired private UsuarioService usuarioService;
 
     /** GET /api/convocatorias/activa — cualquier usuario autenticado */
     @GetMapping("/activa")
@@ -31,14 +29,11 @@ public class ConvocatoriaController {
         return ResponseEntity.ok(mapear(c));
     }
 
-    /** PUT /api/convocatorias — solo ADMIN */
+    /** PUT /api/convocatorias — solo ADMIN o POSGRADOS */
+    @PreAuthorize("hasAnyRole('ADMIN', 'POSGRADOS')")
     @PutMapping
     public ResponseEntity<?> actualizar(Authentication auth, @RequestBody Map<String, String> body) {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "No autenticado"));
-        Usuario usuario = usuarioService.obtenerUsuarioPorCedula(auth.getName());
-        if (usuario == null || !"ADMIN".equals(usuario.getRolNombre())) {
-            return ResponseEntity.status(403).body(Map.of("error", "Acción no permitida"));
-        }
 
         String inicioStr = body.get("fechaInicio");
         String finStr    = body.get("fechaFin");
