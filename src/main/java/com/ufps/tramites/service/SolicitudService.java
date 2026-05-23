@@ -181,7 +181,7 @@ public class SolicitudService {
             return Map.of("pendientes", List.of(), "aprobadas", List.of(), "rechazadas", List.of());
         }
 
-        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRolNombre(programaId, "ESTUDIANTE");
+        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRol_Nombre(programaId, "ESTUDIANTE");
         List<String> cedulas = estudiantes.stream().map(Usuario::getCedula).collect(Collectors.toList());
         Map<String, Usuario> porCedula = estudiantes.stream()
                 .collect(Collectors.toMap(Usuario::getCedula, u -> u));
@@ -217,7 +217,7 @@ public class SolicitudService {
             return Map.of("pendientes", List.of(), "aprobadas", List.of(), "rechazadas", List.of());
         }
 
-        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRolNombre(programaId, "ESTUDIANTE");
+        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRol_Nombre(programaId, "ESTUDIANTE");
         List<String> cedulas = estudiantes.stream().map(Usuario::getCedula).collect(Collectors.toList());
         Map<String, Usuario> porCedula = estudiantes.stream()
                 .collect(Collectors.toMap(Usuario::getCedula, u -> u));

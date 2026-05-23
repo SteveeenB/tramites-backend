@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,6 +34,7 @@ public class SolicitudController {
     @Autowired private ValidacionGradoService validacionGradoService;
 
     /** POST /api/solicitudes/terminacion-materias */
+    @PreAuthorize("hasRole('ESTUDIANTE')")
     @PostMapping("/terminacion-materias")
     public ResponseEntity<?> crearSolicitudTerminacion(Authentication auth) {
         Usuario estudiante = resolverUsuario(auth);
@@ -46,6 +48,7 @@ public class SolicitudController {
     }
 
     /** POST /api/solicitudes/grado (multipart) */
+    @PreAuthorize("hasRole('ESTUDIANTE')")
     @PostMapping(value = "/grado", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> crearSolicitudGrado(
             Authentication auth,
@@ -71,6 +74,7 @@ public class SolicitudController {
     }
 
     /** GET /api/solicitudes */
+    @PreAuthorize("hasRole('ESTUDIANTE')")
     @GetMapping
     public ResponseEntity<?> obtenerSolicitudes(Authentication auth) {
         Usuario estudiante = resolverUsuario(auth);
@@ -79,6 +83,7 @@ public class SolicitudController {
     }
 
     /** GET /api/solicitudes/bandeja — bandeja del director */
+    @PreAuthorize("hasRole('DIRECTOR')")
     @GetMapping("/bandeja")
     public ResponseEntity<?> obtenerBandeja(Authentication auth) {
         Usuario director = resolverUsuario(auth);
@@ -89,6 +94,7 @@ public class SolicitudController {
     }
 
     /** GET /api/solicitudes/bandeja-grado */
+    @PreAuthorize("hasRole('DIRECTOR')")
     @GetMapping("/bandeja-grado")
     public ResponseEntity<?> obtenerBandejaGrado(Authentication auth) {
         Usuario director = resolverUsuario(auth);
@@ -99,6 +105,7 @@ public class SolicitudController {
     }
 
     /** POST /api/solicitudes/{id}/documentos */
+    @PreAuthorize("hasRole('ESTUDIANTE')")
     @PostMapping(value = "/{id}/documentos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> subirDocumento(@PathVariable Long id, @RequestParam MultipartFile archivo) {
         try {
@@ -112,12 +119,14 @@ public class SolicitudController {
     }
 
     /** GET /api/solicitudes/{id}/documentos */
+    @PreAuthorize("hasAnyRole('ESTUDIANTE', 'DIRECTOR')")
     @GetMapping("/{id}/documentos")
     public ResponseEntity<?> listarDocumentos(@PathVariable Long id) {
         return ResponseEntity.ok(documentoService.listarDocumentos(id));
     }
 
     /** GET /api/solicitudes/{id}/documentos/{docId}/file */
+    @PreAuthorize("hasAnyRole('ESTUDIANTE', 'DIRECTOR')")
     @GetMapping("/{id}/documentos/{docId}/file")
     public ResponseEntity<byte[]> descargarArchivo(@PathVariable Long id, @PathVariable Long docId) {
         try {
@@ -134,6 +143,7 @@ public class SolicitudController {
     }
 
     /** POST /api/solicitudes/{id}/aprobar */
+    @PreAuthorize("hasRole('DIRECTOR')")
     @PostMapping("/{id}/aprobar")
     public ResponseEntity<?> aprobarSolicitud(@PathVariable Long id, Authentication auth) {
         Usuario director = resolverUsuario(auth);
@@ -150,6 +160,7 @@ public class SolicitudController {
     }
 
     /** POST /api/solicitudes/{id}/rechazar */
+    @PreAuthorize("hasRole('DIRECTOR')")
     @PostMapping("/{id}/rechazar")
     public ResponseEntity<?> rechazarSolicitud(@PathVariable Long id,
             Authentication auth,
@@ -168,6 +179,7 @@ public class SolicitudController {
     }
 
     /** GET /api/solicitudes/{id}/acta */
+    @PreAuthorize("hasAnyRole('DIRECTOR', 'POSGRADOS')")
     @GetMapping("/{id}/acta")
     public ResponseEntity<byte[]> descargarActa(@PathVariable Long id) {
         try {
@@ -186,6 +198,7 @@ public class SolicitudController {
     }
 
     /** GET /api/solicitudes/{id}/certificado */
+    @PreAuthorize("hasAnyRole('DIRECTOR', 'POSGRADOS')")
     @GetMapping("/{id}/certificado")
     public ResponseEntity<byte[]> descargarCertificado(@PathVariable Long id) {
         try {
@@ -202,16 +215,16 @@ public class SolicitudController {
     }
 
     /** GET /api/solicitudes/posgrados/pendientes */
+    @PreAuthorize("hasAnyRole('ADMIN', 'POSGRADOS')")
     @GetMapping("/posgrados/pendientes")
     public ResponseEntity<?> obtenerPendientesValidacion(Authentication auth) {
         Usuario admin = resolverUsuario(auth);
         if (admin == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
-        if (!"ADMIN".equals(admin.getRolNombre()))
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido al administrador"));
         return ResponseEntity.ok(validacionGradoService.obtenerSolicitudesPendientesValidacion());
     }
 
     /** POST /api/solicitudes/{id}/validar-grado */
+    @PreAuthorize("hasAnyRole('ADMIN', 'POSGRADOS')")
     @PostMapping("/{id}/validar-grado")
     public ResponseEntity<?> validarSolicitudGrado(
             @PathVariable Long id,
@@ -220,8 +233,6 @@ public class SolicitudController {
             @RequestParam(required = false) String observaciones) {
         Usuario admin = resolverUsuario(auth);
         if (admin == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
-        if (!"ADMIN".equals(admin.getRolNombre()))
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido al administrador"));
         try {
             return ResponseEntity.ok(validacionGradoService.registrarValidacion(id, decision, observaciones, admin));
         } catch (IllegalArgumentException e) {
@@ -232,6 +243,7 @@ public class SolicitudController {
     }
 
     /** POST /api/solicitudes/{id}/pagar-grado */
+    @PreAuthorize("hasRole('ESTUDIANTE')")
     @PostMapping("/{id}/pagar-grado")
     public ResponseEntity<?> pagarGrado(@PathVariable Long id) {
         try {
@@ -244,6 +256,7 @@ public class SolicitudController {
     }
 
     /** POST /api/solicitudes/{id}/fecha-grado */
+    @PreAuthorize("hasAnyRole('DIRECTOR', 'POSGRADOS')")
     @PostMapping("/{id}/fecha-grado")
     public ResponseEntity<?> registrarFechaGrado(@PathVariable Long id, @RequestParam String fecha) {
         try {
@@ -258,6 +271,7 @@ public class SolicitudController {
     }
 
     /** GET /api/solicitudes/posgrados/bandeja */
+    @PreAuthorize("hasRole('POSGRADOS')")
     @GetMapping("/posgrados/bandeja")
     public ResponseEntity<?> getBandejaPosgrados(Authentication auth) {
         Usuario u = resolverUsuario(auth);
@@ -268,6 +282,7 @@ public class SolicitudController {
     }
 
     /** GET /api/solicitudes/{id}/certificado-pdf */
+    @PreAuthorize("hasRole('POSGRADOS')")
     @GetMapping("/{id}/certificado-pdf")
     public ResponseEntity<byte[]> descargarCertificadoPdf(@PathVariable Long id, Authentication auth) {
         Usuario u = resolverUsuario(auth);
@@ -285,6 +300,7 @@ public class SolicitudController {
     }
 
     /** POST /api/solicitudes/{id}/rechazar-posgrados */
+    @PreAuthorize("hasRole('POSGRADOS')")
     @PostMapping("/{id}/rechazar-posgrados")
     public ResponseEntity<?> rechazarPosgrados(@PathVariable Long id,
             Authentication auth, @RequestParam(required = false) String motivo) {
@@ -298,6 +314,7 @@ public class SolicitudController {
     }
 
     /** POST /api/solicitudes/{id}/aprobar-posgrados */
+    @PreAuthorize("hasRole('POSGRADOS')")
     @PostMapping("/{id}/aprobar-posgrados")
     public ResponseEntity<?> aprobarPosgrados(@PathVariable Long id, Authentication auth) {
         Usuario u = resolverUsuario(auth);

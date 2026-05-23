@@ -4,6 +4,7 @@ import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.repository.UsuarioRepository;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -12,7 +13,13 @@ public class UsuarioService {
     @Autowired
     private UsuarioRepository usuarioRepository;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     public Usuario guardarUsuario(Usuario usuario) {
+        if (usuario.getPassword() != null && !usuario.getPassword().startsWith("$2a$")) {
+            usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
+        }
         return usuarioRepository.save(usuario);
     }
 
@@ -37,10 +44,10 @@ public class UsuarioService {
     }
 
     public List<Usuario> obtenerPorProgramaYRol(Long programaId, String rolNombre) {
-        return usuarioRepository.findByProgramaAcademicoIdAndRolNombre(programaId, rolNombre);
+        return usuarioRepository.findByProgramaAcademicoIdAndRol_Nombre(programaId, rolNombre);
     }
 
     public List<Usuario> obtenerPorRol(String rolNombre) {
-        return usuarioRepository.findByRolNombre(rolNombre);
+        return usuarioRepository.findByRol_Nombre(rolNombre);
     }
 }

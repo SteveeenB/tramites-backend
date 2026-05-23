@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -44,6 +45,7 @@ public class CertificadoController {
     }
 
     /** Historial de solicitudes del estudiante autenticado. */
+    @PreAuthorize("hasRole('ESTUDIANTE')")
     @GetMapping
     public ResponseEntity<?> miHistorial(Authentication auth) {
         Usuario usuario = resolverUsuario(auth);
@@ -55,6 +57,7 @@ public class CertificadoController {
     }
 
     /** Crea una nueva solicitud de certificado para el estudiante autenticado. */
+    @PreAuthorize("hasRole('ESTUDIANTE')")
     @PostMapping("/solicitar")
     public ResponseEntity<?> solicitar(@RequestParam String tipo,
                                         @RequestParam(defaultValue = "DIGITAL") String modalidad,
@@ -89,6 +92,7 @@ public class CertificadoController {
     }
 
     /** Registra el pago y pasa el estado a GENERADO (listo para descargar). */
+    @PreAuthorize("hasRole('ESTUDIANTE')")
     @PostMapping("/{id}/pagar")
     public ResponseEntity<?> pagar(@PathVariable Long id, Authentication auth) {
         Usuario usuario = resolverUsuario(auth);
@@ -106,6 +110,7 @@ public class CertificadoController {
     }
 
     /** Descarga el PDF del certificado. */
+    @PreAuthorize("hasAnyRole('ESTUDIANTE', 'DEPENDENCIA')")
     @GetMapping("/{id}/pdf")
     public ResponseEntity<?> descargarPdf(@PathVariable Long id, Authentication auth) {
         Usuario usuario = resolverUsuario(auth);
@@ -145,6 +150,7 @@ public class CertificadoController {
     }
 
     /** Bandeja de la dependencia: solicitudes que le corresponden gestionar. */
+    @PreAuthorize("hasRole('DEPENDENCIA')")
     @GetMapping("/dependencia/{cedula}")
     public ResponseEntity<?> bandejaDependencia(@PathVariable String cedula, Authentication auth) {
         Usuario usuario = resolverUsuario(auth);
@@ -164,6 +170,7 @@ public class CertificadoController {
     }
 
     /** La dependencia marca el certificado físico como listo para retiro. */
+    @PreAuthorize("hasRole('DEPENDENCIA')")
     @PostMapping("/{id}/marcar-listo")
     public ResponseEntity<?> marcarListo(@PathVariable Long id,
                                           @RequestParam String cedulaDependencia,
@@ -172,6 +179,7 @@ public class CertificadoController {
     }
 
     /** La dependencia marca el certificado como entregado al estudiante. */
+    @PreAuthorize("hasRole('DEPENDENCIA')")
     @PostMapping("/{id}/marcar-entregado")
     public ResponseEntity<?> marcarEntregado(@PathVariable Long id,
                                               @RequestParam String cedulaDependencia,
