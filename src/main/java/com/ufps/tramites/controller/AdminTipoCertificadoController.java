@@ -142,7 +142,7 @@ public class AdminTipoCertificadoController {
         m.put("activo", t.getActivo());
 
         if (t.getDependenciaCedula() != null) {
-            usuarioRepository.findById(t.getDependenciaCedula()).ifPresent(u ->
+            usuarioRepository.findByCedula(t.getDependenciaCedula()).ifPresent(u ->
                 m.put("dependenciaNombre", u.getNombre()));
         }
         return m;

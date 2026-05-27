@@ -185,7 +185,7 @@ public class SolicitudService {
             return Map.of("pendientes", List.of(), "aprobadas", List.of(), "rechazadas", List.of());
         }
 
-        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRol(programaId, "ESTUDIANTE");
+        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRol_Nombre(programaId, "ESTUDIANTE");
         List<String> cedulas = estudiantes.stream().map(Usuario::getCedula).collect(Collectors.toList());
         Map<String, Usuario> porCedula = estudiantes.stream()
                 .collect(Collectors.toMap(Usuario::getCedula, u -> u));
@@ -221,7 +221,7 @@ public class SolicitudService {
             return Map.of("pendientes", List.of(), "aprobadas", List.of(), "rechazadas", List.of());
         }
 
-        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRol(programaId, "ESTUDIANTE");
+        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRol_Nombre(programaId, "ESTUDIANTE");
         List<String> cedulas = estudiantes.stream().map(Usuario::getCedula).collect(Collectors.toList());
         Map<String, Usuario> porCedula = estudiantes.stream()
                 .collect(Collectors.toMap(Usuario::getCedula, u -> u));
@@ -329,13 +329,13 @@ public class SolicitudService {
         // Si es solicitud de GRADO: marcar estadoGrado del estudiante e iniciar paz y salvo
         if ("GRADO".equals(s.getTipo())) {
             // Marcar al estudiante con pago de grado pendiente
-            usuarioRepository.findById(s.getCedula()).ifPresent(est -> {
+            usuarioRepository.findByCedula(s.getCedula()).ifPresent(est -> {
                 est.setEstadoGrado("PAGO_GRADO_PENDIENTE");
                 usuarioRepository.save(est);
             });
             // Iniciar proceso de paz y salvo
             if (cedulaDirector != null) {
-                usuarioRepository.findById(cedulaDirector).ifPresent(director
+                usuarioRepository.findByCedula(cedulaDirector).ifPresent(director
                         -> pazYSalvoService.iniciarProcesoPazYSalvo(s, director)
                 );
             }
@@ -368,7 +368,7 @@ public class SolicitudService {
 
     private void notificarEstudiante(Solicitud s, String estadoAnterior) {
         notificacionSseService.notificarCambioEstado(s, estadoAnterior);
-        usuarioRepository.findById(s.getCedula())
+        usuarioRepository.findByCedula(s.getCedula())
                 .ifPresent(est -> notificacionService.notificarEstudianteCambioEstado(s, est));
     }
 
@@ -516,7 +516,7 @@ public class SolicitudService {
                 r.put("mensaje", "El código de verificación no coincide.");
                 return r;
             }
-            Usuario est = usuarioRepository.findById(cedulaReal).orElse(null);
+            Usuario est = usuarioRepository.findByCedula(cedulaReal).orElse(null);
             Map<String, Object> r = new java.util.LinkedHashMap<>();
             r.put("valido", true);
             r.put("codigo", codigo);
@@ -558,7 +558,7 @@ public class SolicitudService {
         }
 
         // Primera generación: construir PDF
-        Usuario est = usuarioRepository.findById(s.getCedula()).orElse(null);
+        Usuario est = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
         String nombre = est != null ? est.getNombre() : "Estudiante";
         String cedula = s.getCedula();
         String codigo = est != null ? est.getCodigo() : "-";
@@ -613,7 +613,7 @@ public class SolicitudService {
 
     private Map<String, Object> enriquecerConEstudiante(Solicitud s) {
         Map<String, Object> m = construirRespuestaSolicitud(s);
-        usuarioRepository.findById(s.getCedula()).ifPresent(est -> {
+        usuarioRepository.findByCedula(s.getCedula()).ifPresent(est -> {
             m.put("nombreEstudiante", est.getNombre());
             m.put("cedulaEstudiante", est.getCedula());
             m.put("codigoEstudiante", est.getCodigo());
@@ -640,7 +640,7 @@ public class SolicitudService {
         if (!"TERMINACION_MATERIAS".equals(s.getTipo())) {
             throw new IllegalStateException("Este tipo de solicitud no genera certificado");
         }
-        Usuario est = usuarioRepository.findById(s.getCedula()).orElse(null);
+        Usuario est = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
         String nombre = est != null ? est.getNombre() : "Estudiante";
         String codigo = est != null ? est.getCodigo() : "-";
         String programa = est != null && est.getProgramaAcademico() != null ? est.getProgramaAcademico().getNombre() : "-";
@@ -674,7 +674,7 @@ public class SolicitudService {
         notificarEstudiante(s, "APROBADA_DIRECTOR");
         byte[] pdfBytes = generarCertificadoPdf(id); // sets actaGenerada=true
         try {
-            usuarioRepository.findById(s.getCedula()).ifPresent(est -> {
+            usuarioRepository.findByCedula(s.getCedula()).ifPresent(est -> {
                 if (est.getCorreo() != null && !est.getCorreo().isBlank()) {
                     correoService.enviarCertificadoPorCorreo(est, pdfBytes, id);
                 }
@@ -700,7 +700,7 @@ public class SolicitudService {
             throw new IllegalStateException("Este tipo de solicitud no genera certificado");
         }
 
-        Usuario est = usuarioRepository.findById(s.getCedula()).orElse(null);
+        Usuario est = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
         String nombre = est != null ? est.getNombre() : "Estudiante";
         String cedula = s.getCedula();
         String codigo = est != null ? est.getCodigo() : "-";

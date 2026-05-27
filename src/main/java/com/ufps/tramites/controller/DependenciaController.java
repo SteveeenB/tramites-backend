@@ -34,7 +34,7 @@ public class DependenciaController {
     @ApiResponse(responseCode = "200", description = "Lista de dependencias")
     @GetMapping
     public ResponseEntity<List<Map<String, Object>>> listar() {
-        List<Usuario> dependencias = usuarioRepository.findByRol("DEPENDENCIA");
+        List<Usuario> dependencias = usuarioRepository.findByRol_Nombre("DEPENDENCIA");
         List<Map<String, Object>> data = dependencias.stream().map(u -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("cedula", u.getCedula());
