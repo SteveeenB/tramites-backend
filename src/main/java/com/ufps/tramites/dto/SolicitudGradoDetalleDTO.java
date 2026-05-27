@@ -4,6 +4,7 @@ import java.util.List;
 
 public class SolicitudGradoDetalleDTO {
     private Long id;
+    private String radicado;
     private String tipo;
     private String cedula;
     private String nombreEstudiante;
@@ -64,6 +65,8 @@ public class SolicitudGradoDetalleDTO {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+    public String getRadicado() { return radicado; }
+    public void setRadicado(String radicado) { this.radicado = radicado; }
     public String getTipo() { return tipo; }
     public void setTipo(String tipo) { this.tipo = tipo; }
     public String getCedula() { return cedula; }

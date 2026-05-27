@@ -1,3 +1,4 @@
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/SteveeenB/tramites-backend)
 # tramites-backend
 
 Documentación técnica del backend del sistema **GROWEB — TposgradosUFPS**.  
@@ -22,18 +23,20 @@ API REST desarrollada con Java + Spring Boot para la gestión de trámites acad�
 
 ## 1. Visión General
 
-El backend gestiona los trámites académicos de posgrado de la UFPS: **terminación de materias**, **solicitud de grado** y **expedición de certificados**. Expone sus servicios a través de HTTP/JSON y utiliza Supabase (PostgreSQL + Storage) como capa de persistencia.
+El backend gestiona los trámites académicos de posgrado de la UFPS: **terminación de materias**, **solicitud de grado**, **expedición de certificados académicos** y **gestión de paz y salvos**. Expone sus servicios a través de HTTP/JSON y utiliza Supabase (PostgreSQL + Storage) como capa de persistencia.
 
 ### Stack Tecnológico
 
 | Componente | Tecnología | Detalle |
 |---|---|---|
-| Framework | Java + Spring Boot | Desplegado en Render (prod) |
+| Framework | Java 17 + Spring Boot 4.0.5 | Desplegado en Render (prod) |
 | Base de Datos | PostgreSQL (Supabase) | ORM: Hibernate / JPA — `ddl-auto: update` |
 | Almacenamiento | Supabase Storage | Bucket: `tramites-documentos` (privado) |
-| Documentación API | Swagger / OpenAPI | Ruta: `/swagger-ui.html` |
+| Generación PDF | iText 7 (v7.2.5) | Actas de grado y certificados en PDF |
+| Códigos QR | ZXing (v3.5.2) | QR embebido en certificados para validación |
+| Documentación API | Swagger / OpenAPI (springdoc 2.8.8) | Ruta: `/swagger-ui.html` |
 | Notificaciones RT | Server-Sent Events (SSE) | `/api/notificaciones/subscribe` |
-| Email (dev) | MailHog — `localhost:1025` | SMTP local sin autenticación |
+| Email | Gmail SMTP / Spring Mail | Notificaciones automáticas por correo |
 | Contenedor | Docker | `Dockerfile` incluido en la raíz |
 
 ### Variables de Entorno Requeridas
@@ -74,10 +77,14 @@ com.ufps.tramites
 │   ├── CorsConfig.java                     Configuración CORS (env: CORS_ORIGIN)
 │   └── SwaggerConfig.java                  Configuración Swagger/OpenAPI
 ├── controller/
-│   ├── ConvocatoriaController.java         GET /api/convocatorias/activa, PUT /api/convocatorias
-│   ├── NotificacionController.java         GET /api/notificaciones/subscribe (SSE)
-│   ├── SolicitudController.java            /api/solicitudes/** (14 endpoints)
-│   ├── TramiteController.java              GET /api/tramites, /api/tramites/proceso-grado
+│   ├── AdminTipoCertificadoController.java /api/admin/tipos-certificado (ADMIN)
+│   ├── CertificadoController.java          /api/certificados/** (estudiante + dependencia)
+│   ├── ConvocatoriaController.java         /api/convocatorias/activa, PUT /api/convocatorias
+│   ├── DependenciaController.java          /api/dependencias (listado de dependencias)
+│   ├── NotificacionController.java         /api/notificaciones/subscribe (SSE)
+│   ├── PazYSalvoController.java            /api/paz-y-salvo/** (dependencias + director)
+│   ├── SolicitudController.java            /api/solicitudes/** (16+ endpoints)
+│   ├── TramiteController.java              /api/tramites, /api/tramites/proceso-grado
 │   └── UsuarioController.java              POST /login-demo, GET /me, POST /logout
 ├── dto/
 │   ├── LoginRequestDTO.java
@@ -90,28 +97,40 @@ com.ufps.tramites
 │   ├── Convocatoria.java                   Período habilitado de trámites
 │   ├── DecisionDirector.java
 │   ├── DocumentoSolicitud.java             Archivos subidos a Supabase Storage
+│   ├── PazYSalvo.java                      Paz y salvo por dependencia/director
 │   ├── ProgramaAcademico.java              Programa con totalCreditos requeridos
-│   ├── Solicitud.java                      Entidad central del sistema
-│   └── Usuario.java                        Estudiante / Director / Admin
+│   ├── Solicitud.java                      Entidad central (terminación + grado)
+│   ├── SolicitudCertificado.java           Solicitud específica de certificado
+│   ├── TipoCertificado.java                Catálogo de tipos de certificado configurables
+│   └── Usuario.java                        Estudiante / Director / Admin / Dependencia
 ├── repository/
 │   ├── ConvocatoriaRepository.java
 │   ├── DocumentoSolicitudRepository.java
+│   ├── PazYSalvoRepository.java
+│   ├── SolicitudCertificadoRepository.java
 │   ├── SolicitudRepository.java
+│   ├── TipoCertificadoRepository.java
 │   └── UsuarioRepository.java
 └── service/
-    ├── ActaPdfGeneratorService.java        Genera el acta de grado en PDF
-    ├── AlertaDirectorService.java          Alertas cuando el Director supera el plazo
-    ├── ConvocatoriaService.java            Validación de fechas del calendario académico
-    ├── DecisionSolicitudService.java       Flujo aprobar/rechazar
-    ├── DocumentoService.java              Subida y descarga de archivos
-    ├── NotificacionEmailService.java       Envío de emails
-    ├── NotificacionService.java            Lógica de notificaciones
-    ├── NotificacionSseService.java         Stream SSE por cédula
-    ├── SolicitudService.java               Orquestador principal de trámites
-    ├── SupabaseStorageService.java         Cliente HTTP para Supabase Storage
-    ├── TramiteService.java                 Módulo de trámites por rol
-    ├── UsuarioService.java                 CRUD de usuarios
-    └── ValidacionGradoService.java         Validación de posgrados sobre solicitud de grado
+    ├── ActaPdfGeneratorService.java         Genera el acta de grado en PDF (iText 7)
+    ├── AlertaDirectorService.java           Alertas cuando el Director supera el plazo
+    ├── CertificadoConstanciaPdfService.java PDF de constancias académicas
+    ├── CertificadoPdfService.java           PDF de certificados con firma digital + QR
+    ├── CertificadoService.java              Lógica completa del módulo de certificados
+    ├── ConvocatoriaService.java             Validación de fechas del calendario académico
+    ├── CorreoCertificadoService.java        Envío de email al emitir certificado
+    ├── CorreoConstanciaService.java         Envío de email por constancias
+    ├── DecisionSolicitudService.java        Flujo aprobar/rechazar del Director
+    ├── DocumentoService.java                Subida y descarga de archivos
+    ├── NotificacionEmailService.java        Envío de emails transaccionales
+    ├── NotificacionService.java             Lógica de notificaciones
+    ├── NotificacionSseService.java          Stream SSE por cédula
+    ├── PazYSalvoService.java                Gestión del flujo de paz y salvos
+    ├── SolicitudService.java                Orquestador principal de trámites
+    ├── SupabaseStorageService.java          Cliente HTTP para Supabase Storage
+    ├── TramiteService.java                  Módulo de trámites por rol
+    ├── UsuarioService.java                  CRUD de usuarios
+    └── ValidacionGradoService.java          Validación de la Unidad de Posgrados
 ```
 
 ---
@@ -120,18 +139,18 @@ com.ufps.tramites
 
 ### Solicitud _(tabla: solicitud)_
 
-Entidad central del sistema. Representa cualquier trámite iniciado por un estudiante o graduado.
+Entidad central del sistema. Representa trámites de terminación de materias y solicitudes de grado.
 
 | Campo | Tipo Java | Descripción |
 |---|---|---|
 | `id` | `Long` (PK, auto) | Identificador autoincremental |
 | `cedula` | `String` | Cédula del estudiante solicitante |
-| `tipo` | `String` | `TERMINACION_MATERIAS` \| `GRADO` \| `CERTIFICADO` |
+| `tipo` | `String` | `TERMINACION_MATERIAS` \| `GRADO` |
 | `estado` | `String` | `PENDIENTE_PAGO` \| `EN_REVISION` \| `APROBADA` \| `RECHAZADA` \| `PENDIENTE_VALIDACION` \| `APROBADA_POSGRADOS` \| `RECHAZADA_POSGRADOS` |
 | `fechaSolicitud` | `LocalDate` | Fecha de creación |
 | `costo` | `Double` | Monto liquidado en COP |
 | `observaciones` | `String` | Notas del estudiante |
-| `decision` | `String` | `APROBADA` \| `RECHAZADA` (Director) — `null` hasta que decide |
+| `decision` | `String` | `APROBADA` \| `RECHAZADA` (Director) |
 | `observacionesDirector` | `String` | Motivo del Director |
 | `fechaDecision` | `LocalDateTime` | Timestamp de la decisión del Director |
 | `cedulaDirector` | `String` | Cédula del Director que decidió |
@@ -144,6 +163,54 @@ Entidad central del sistema. Representa cualquier trámite iniciado por un estud
 | `fechaValidacion` | `LocalDateTime` | Timestamp de la validación de posgrados |
 | `cedulaPosgrados` | `String` | Cédula del Admin que validó |
 
+### SolicitudCertificado _(tabla: solicitud_certificado)_
+
+Entidad independiente para el módulo de certificados académicos.
+
+| Campo | Tipo Java | Descripción |
+|---|---|---|
+| `id` | `Long` (PK, auto) | Identificador autoincremental |
+| `cedula` | `String` | Cédula del solicitante |
+| `tipoCertificado` | `TipoCertificado` (FK) | Tipo de certificado solicitado |
+| `estado` | `String` | `PENDIENTE_PAGO` \| `PAGADO` \| `GENERADO` \| `LISTO_RETIRO` \| `ENTREGADO` |
+| `modalidad` | `String` | `DIGITAL` \| `FISICO` |
+| `destinatario` | `String` | Para quién va dirigido (opcional) |
+| `costo` | `Double` | Monto liquidado en COP |
+| `fechaSolicitud` | `LocalDateTime` | Timestamp de creación |
+| `fechaPago` | `LocalDateTime` | Timestamp del pago |
+| `fechaGeneracion` | `LocalDateTime` | Timestamp de generación del PDF |
+| `radicado` | `String` | Número de radicado único institucional |
+| `urlPdf` | `String` | URL del PDF en Supabase Storage |
+| `cedulaDependencia` | `String` | Dependencia responsable de entrega |
+
+### TipoCertificado _(tabla: tipo_certificado)_
+
+Catálogo configurable por el Administrador.
+
+| Campo | Tipo Java | Descripción |
+|---|---|---|
+| `id` | `Long` (PK, auto) | Identificador autoincremental |
+| `nombre` | `String` | Nombre del certificado |
+| `descripcion` | `String` | Descripción breve |
+| `costo` | `Double` | Tarifa en COP |
+| `activo` | `Boolean` | Si está disponible para solicitar |
+| `estadosHabilitados` | `String` | Estados académicos que pueden solicitarlo |
+| `cedulaDependencia` | `String` | Dependencia encargada de gestionar la entrega |
+
+### PazYSalvo _(tabla: paz_y_salvo)_
+
+Registro de paz y salvos por dependencia para el proceso de grado.
+
+| Campo | Tipo Java | Descripción |
+|---|---|---|
+| `id` | `Long` (PK, auto) | Identificador autoincremental |
+| `solicitudId` | `Long` | FK a `solicitud.id` |
+| `cedulaResponsable` | `String` | Cédula de la dependencia o director responsable |
+| `nombreResponsable` | `String` | Nombre descriptivo de la dependencia |
+| `estado` | `String` | `PENDIENTE` \| `APROBADO` \| `RECHAZADO` |
+| `observaciones` | `String` | Observaciones al responder |
+| `fechaRespuesta` | `LocalDateTime` | Timestamp de la respuesta |
+
 ### Usuario _(tabla: usuario)_
 
 | Campo | Tipo Java | Descripción |
@@ -152,11 +219,11 @@ Entidad central del sistema. Representa cualquier trámite iniciado por un estud
 | `codigo` | `String` | Código institucional UFPS |
 | `nombre` | `String` | Nombre completo |
 | `contrasena` | `String` | No expuesta en respuestas de API |
-| `rol` | `String` | `ESTUDIANTE` \| `DIRECTOR` \| `ADMIN` |
+| `rol` | `String` | `ESTUDIANTE` \| `DIRECTOR` \| `ADMIN` \| `DEPENDENCIA` |
 | `creditosAprobados` | `Integer` | Créditos aprobados del estudiante |
 | `correo` | `String` | Correo electrónico institucional |
 | `estadoGrado` | `String` | `null` \| `GRADUADO` |
-| `programaAcademico` | `ProgramaAcademico` (FK) | Programa al que pertenece (`@ManyToOne`) |
+| `programaAcademico` | `ProgramaAcademico` (FK) | Programa al que pertenece |
 
 ### DocumentoSolicitud _(tabla: documento_solicitud)_
 
@@ -226,18 +293,56 @@ Autenticación: sesión HTTP. El login crea la sesión; cada petición debe incl
 | `GET` | `/{id}/certificado` | `id` (path) | Descarga certificado de terminación (requiere estado `APROBADA`). | `200 TXT` |
 | `POST` | `/{id}/documentos` | `id` (path), `archivo` (multipart) | Sube documento a Supabase Storage y registra metadatos. | `201` \| `400` |
 | `GET` | `/{id}/documentos` | `id` (path) | Lista documentos de la solicitud. | `200 List` |
-| `GET` | `/{id}/documentos/{docId}/file` | `id`, `docId` (path) | Descarga archivo desde Supabase Storage (bucket privado). | `200 bytes` \| `404` |
+| `GET` | `/{id}/documentos/{docId}/file` | `id`, `docId` (path) | Descarga archivo desde Supabase Storage. | `200 bytes` \| `404` |
 | `GET` | `/posgrados/pendientes` | `cedula` (query, **ADMIN**) | Lista solicitudes de grado en estado `PENDIENTE_VALIDACION`. | `200` \| `403` |
 | `POST` | `/{id}/validar-grado` | `id` (path), `cedula`, `decision`, `[observaciones]` (**ADMIN**) | Unidad Posgrados aprueba o rechaza solicitud de grado. | `200` \| `422` |
 
-### 4.4 Convocatorias — `/api/convocatorias`
+### 4.4 Certificados — `/api/certificados`
+
+| Método | Ruta | Parámetros | Descripción | Resp. |
+|---|---|---|---|---|
+| `GET` | `/tipos` | — | Lista todos los tipos de certificado activos. | `200 List` |
+| `POST` | `/solicitar` | `cedula`, `tipo`, `modalidad`, `[destinatario]` (query) | Crea solicitud de certificado y genera liquidación. Valida estado académico. | `201` \| `422` |
+| `GET` | `/` | `cedula` (query) | Lista todos los certificados del estudiante. | `200 List` |
+| `POST` | `/{id}/pagar` | `id` (path), `cedula` (query) | Simula pago y avanza el certificado a estado `PAGADO`. Genera el PDF con firma digital y QR. | `200` \| `422` |
+| `GET` | `/{id}/pdf` | `id` (path), `cedula` (query) | Descarga el PDF del certificado. Disponible para el dueño o la dependencia encargada. | `200 PDF` \| `422` |
+| `GET` | `/dependencia/{cedulaDependencia}` | `cedulaDependencia` (path), `[estado]` (query) | Bandeja de certificados asignados a la dependencia, filtrable por estado. | `200 List` \| `403` |
+| `POST` | `/{id}/marcar-listo` | `id` (path), `cedulaDependencia` (query) | Dependencia marca el certificado físico como listo para retiro. | `200` \| `422` |
+| `POST` | `/{id}/marcar-entregado` | `id` (path), `cedulaDependencia` (query) | Dependencia confirma la entrega física al estudiante. | `200` \| `422` |
+
+### 4.5 Paz y Salvos — `/api/paz-y-salvo`
+
+| Método | Ruta | Parámetros | Descripción | Resp. |
+|---|---|---|---|---|
+| `GET` | `/mis-solicitudes` | `cedula` (query, **DEPENDENCIA** o **DIRECTOR**) | Lista todos los paz y salvos asignados al responsable. | `200 List` \| `403` |
+| `GET` | `/pendientes` | `cedula` (query, **DEPENDENCIA** o **DIRECTOR**) | Lista únicamente los paz y salvos pendientes del responsable. | `200 List` \| `403` |
+| `POST` | `/{id}/responder` | `id` (path), `cedula`, `decision` (`APROBADO`\|`RECHAZADO`), `[observaciones]` | Dependencia o Director responde su paz y salvo. Si todos quedan respondidos, avanza la solicitud. | `200` \| `422` |
+| `GET` | `/solicitud/{solicitudId}` | `solicitudId` (path) | Estado general de todos los paz y salvos de una solicitud de grado. | `200` |
+| `GET` | `/estado-estudiantes` | `cedula` (query, **DIRECTOR**) | Vista del estado de los estudiantes del programa en el proceso de paz y salvos. | `200` \| `403` |
+
+### 4.6 Dependencias — `/api/dependencias`
+
+| Método | Ruta | Descripción | Respuesta |
+|---|---|---|---|
+| `GET` | `/` | Lista todas las dependencias registradas en el sistema. | `200 List` |
+
+### 4.7 Admin — Tipos de Certificado — `/api/admin/tipos-certificado`
+
+| Método | Ruta | Parámetros | Descripción | Resp. |
+|---|---|---|---|---|
+| `GET` | `/` | `cedula` (query, **ADMIN**) | Lista todos los tipos de certificado (activos e inactivos). | `200 List` |
+| `POST` | `/` | `cedula` (query, **ADMIN**), body JSON | Crea un nuevo tipo de certificado. | `201` \| `403` |
+| `PUT` | `/{id}` | `id` (path), `cedula` (query, **ADMIN**), body JSON | Actualiza un tipo de certificado existente. | `200` \| `403` |
+| `DELETE` | `/{id}` | `id` (path), `cedula` (query, **ADMIN**) | Desactiva (baja lógica) un tipo de certificado. | `200` \| `403` |
+
+### 4.8 Convocatorias — `/api/convocatorias`
 
 | Método | Ruta | Parámetros | Descripción | Respuesta |
 |---|---|---|---|---|
 | `GET` | `/activa` | — | Retorna la convocatoria activa (`fechaInicio`, `fechaFin`). | `200 JSON` |
 | `PUT` | `/` | `cedula` (query, **ADMIN**), body `{fechaInicio, fechaFin}` | Actualiza las fechas del período habilitado. | `200` \| `400` \| `403` |
 
-### 4.5 Notificaciones — `/api/notificaciones`
+### 4.9 Notificaciones — `/api/notificaciones`
 
 | Método | Ruta | Parámetros | Descripción | Respuesta |
 |---|---|---|---|---|
@@ -253,7 +358,7 @@ Autenticación: sesión HTTP. El login crea la sesión; cada petición debe incl
 |---|---|---|
 | Créditos suficientes | `creditosAprobados >= programa.totalCreditos` | `422: "No cumple los requisitos académicos: tiene X/Y créditos aprobados."` |
 | Convocatoria vigente | `ConvocatoriaService.estaVigente() == true` | `422: "La solicitud está fuera del período habilitado (fecha al fecha)."` |
-| Sin duplicado activo | No existe `Solicitud` con misma cédula + tipo `TERMINACION_MATERIAS` | `422: "Ya existe una solicitud de terminación de materias con estado: X"` |
+| Sin duplicado activo | No existe `Solicitud` con misma cédula + tipo `TERMINACION_MATERIAS` activa | `422: "Ya existe una solicitud de terminación de materias con estado: X"` |
 | Costo fijo | `COSTO_TERMINACION = 150.000 COP` | Liquidación automática al crear |
 
 ### 5.2 Solicitud de Grado (`SolicitudService`)
@@ -273,7 +378,23 @@ Autenticación: sesión HTTP. El login crea la sesión; cada petición debe incl
 | Estado correcto | `solicitud.estado == PENDIENTE_VALIDACION` | `422: "La solicitud no está pendiente de validación"` |
 | Decisión válida | `decision == APROBADA \|\| RECHAZADA` | `422: "Decisión inválida: X"` |
 
-### 5.4 Flujo de Estados
+### 5.4 Paz y Salvos (`PazYSalvoService`)
+
+| Regla | Descripción |
+|---|---|
+| Generación automática | Al aprobar una solicitud de grado el sistema crea automáticamente registros `PazYSalvo` para cada dependencia responsable y el Director. |
+| Bloqueo de avance | El flujo no avanza a `PENDIENTE_VALIDACION` hasta que todos los paz y salvos estén en estado `APROBADO`. |
+| Responsable único | Cada dependencia solo puede ver y responder sus propios paz y salvos. |
+
+### 5.5 Certificados (`CertificadoService`)
+
+| Regla | Descripción |
+|---|---|
+| Filtro por estado | Solo se muestran tipos de certificado habilitados para el estado académico del solicitante. |
+| Generación con autenticidad | Al confirmar el pago, el sistema genera automáticamente el PDF con firma digital, número de radicado único y código QR de verificación. |
+| Correo automático | Al generar el PDF se envía automáticamente un email al estudiante con el certificado adjunto. |
+
+### 5.6 Flujo de Estados
 
 ```
 TERMINACION_MATERIAS:
@@ -283,15 +404,19 @@ TERMINACION_MATERIAS:
 GRADO:
   PENDIENTE_PAGO → EN_REVISION → PENDIENTE_VALIDACION → APROBADA_POSGRADOS
                                                        → RECHAZADA_POSGRADOS
+
+CERTIFICADO:
+  PENDIENTE_PAGO → PAGADO → GENERADO → LISTO_RETIRO → ENTREGADO
 ```
 
-### 5.5 Roles y Permisos
+### 5.7 Roles y Permisos
 
 | Rol | Acciones permitidas |
 |---|---|
-| `ESTUDIANTE` | Crear solicitudes, consultar propias, subir documentos, descargar acta/certificado, suscribirse a SSE |
-| `DIRECTOR` | Ver bandeja de terminación y grado de su programa, aprobar/rechazar solicitudes |
-| `ADMIN` | Ver pendientes de validación, validar solicitudes de grado, actualizar convocatoria |
+| `ESTUDIANTE` | Crear solicitudes, consultar propias, subir documentos, descargar acta/certificado, solicitar y descargar certificados académicos, suscribirse a SSE |
+| `DIRECTOR` | Ver bandeja de terminación y grado de su programa, aprobar/rechazar solicitudes, responder paz y salvos, ver estado de estudiantes |
+| `ADMIN` | Ver pendientes de validación, validar solicitudes de grado, actualizar convocatoria, gestionar tipos de certificado |
+| `DEPENDENCIA` | Ver y responder sus paz y salvos, gestionar bandeja de certificados asignados |
 
 ---
 
@@ -302,7 +427,6 @@ GRADO:
 - Java 17 o superior
 - Maven 3.8+ (o usar el wrapper `mvnw` incluido)
 - Cuenta y proyecto en Supabase (PostgreSQL + Storage)
-- MailHog instalado localmente para pruebas de email (opcional)
 
 ### Clonar el Repositorio
 
@@ -314,14 +438,14 @@ cd tramites-backend
 ### Actualizar desde el Remoto
 
 ```bash
-# Traer todo del remoto descartando cambios locales
-git fetch origin
-git reset --hard origin/main
-
-# Si quieres conservar cambios locales primero
+# Traer todo del remoto conservando cambios locales
 git stash
 git pull origin main
 git stash pop
+
+# O descartar cambios locales completamente
+git fetch origin
+git reset --hard origin/main
 ```
 
 ### Configurar Variables de Entorno
@@ -358,15 +482,15 @@ docker run -p 8080:8080 \
   tramites-backend
 ```
 
-### Configurar Correo para Producción
+### Configurar Correo
 
-Editar `application.properties`:
+El sistema usa Gmail SMTP para envío de notificaciones. Editar `application.properties` o establecer las variables correspondientes:
 
 ```properties
-spring.mail.host=smtp.tuservidor.com
+spring.mail.host=smtp.gmail.com
 spring.mail.port=587
 spring.mail.username=tu@correo.com
-spring.mail.password=tucontraseña
+spring.mail.password=tu-contrasena-de-aplicacion
 spring.mail.properties.mail.smtp.auth=true
 spring.mail.properties.mail.smtp.starttls.enable=true
 ```
@@ -377,12 +501,14 @@ spring.mail.properties.mail.smtp.starttls.enable=true
 
 ### Clases de Prueba Existentes
 
-| Clase | Capa | Cobertura |
-|---|---|---|
-| `TramitesApplicationTests` | Integración | Carga del contexto Spring Boot completo |
-| `SolicitudRepositoryTest` | Repository | Consultas JPA sobre la entidad `Solicitud` |
-| `AlertaDirectorServiceTest` | Service | Alertas por plazo vencido del Director (TP-44) |
-| `DecisionSolicitudServiceTest` | Service | Flujo completo de aprobación y rechazo (HU-04) |
+| Clase | Capa | Sprint | Cobertura |
+|---|---|---|---|
+| `TramitesApplicationTests` | Integración | S1 | Carga del contexto Spring Boot completo |
+| `SolicitudRepositoryTest` | Repository | S1 | Consultas JPA sobre la entidad `Solicitud` |
+| `AlertaDirectorServiceTest` | Service | S2 | Alertas por plazo vencido del Director (TP-44) |
+| `DecisionSolicitudServiceTest` | Service | S2 | Flujo completo de aprobación y rechazo (HU-04) |
+| `CertificadoEndpointTest` | Service | S3 | Catálogo de tipos activos, validación de tipo/modalidad, duplicados vigentes y cálculo de precios — HU-12 (TP-87) |
+| `CertificadoQRValidationTest` | Service | S3 | Radicado único, generación y determinismo del QR con ZXing, hash SHA-256 del PDF, reglas de negocio de pago y descarga — HU-13 (TP-97) |
 
 ### Ejecutar las Pruebas
 
@@ -400,7 +526,6 @@ Para generar reporte HTML en `target/site/surefire-report.html`:
 
 | Servicio / Flujo | Estado | Notas |
 |---|---|---|
-| `SolicitudService.crearSolicitudGrado` | Sin prueba unitaria | Requiere mock de `SupabaseStorageService` |
+| `PazYSalvoService` | Sin prueba unitaria | Mocking de dependencias externas no implementado |
 | `ValidacionGradoService` | Sin prueba unitaria | Validación de posgrados HU-09 |
-| `POST /pagos/confirmar` | Endpoint pendiente (TP-37) | Bloqueante para HU-03 |
-| Paz y salvos (HU-08) | En curso | Mocking de dependencias externas no implementado |
+| `POST /pagos/confirmar` | Endpoint pendiente (TP-37) | Integración Wompi — bloqueante para HU-03 |.
