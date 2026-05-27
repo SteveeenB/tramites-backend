@@ -1,196 +1,342 @@
-# Documentación de Autenticación y Seguridad
+  ---
+  Resumen de lo implementado
 
-## Fase 0 — Modelo de datos
+  Backend — Modelo de datos (Fase 0)
 
-- **`Rol.java`** — entidad que mapea la tabla `roles` (id, nombre). Roles: ESTUDIANTE, DIRECTOR, ADMIN, POSGRADOS, DEPENDENCIA.
-- **`Usuario.java`** — rediseñado: PK es `id` (Long), `rol` es `@ManyToOne → Rol`. Campos agregados: `email`, `googleId`, `fotoUrl`, `moodleId`, `telefono`. Helpers de compatibilidad: `getNombre()`, `getCorreo()`, `getRolNombre()`.
-- **`UsuarioRepository`** — métodos: `findByCedula()`, `findByEmail()`, `findByGoogleId()`, `findByRolNombre()`.
-- **`data.sql`** — inserta primero los roles (IDs 1–5), luego los usuarios con el nuevo esquema. Contraseñas almacenadas como hash BCrypt de `123456`.
-- Todos los controllers y servicios actualizados: `getRol()` → `getRolNombre()`.
+  - Rol.java — nueva entidad que mapea la tabla roles (id, nombre)
+  - Usuario.java — rediseñado: PK es ahora id (Long), rol es @ManyToOne → Rol, se añadieron email, googleId, fotoUrl, moodleId, telefono. Helpers de compatibilidad: getNombre(), getCorreo(), getRolNombre()
+  - UsuarioRepository — usa findByCedula(), findByEmail(), findByGoogleId(), findByRolNombre() en lugar del viejo findById(String)
+  - data.sql — inserta primero los roles (1-5), luego los usuarios con el nuevo esquema
+  - Todos los controllers y servicios actualizados: getRol() → getRolNombre(), findByRol → findByRolNombre
 
----
+  Backend — Autenticación JWT (Fase 1)
 
-## Fase 1 — Autenticación JWT
+  - JwtService.java — genera/valida tokens HS256 con claims: sub=id, cedula, rol, nombreCompleto, email
+  - JwtAuthFilter.java — lee el header Authorization: Bearer, valida el token, puebla el SecurityContext
+  - SecurityConfig.java — Spring Security stateless, CORS desde CorsConfig, rutas públicas: /api/auth/**, /swagger-ui/**, SSE
+  - AuthController.java — tres endpoints: POST /api/auth/login (código+contraseña), POST /api/auth/google (id_token de Google), POST /api/auth/login-demo (solo dev)
+  - CorsConfig.java — convertido a CorsConfigurationSource bean para Spring Security
 
-### Cómo funciona el flujo
+  Frontend (Fase 2)
 
-```
-[Login.jsx]
-  POST /api/auth/login  { codigo, contrasena }
-        ↓
-[AuthController]
-  1. Busca usuario por código en DB
-  2. Valida contraseña con BCrypt (passwordEncoder.matches)
-  3. Genera JWT con JwtService
-  4. Devuelve { token, id, cedula, nombreCompleto, email, codigo, rol }
-        ↓
-[Frontend — AuthContext.js]
-  1. Guarda token en localStorage
-  2. Decodifica payload del JWT (sin verificar firma, solo leer claims)
-  3. Guarda usuario en estado React
-```
+  - AuthContext.js — reemplazado completamente: restaura sesión desde localStorage, login(), logout(), cambiarRol() llama a /api/auth/login-demo
+  - apiClient.js — añade Authorization: Bearer, elimina credentials: 'include', maneja 401 redirigiendo a /login
+  - Login.jsx — página nueva con login por código/contraseña + botón Google OAuth
+  - solicitudesApi.js, tramitesApi.js, pazYSalvoApi.js — eliminados todos los ?cedula=
+  - ProtectedRoute.js — redirige a /login si no hay sesión
+  - Todos los hooks y páginas actualizados para no pasar cedula a las funciones de API
 
-### Claims del JWT
+  Para activar el modo demo en local: cambia spring.profiles.active=local a spring.profiles.active=local,dev en application.properties.
 
-| Claim          | Valor             | Tipo     |
-|----------------|-------------------|----------|
-| `sub`          | id del usuario    | estándar |
-| `cedula`       | cédula            | custom   |
-| `rol`          | nombre del rol    | custom   |
-| `nombreCompleto` | nombre completo | custom   |
-| `codigo`       | código académico  | custom   |
-| `email`        | correo            | custom   |
-| `iat` / `exp`  | emisión/expiración (24h) | estándar |
+  spring.profiles.active=local,dev
 
-### Archivos clave
+  Spring Boot aplica las propiedades en capas, de menor a mayor prioridad:
 
-- **`JwtService.java`** — genera y valida tokens HS256. Secreto configurado en `jwt.secret` (properties).
-- **`JwtAuthFilter.java`** — intercepta cada request, valida el token, extrae `cedula` y `rol`, puebla el `SecurityContext` con autoridad `ROLE_<ROL>`.
-- **`SecurityConfig.java`** — Spring Security stateless, CORS desde `CorsConfig`, rutas públicas: `/api/auth/**`, `/swagger-ui/**`, SSE.
-- **`AuthController.java`** — tres endpoints:
-  - `POST /api/auth/login` — código + contraseña (BCrypt)
-  - `POST /api/auth/google` — id_token de Google OAuth
-  - `POST /api/auth/login-demo` — solo activo con perfil `dev` (`demo.auth.enabled=true`)
+  application.properties          ← base
+  application-local.properties    ← sobrescribe con credenciales locales
+  application-dev.properties      ← sobrescribe con configuración de desarrollo
 
-### Perfiles de Spring Boot
+  Con local,dev activos al mismo tiempo:
+  - local aporta las credenciales de Supabase (URL, usuario, password) — ese archivo no se sube al repo por .gitignore
+  - dev aporta demo.auth.enabled=true, que sobrescribe el false del application.properties base y habilita el endpoint /api/auth/login-demo
 
-```
-application.properties          ← base (demo.auth.enabled=false)
-application-local.properties    ← credenciales Supabase (no se sube al repo)
-application-dev.properties      ← demo.auth.enabled=true
-```
+   Plan: @PreAuthorize + BCrypt password hashing
 
-`spring.profiles.active=local,dev` activa ambos perfiles simultáneamente.
+ Context
 
----
+ El backend actualmente no protege sus endpoints por rol — solo verifica que el usuario esté autenticado. Cualquiera con un JWT válido (incluso de ESTUDIANTE) puede llamar endpoints de DIRECTOR o ADMIN
+ directamente desde Postman. Adicionalmente, las contraseñas en data.sql están en texto plano y AuthController acepta texto plano como fallback. El objetivo es agregar protección real por rol en el backend y
+ adoptar BCrypt como estándar de almacenamiento de contraseñas.
 
-## Fase 2 — Frontend
+ ---
+ Orden de ejecución (importa)
 
-- **`AuthContext.js`** — restaura sesión desde `localStorage`, expone `login()`, `logout()`, `cambiarRol()` (llama a `/api/auth/login-demo`).
-- **`apiClient.js`** — agrega `Authorization: Bearer <token>` a cada request, maneja 401 redirigiendo a `/login`.
-- **`Login.jsx`** — formulario código/contraseña + botón Google OAuth (solo visible si `REACT_APP_GOOGLE_CLIENT_ID` está configurado).
-- **`ProtectedRoute.js`** — redirige a `/login` si no hay sesión; redirige a `/no-autorizado` si el rol no tiene acceso a la ruta.
-- Todos los hooks y APIs eliminaron el parámetro `?cedula=` — la cédula la provee el JWT.
+ 1. SecurityConfig.java       → habilitar method security (aditivo, no rompe nada)
+ 2. Todos los controllers     → agregar @PreAuthorize
+ 3. UsuarioService.java       → encodear contraseña al guardar
+ 4. data.sql                  → reemplazar '123456' con hash BCrypt
+ 5. [DB] UPDATE manual        → actualizar usuarios ya existentes en Supabase
+ 6. AuthController.java       → eliminar fallback de texto plano
 
-### Variable de entorno para el selector demo
+ No invertir 4 y 6: si se elimina el fallback antes de actualizar la DB, los usuarios actuales quedan bloqueados.
 
-En `frontend/.env`:
-```
-REACT_APP_DEMO_MODE=false   # oculta el selector de usuarios demo en el sidebar
-```
-Cambiar a `true` (o eliminar la línea) para mostrarlo.
+ ---
+ Paso 1 — SecurityConfig.java
 
----
+ config/SecurityConfig.java — agregar anotación en la clase:
 
-## Fase 3 — Seguridad por rol y contraseñas BCrypt
+ @Configuration
+ @EnableWebSecurity
+ @EnableMethodSecurity(prePostEnabled = true)   // ← agregar
+ public class SecurityConfig {
 
-### Problema que resuelve
+ Import: org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 
-Antes de esta fase, cualquier usuario con un JWT válido (incluso ESTUDIANTE) podía llamar endpoints de DIRECTOR o ADMIN directamente desde Postman. Además, las contraseñas estaban en texto plano en la base de datos.
+ ---
+ Paso 2 — @PreAuthorize en controllers
 
-### BCrypt — contraseñas
+ Import a agregar en cada controller: org.springframework.security.access.prepost.PreAuthorize
 
-**`UsuarioService.guardarUsuario()`** — ahora encripta la contraseña antes de persistir:
-```java
-if (usuario.getPassword() != null && !usuario.getPassword().startsWith("$2a$")) {
-    usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
-}
-```
-El guard `!startsWith("$2a$")` evita doble-encodeo si el usuario ya tiene hash.
+ Regla sintáctica: hasRole('DIRECTOR') → busca autoridad ROLE_DIRECTOR (el prefijo lo agrega Spring automáticamente). Nunca escribir hasRole('ROLE_DIRECTOR').
 
-**`AuthController.login()`** — eliminado el fallback de texto plano. Solo acepta BCrypt:
-```java
-boolean passwordValida = usuario.getPassword() != null &&
-        passwordEncoder.matches(request.getContrasena(), usuario.getPassword());
-```
+ SolicitudController (19 anotaciones)
 
-Hash BCrypt de `123456` usado en `data.sql`:
-```
-$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq
-```
+ ┌───────────────────────────────────┬───────────────────────────────────────────────────────┐
+ │             Endpoint              │                       Anotación                       │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ POST /terminacion-materias        │ @PreAuthorize("hasRole('ESTUDIANTE')")                │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ POST /grado                       │ @PreAuthorize("hasRole('ESTUDIANTE')")                │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ GET /                             │ @PreAuthorize("hasRole('ESTUDIANTE')")                │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ GET /bandeja                      │ @PreAuthorize("hasRole('DIRECTOR')")                  │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ GET /bandeja-grado                │ @PreAuthorize("hasRole('DIRECTOR')")                  │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ POST /{id}/documentos             │ @PreAuthorize("hasRole('ESTUDIANTE')")                │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ GET /{id}/documentos              │ @PreAuthorize("hasAnyRole('ESTUDIANTE', 'DIRECTOR')") │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ GET /{id}/documentos/{docId}/file │ @PreAuthorize("hasAnyRole('ESTUDIANTE', 'DIRECTOR')") │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ POST /{id}/aprobar                │ @PreAuthorize("hasRole('DIRECTOR')")                  │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ POST /{id}/rechazar               │ @PreAuthorize("hasRole('DIRECTOR')")                  │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ GET /{id}/acta                    │ @PreAuthorize("hasAnyRole('DIRECTOR', 'POSGRADOS')")  │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ GET /{id}/certificado             │ @PreAuthorize("hasAnyRole('DIRECTOR', 'POSGRADOS')")  │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ GET /posgrados/pendientes         │ @PreAuthorize("hasAnyRole('ADMIN', 'POSGRADOS')")     │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ POST /{id}/validar-grado          │ @PreAuthorize("hasAnyRole('ADMIN', 'POSGRADOS')")     │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ POST /{id}/pagar-grado            │ @PreAuthorize("hasRole('ESTUDIANTE')")                │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ POST /{id}/fecha-grado            │ @PreAuthorize("hasAnyRole('DIRECTOR', 'POSGRADOS')")  │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ GET /posgrados/bandeja            │ @PreAuthorize("hasRole('POSGRADOS')")                 │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ GET /{id}/certificado-pdf         │ @PreAuthorize("hasRole('POSGRADOS')")                 │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ POST /{id}/rechazar-posgrados     │ @PreAuthorize("hasRole('POSGRADOS')")                 │
+ ├───────────────────────────────────┼───────────────────────────────────────────────────────┤
+ │ POST /{id}/aprobar-posgrados      │ @PreAuthorize("hasRole('POSGRADOS')")                 │
+ └───────────────────────────────────┴───────────────────────────────────────────────────────┘
 
-> **Nota para deploys existentes:** como los INSERTs usan `ON CONFLICT DO NOTHING`, ejecutar en Supabase:
-> ```sql
-> UPDATE usuario SET contrasena = '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq'
-> WHERE contrasena = '123456';
-> ```
+ AdminController (5 anotaciones)
 
-### @PreAuthorize — protección por rol en el backend
+ ┌────────────────────────────────────────────┬───────────────────────────────────────────────────┐
+ │                  Endpoint                  │                     Anotación                     │
+ ├────────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ GET /dependencias                          │ @PreAuthorize("hasAnyRole('ADMIN', 'POSGRADOS')") │
+ ├────────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ GET /admin/tipos-certificado               │ @PreAuthorize("hasAnyRole('ADMIN', 'POSGRADOS')") │
+ ├────────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ POST /admin/tipos-certificado              │ @PreAuthorize("hasRole('ADMIN')")                 │
+ ├────────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ PUT /admin/tipos-certificado/{id}          │ @PreAuthorize("hasRole('ADMIN')")                 │
+ ├────────────────────────────────────────────┼───────────────────────────────────────────────────┤
+ │ PATCH /admin/tipos-certificado/{id}/activo │ @PreAuthorize("hasRole('ADMIN')")                 │
+ └────────────────────────────────────────────┴───────────────────────────────────────────────────┘
 
-Habilitado con `@EnableMethodSecurity(prePostEnabled = true)` en `SecurityConfig`.
+ PazYSalvoController (5 anotaciones)
 
-**Regla:** `hasRole('DIRECTOR')` busca autoridad `ROLE_DIRECTOR` (Spring agrega el prefijo automáticamente).
+ ┌──────────────────────────────┬──────────────────────────────────────────────────────────────────────┐
+ │           Endpoint           │                              Anotación                               │
+ ├──────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+ │ GET /mis-solicitudes         │ @PreAuthorize("hasAnyRole('DEPENDENCIA', 'DIRECTOR')")               │
+ ├──────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+ │ GET /pendientes              │ @PreAuthorize("hasAnyRole('DEPENDENCIA', 'DIRECTOR')")               │
+ ├──────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+ │ POST /{id}/responder         │ @PreAuthorize("hasAnyRole('DEPENDENCIA', 'DIRECTOR')")               │
+ ├──────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+ │ GET /solicitud/{solicitudId} │ @PreAuthorize("hasAnyRole('ESTUDIANTE', 'DIRECTOR', 'DEPENDENCIA')") │
+ ├──────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+ │ GET /estado-estudiantes      │ @PreAuthorize("hasRole('DIRECTOR')")                                 │
+ └──────────────────────────────┴──────────────────────────────────────────────────────────────────────┘
 
-#### SolicitudController — `/api/solicitudes`
+ CertificadoController (6 anotaciones)
 
-| Endpoint | Rol requerido |
-|----------|---------------|
-| `POST /terminacion-materias` | ESTUDIANTE |
-| `POST /grado` | ESTUDIANTE |
-| `GET /` | ESTUDIANTE |
-| `POST /{id}/pagar-grado` | ESTUDIANTE |
-| `POST /{id}/documentos` | ESTUDIANTE |
-| `GET /{id}/documentos` | ESTUDIANTE, DIRECTOR |
-| `GET /{id}/documentos/{docId}/file` | ESTUDIANTE, DIRECTOR |
-| `GET /bandeja` | DIRECTOR |
-| `GET /bandeja-grado` | DIRECTOR |
-| `POST /{id}/aprobar` | DIRECTOR |
-| `POST /{id}/rechazar` | DIRECTOR |
-| `GET /{id}/acta` | DIRECTOR, POSGRADOS |
-| `GET /{id}/certificado` | DIRECTOR, POSGRADOS |
-| `POST /{id}/fecha-grado` | DIRECTOR, POSGRADOS |
-| `GET /posgrados/pendientes` | ADMIN, POSGRADOS |
-| `POST /{id}/validar-grado` | ADMIN, POSGRADOS |
-| `GET /posgrados/bandeja` | POSGRADOS |
-| `GET /{id}/certificado-pdf` | POSGRADOS |
-| `POST /{id}/rechazar-posgrados` | POSGRADOS |
-| `POST /{id}/aprobar-posgrados` | POSGRADOS |
+ ┌─────────────────────────────┬──────────────────────────────────────────────────────────┐
+ │          Endpoint           │                        Anotación                         │
+ ├─────────────────────────────┼──────────────────────────────────────────────────────────┤
+ │ GET /                       │ @PreAuthorize("hasRole('ESTUDIANTE')")                   │
+ ├─────────────────────────────┼──────────────────────────────────────────────────────────┤
+ │ POST /solicitar             │ @PreAuthorize("hasRole('ESTUDIANTE')")                   │
+ ├─────────────────────────────┼──────────────────────────────────────────────────────────┤
+ │ POST /{id}/pagar            │ @PreAuthorize("hasRole('ESTUDIANTE')")                   │
+ ├─────────────────────────────┼──────────────────────────────────────────────────────────┤
+ │ GET /{id}/pdf               │ @PreAuthorize("hasAnyRole('ESTUDIANTE', 'DEPENDENCIA')") │
+ ├─────────────────────────────┼──────────────────────────────────────────────────────────┤
+ │ GET /dependencia/{cedula}   │ @PreAuthorize("hasRole('DEPENDENCIA')")                  │
+ ├─────────────────────────────┼──────────────────────────────────────────────────────────┤
+ │ POST /{id}/marcar-listo     │ @PreAuthorize("hasRole('DEPENDENCIA')")                  │
+ ├─────────────────────────────┼──────────────────────────────────────────────────────────┤
+ │ POST /{id}/marcar-entregado │ @PreAuthorize("hasRole('DEPENDENCIA')")                  │
+ └─────────────────────────────┴──────────────────────────────────────────────────────────┘
 
-#### AdminController — `/api`
+ ConvocatoriaController (1 anotación)
 
-| Endpoint | Rol requerido |
-|----------|---------------|
-| `GET /dependencias` | ADMIN, POSGRADOS |
-| `GET /admin/tipos-certificado` | ADMIN, POSGRADOS |
-| `POST /admin/tipos-certificado` | ADMIN |
-| `PUT /admin/tipos-certificado/{id}` | ADMIN |
-| `PATCH /admin/tipos-certificado/{id}/activo` | ADMIN |
+ ┌──────────┬───────────────────────────────────────────────────┐
+ │ Endpoint │                     Anotación                     │
+ ├──────────┼───────────────────────────────────────────────────┤
+ │ PUT /    │ @PreAuthorize("hasAnyRole('ADMIN', 'POSGRADOS')") │
+ └──────────┴───────────────────────────────────────────────────┘
 
-#### PazYSalvoController — `/api/paz-y-salvo`
+ Sin cambios
 
-| Endpoint | Rol requerido |
-|----------|---------------|
-| `GET /mis-solicitudes` | DEPENDENCIA, DIRECTOR |
-| `GET /pendientes` | DEPENDENCIA, DIRECTOR |
-| `POST /{id}/responder` | DEPENDENCIA, DIRECTOR |
-| `GET /solicitud/{solicitudId}` | ESTUDIANTE, DIRECTOR, DEPENDENCIA |
-| `GET /estado-estudiantes` | DIRECTOR |
+ - UsuarioController, TramiteController, NotificacionController → solo requieren autenticación, el filtro chain ya lo cubre.
 
-#### CertificadoController — `/api/certificados`
+ ---
+ Paso 3 — UsuarioService.java
 
-| Endpoint | Rol requerido |
-|----------|---------------|
-| `GET /` | ESTUDIANTE |
-| `POST /solicitar` | ESTUDIANTE |
-| `POST /{id}/pagar` | ESTUDIANTE |
-| `GET /{id}/pdf` | ESTUDIANTE, DEPENDENCIA |
-| `GET /dependencia/{cedula}` | DEPENDENCIA |
-| `POST /{id}/marcar-listo` | DEPENDENCIA |
-| `POST /{id}/marcar-entregado` | DEPENDENCIA |
+ Agregar PasswordEncoder y guard de encodeo en guardarUsuario():
 
-#### ConvocatoriaController — `/api/convocatorias`
+ @Autowired
+ private PasswordEncoder passwordEncoder;
 
-| Endpoint | Rol requerido |
-|----------|---------------|
-| `PUT /` | ADMIN, POSGRADOS |
+ public Usuario guardarUsuario(Usuario usuario) {
+     if (usuario.getPassword() != null && !usuario.getPassword().startsWith("$2a$")) {
+         usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
+     }
+     return usuarioRepository.save(usuario);
+ }
 
-#### Sin restricción de rol (solo autenticación)
-- `UsuarioController`, `TramiteController`, `NotificacionController`, `GET /api/certificados/tipos`, `GET /api/convocatorias/activa`
+ El guard !startsWith("$2a$") evita doble-encodeo si el método es llamado sobre un usuario que ya tiene hash.
 
----
+ ---
+ Paso 4 — data.sql
 
-## Compatibilidad con plataforma externa (JWT federation)
+ Reemplazar todas las ocurrencias de '123456' en columna contrasena con:
 
-Cuando el módulo se integre a la plataforma principal, la plataforma emitirá los tokens y este módulo solo los validará. El único cambio necesario será en **`JwtAuthFilter.java` líneas 42–43** — cómo se extraen `cedula` y `rol` del token entrante. Las 36+ anotaciones `@PreAuthorize` en los controllers quedan intactas porque operan sobre las autoridades de Spring Security, no sobre los claim names del JWT.
+ '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LbZibmznP02'
 
-**Costo de migración: 1 archivo, 2 líneas.**
+ Son 14 ocurrencias en 6 bloques INSERT. Usar replace_all=true en el editor.
+
+ ---
+ Paso 5 — UPDATE en Supabase (usuarios ya existentes)
+
+ Como los INSERTs usan ON CONFLICT DO NOTHING, el data.sql actualizado solo aplica a deployments frescos. Para la DB actual ejecutar en el editor SQL de Supabase:
+
+ UPDATE usuario
+ SET contrasena = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LbZibmznP02'
+ WHERE contrasena = '123456';
+
+ ---
+ Paso 6 — AuthController.java
+
+ Eliminar el fallback de texto plano (líneas 59-61). Reemplazar:
+
+ // Soporta contraseñas en texto plano (data.sql demo) y hasheadas con BCrypt
+ boolean passwordValida = usuario.getPassword() != null && (
+         passwordEncoder.matches(request.getContrasena(), usuario.getPassword())
+         || request.getContrasena().equals(usuario.getPassword())
+ );
+
+ Por:
+
+ boolean passwordValida = usuario.getPassword() != null &&
+         passwordEncoder.matches(request.getContrasena(), usuario.getPassword());
+
+ ---
+ Verificación
+
+ 1. POST /api/auth/login con código 20261002 y contraseña 123456 → debe devolver 200 + JWT
+ 2. Mismo endpoint con contraseña incorrecta → 401
+ 3. GET /api/solicitudes/bandeja con token de DIRECTOR → 200
+ 4. GET /api/solicitudes/bandeja con token de ESTUDIANTE → 403
+ // Soporta contraseñas en texto plano (data.sql demo) y hasheadas con BCrypt
+ boolean passwordValida = usuario.getPassword() != null && (
+         passwordEncoder.matches(request.getContrasena(), usuario.getPassword())
+         || request.getContrasena().equals(usuario.getPassword())
+ );
+
+ Por:
+
+ boolean passwordValida = usuario.getPassword() != null &&
+         passwordEncoder.matches(request.getContrasena(), usuario.getPassword());
+
+ ---
+ ---
+ Paso 4 — data.sql
+
+ Reemplazar todas las ocurrencias de '123456' en columna contrasena con:
+
+ '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LbZibmznP02'
+
+ Son 14 ocurrencias en 6 bloques INSERT. Usar replace_all=true en el editor.
+
+ ---
+ Paso 5 — UPDATE en Supabase (usuarios ya existentes)
+
+ Como los INSERTs usan ON CONFLICT DO NOTHING, el data.sql actualizado solo aplica a deployments frescos. Para la DB actual ejecutar en el
+ editor SQL de Supabase:
+
+ UPDATE usuario
+ SET contrasena = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LbZibmznP02'
+ WHERE contrasena = '123456';
+
+ ---
+ Paso 6 — AuthController.java
+
+ Eliminar el fallback de texto plano (líneas 59-61). Reemplazar:
+
+ // Soporta contraseñas en texto plano (data.sql demo) y hasheadas con BCrypt
+ Son 14 ocurrencias en 6 bloques INSERT. Usar replace_all=true en el editor.
+
+ ---
+ Paso 5 — UPDATE en Supabase (usuarios ya existentes)
+
+ Como los INSERTs usan ON CONFLICT DO NOTHING, el data.sql actualizado solo aplica a deployments frescos. Para la DB actual ejecutar en el editor SQL de Supabase:
+
+ UPDATE usuario
+ SET contrasena = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LbZibmznP02'
+ WHERE contrasena = '123456';
+
+ ---
+ Paso 6 — AuthController.java
+
+ Eliminar el fallback de texto plano (líneas 59-61). Reemplazar:
+
+ // Soporta contraseñas en texto plano (data.sql demo) y hasheadas con BCrypt
+ boolean passwordValida = usuario.getPassword() != null && (
+         passwordEncoder.matches(request.getContrasena(), usuario.getPassword())
+         || request.getContrasena().equals(usuario.getPassword())
+ );
+
+ Por:
+
+ boolean passwordValida = usuario.getPassword() != null &&
+         passwordEncoder.matches(request.getContrasena(), usuario.getPassword());
+
+ ---
+ Verificación
+
+ 1. POST /api/auth/login con código 20261002 y contraseña 123456 → debe devolver 200 + JWT
+ 2. Mismo endpoint con contraseña incorrecta → 401
+ 3. GET /api/solicitudes/bandeja con token de DIRECTOR → 200
+ 4. GET /api/solicitudes/bandeja con token de ESTUDIANTE → 403
+ 5. GET /api/solicitudes con token de DIRECTOR → 403
+ 6. POST /api/auth/login sin Authorization header → 200 (endpoint público no bloqueado)
+
+ --- 
+ Nota sobre compatibilidad de JWT claims
+
+ Los @PreAuthorize usan autoridades de Spring Security (ROLE_X), no los claim names del JWT. Cuando se integre con la plataforma real, solo cambia JwtAuthFilter.java líneas 42-43 (cómo se extraen cedula y rol del token). Las 36+ anotaciones @PreAuthorize quedan
+ intactas. Costo de migración: 1 archivo, 2 líneas.
+
+  36 anotaciones @PreAuthorize agregadas en 5 controllers — el backend ahora rechaza con 403 cualquier llamada a un endpoint con rol incorrecto, aunque el token sea válido.
+
+  BCrypt activado — UsuarioService ahora encripta la contraseña antes de guardar cualquier usuario nuevo. data.sql tiene los hashes precomputados para los datos de prueba.
+
+  Fallback texto plano eliminado — AuthController ya solo acepta contraseñas BCrypt.
+
+  Paso pendiente (manual): Ejecutar esto en el editor SQL de Supabase para actualizar los usuarios que ya existen en la DB:
+
+  UPDATE usuario
+  SET contrasena = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LbZibmznP02'
+  WHERE contrasena = '123456';
+
+  Sin ese UPDATE, los usuarios existentes no podrán iniciar sesión hasta que lo ejecutes.
