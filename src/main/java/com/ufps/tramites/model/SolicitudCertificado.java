@@ -1,11 +1,13 @@
 package com.ufps.tramites.model;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "solicitud_certificado")
@@ -16,18 +18,26 @@ public class SolicitudCertificado {
     private Long id;
 
     private String cedula;
-    private String tipoCertificado;   // TipoCertificado.codigo
-    private String modalidadEnvio;    // DIGITAL | FISICA
-    private String estado;            // PENDIENTE_PAGO | PAGADO | GENERADO | LISTO_RETIRO | ENTREGADO | VENCIDA
-    private Double costo;
-    private String cedulaDependencia; // quién gestiona la entrega física
-    private LocalDateTime fechaSolicitud;
-    private LocalDateTime fechaVencimientoPago;
+    private String tipoCertificado;
+    private String modalidadEnvio;   // DIGITAL | FISICA
+    private String estado;           // PENDIENTE_PAGO | PAGADO | GENERADO | LISTO_RETIRO | ENTREGADO | VENCIDA
+    private LocalDate fechaSolicitud;
+    private LocalDate fechaVencimientoPago;
+    private LocalDateTime fechaPago;
+    private LocalDateTime fechaGeneracion;
     private LocalDateTime fechaEntrega;
+
+    private Double costo;
+    private String observaciones;
+    private String destinatario;
+
+    private String urlPdf;
+    private String hashPdf;
 
     public SolicitudCertificado() {}
 
     public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
     public String getCedula() { return cedula; }
     public void setCedula(String cedula) { this.cedula = cedula; }
@@ -41,18 +51,33 @@ public class SolicitudCertificado {
     public String getEstado() { return estado; }
     public void setEstado(String estado) { this.estado = estado; }
 
-    public Double getCosto() { return costo; }
-    public void setCosto(Double costo) { this.costo = costo; }
+    public LocalDate getFechaSolicitud() { return fechaSolicitud; }
+    public void setFechaSolicitud(LocalDate fechaSolicitud) { this.fechaSolicitud = fechaSolicitud; }
 
-    public String getCedulaDependencia() { return cedulaDependencia; }
-    public void setCedulaDependencia(String cedulaDependencia) { this.cedulaDependencia = cedulaDependencia; }
+    public LocalDate getFechaVencimientoPago() { return fechaVencimientoPago; }
+    public void setFechaVencimientoPago(LocalDate fechaVencimientoPago) { this.fechaVencimientoPago = fechaVencimientoPago; }
 
-    public LocalDateTime getFechaSolicitud() { return fechaSolicitud; }
-    public void setFechaSolicitud(LocalDateTime fechaSolicitud) { this.fechaSolicitud = fechaSolicitud; }
+    public LocalDateTime getFechaPago() { return fechaPago; }
+    public void setFechaPago(LocalDateTime fechaPago) { this.fechaPago = fechaPago; }
 
-    public LocalDateTime getFechaVencimientoPago() { return fechaVencimientoPago; }
-    public void setFechaVencimientoPago(LocalDateTime fechaVencimientoPago) { this.fechaVencimientoPago = fechaVencimientoPago; }
+    public LocalDateTime getFechaGeneracion() { return fechaGeneracion; }
+    public void setFechaGeneracion(LocalDateTime fechaGeneracion) { this.fechaGeneracion = fechaGeneracion; }
 
     public LocalDateTime getFechaEntrega() { return fechaEntrega; }
     public void setFechaEntrega(LocalDateTime fechaEntrega) { this.fechaEntrega = fechaEntrega; }
+
+    public Double getCosto() { return costo; }
+    public void setCosto(Double costo) { this.costo = costo; }
+
+    public String getObservaciones() { return observaciones; }
+    public void setObservaciones(String observaciones) { this.observaciones = observaciones; }
+
+    public String getDestinatario() { return destinatario; }
+    public void setDestinatario(String destinatario) { this.destinatario = destinatario; }
+
+    public String getUrlPdf() { return urlPdf; }
+    public void setUrlPdf(String urlPdf) { this.urlPdf = urlPdf; }
+
+    public String getHashPdf() { return hashPdf; }
+    public void setHashPdf(String hashPdf) { this.hashPdf = hashPdf; }
 }
