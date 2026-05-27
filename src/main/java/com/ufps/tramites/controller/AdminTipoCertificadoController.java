@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.ufps.tramites.model.TipoCertificado;
@@ -36,6 +37,7 @@ public class AdminTipoCertificadoController {
     @Operation(summary = "Listar todos los tipos de certificado",
                description = "Devuelve el catálogo completo (activos e inactivos) con el nombre de la dependencia responsable.")
     @ApiResponse(responseCode = "200", description = "Lista de tipos de certificado")
+    @PreAuthorize("hasAnyRole('ADMIN', 'POSGRADOS')")
     @GetMapping
     public ResponseEntity<List<Map<String, Object>>> listar() {
         List<Map<String, Object>> data = repository.findAll().stream()
@@ -49,6 +51,7 @@ public class AdminTipoCertificadoController {
         @ApiResponse(responseCode = "200", description = "Tipo de certificado encontrado"),
         @ApiResponse(responseCode = "404", description = "Tipo no encontrado")
     })
+    @PreAuthorize("hasAnyRole('ADMIN', 'POSGRADOS')")
     @GetMapping("/{id}")
     public ResponseEntity<?> obtener(@PathVariable Long id) {
         return repository.findById(id)
@@ -64,6 +67,7 @@ public class AdminTipoCertificadoController {
         @ApiResponse(responseCode = "409", description = "Ya existe un tipo con ese código"),
         @ApiResponse(responseCode = "422", description = "El campo código es obligatorio")
     })
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<?> crear(@RequestBody Map<String, Object> body) {
         String codigo = strOrNull(body.get("codigo"));
@@ -89,6 +93,7 @@ public class AdminTipoCertificadoController {
         @ApiResponse(responseCode = "200", description = "Tipo actualizado"),
         @ApiResponse(responseCode = "404", description = "Tipo no encontrado")
     })
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<?> editar(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         return repository.findById(id).<ResponseEntity<?>>map(t -> {
@@ -105,6 +110,7 @@ public class AdminTipoCertificadoController {
         @ApiResponse(responseCode = "200", description = "Estado actualizado"),
         @ApiResponse(responseCode = "404", description = "Tipo no encontrado")
     })
+    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}/activo")
     public ResponseEntity<?> setActivo(
             @PathVariable Long id,
