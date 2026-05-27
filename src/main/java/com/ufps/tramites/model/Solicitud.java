@@ -43,6 +43,13 @@ public class Solicitud {
     private LocalDateTime fechaValidacion;
     private String cedulaPosgrados;
 
+    // ── Acta de terminación ────────────────────────────────────────────────
+    private Boolean actaGenerada;
+
+    // ── Radicado ──────────────────────────────────────────────────────────
+    @jakarta.persistence.Column(unique = true)
+    private String radicado;
+
     // ── Proceso de Grado (pago y fecha) ───────────────────────────────────
     private String estadoPagoGrado;   // null | APROBADO
     private LocalDate fechaGrado;
@@ -110,9 +117,25 @@ public class Solicitud {
     public String getCedulaPosgrados() { return cedulaPosgrados; }
     public void setCedulaPosgrados(String c) { this.cedulaPosgrados = c; }
 
+    public boolean isActaGenerada() { return Boolean.TRUE.equals(actaGenerada); }
+    public void setActaGenerada(boolean actaGenerada) { this.actaGenerada = actaGenerada; }
+
+    public String getRadicado() { return radicado; }
+    public void setRadicado(String radicado) { this.radicado = radicado; }
+
     public String getEstadoPagoGrado() { return estadoPagoGrado; }
     public void setEstadoPagoGrado(String estadoPagoGrado) { this.estadoPagoGrado = estadoPagoGrado; }
 
     public LocalDate getFechaGrado() { return fechaGrado; }
     public void setFechaGrado(LocalDate fechaGrado) { this.fechaGrado = fechaGrado; }
+
+    // ── Modalidad de grado ─────────────────────────────────────────────────
+    private String modalidadGrado;         // CEREMONIA | SECRETARIA
+    private Boolean pagoModalidadRealizado = false;
+    
+    public String getModalidadGrado() { return modalidadGrado; }
+    public void setModalidadGrado(String modalidadGrado) { this.modalidadGrado = modalidadGrado; }
+    
+    public Boolean getPagoModalidadRealizado() { return pagoModalidadRealizado; }
+    public void setPagoModalidadRealizado(Boolean v) { this.pagoModalidadRealizado = v; }
 }

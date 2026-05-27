@@ -2,6 +2,10 @@ package com.ufps.tramites.controller;
 
 import com.ufps.tramites.model.Convocatoria;
 import com.ufps.tramites.service.ConvocatoriaService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
@@ -16,20 +20,29 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "Admin – Convocatoria",
+     description = "Gestión de la ventana de convocatoria académica. Lectura pública; escritura solo ADMIN o POSGRADOS.")
 @RestController
 @RequestMapping("/api/convocatorias")
 public class ConvocatoriaController {
 
     @Autowired private ConvocatoriaService convocatoriaService;
 
-    /** GET /api/convocatorias/activa — cualquier usuario autenticado */
+    @Operation(summary = "Obtener la convocatoria activa")
+    @ApiResponse(responseCode = "200", description = "Convocatoria vigente con fechaInicio y fechaFin")
     @GetMapping("/activa")
     public ResponseEntity<?> getActiva() {
         Convocatoria c = convocatoriaService.getActiva();
         return ResponseEntity.ok(mapear(c));
     }
 
-    /** PUT /api/convocatorias — solo ADMIN o POSGRADOS */
+    @Operation(summary = "Actualizar las fechas de convocatoria",
+               description = "Solo permitido para ADMIN o POSGRADOS. Body: `{ fechaInicio: 'YYYY-MM-DD', fechaFin: 'YYYY-MM-DD' }`.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Convocatoria actualizada"),
+        @ApiResponse(responseCode = "400", description = "Fechas ausentes o con formato inválido"),
+        @ApiResponse(responseCode = "403", description = "El usuario no tiene rol ADMIN o POSGRADOS")
+    })
     @PreAuthorize("hasAnyRole('ADMIN', 'POSGRADOS')")
     @PutMapping
     public ResponseEntity<?> actualizar(Authentication auth, @RequestBody Map<String, String> body) {
