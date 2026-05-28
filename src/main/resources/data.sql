@@ -3,7 +3,16 @@
 -- Se usa ON CONFLICT DO NOTHING para evitar duplicados
 -- cada vez que reinicia la aplicación (ddl-auto=update)
 -- ============================================================
- 
+
+-- ── Roles (deben existir antes que los usuarios) ─────────────────
+INSERT INTO roles (id, nombre) VALUES
+  (1, 'ESTUDIANTE'),
+  (2, 'DIRECTOR'),
+  (3, 'ADMIN'),
+  (4, 'POSGRADOS'),
+  (5, 'DEPENDENCIA')
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO programa_academico (nombre, tipo, total_creditos) VALUES
 -- Doctorados
 ('Doctorado en Educación',                                                                                      'DOCTORADO',       80),
@@ -26,24 +35,31 @@ INSERT INTO programa_academico (nombre, tipo, total_creditos) VALUES
 ('Especialización en Educación para la Atención a Población Afectada por el Conflicto Armado y en Problemática Fronteriza', 'ESPECIALIZACION', 28)
 ON CONFLICT (nombre) DO NOTHING;
  
-INSERT INTO usuario (cedula, codigo, nombre, contrasena, rol, creditos_aprobados, programa_id) VALUES
--- Estudiante bloqueado: 40/56 créditos → etapa 1 bloqueada
-('1098765432', '20261001', 'Juan Perez',     '123456', 'ESTUDIANTE', 40,
+INSERT INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id, programa_id) VALUES
+-- Estudiante bloqueado: 40/56 créditos → perfil en tabla estudiante
+('1098765432', '20261001', 'Juan Perez',     '123456',
+    (SELECT id FROM roles WHERE nombre = 'ESTUDIANTE'),
     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas')),
--- Estudiante habilitado: 56/56 créditos → terminación aprobada → etapa 2 habilitada
-('1098765435', '20261005', 'Laura Gomez',    '123456', 'ESTUDIANTE', 56,
+-- Estudiante habilitado: 56/56 créditos
+('1098765435', '20261005', 'Laura Gomez',    '123456',
+    (SELECT id FROM roles WHERE nombre = 'ESTUDIANTE'),
     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas')),
 -- Estudiante demo: solicitud pendiente de pago
-('1098765436', '20261006', 'Pedro Martinez', '123456', 'ESTUDIANTE', 56,
+('1098765436', '20261006', 'Pedro Martinez', '123456',
+    (SELECT id FROM roles WHERE nombre = 'ESTUDIANTE'),
     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas')),
 -- Estudiante demo: solicitud rechazada
-('1098765437', '20261007', 'Carlos Rueda',   '123456', 'ESTUDIANTE', 56,
+('1098765437', '20261007', 'Carlos Rueda',   '123456',
+    (SELECT id FROM roles WHERE nombre = 'ESTUDIANTE'),
     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas')),
 -- Director del mismo programa para que la bandeja tenga datos
-('1098765433', '20261002', 'Maria Director', '123456', 'DIRECTOR',   NULL,
+('1098765433', '20261002', 'Maria Director', '123456',
+    (SELECT id FROM roles WHERE nombre = 'DIRECTOR'),
     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas')),
-('1098765434', '20261003', 'Admin User',     '123456', 'ADMIN',      30,
-    (SELECT id FROM programa_academico WHERE nombre = 'Especialización en Estructuras'))
+-- Coordinador de Posgrados (gestión y configuración)
+('1098765434', '20261003', 'Coordinador Posgrados', '123456',
+    (SELECT id FROM roles WHERE nombre = 'POSGRADOS'),
+    (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas'))
 ON CONFLICT (cedula) DO NOTHING;
  
 INSERT INTO solicitud (cedula, tipo, estado, fecha_solicitud, costo, observaciones) VALUES
@@ -56,25 +72,54 @@ INSERT INTO solicitud (cedula, tipo, estado, fecha_solicitud, costo, observacion
 ON CONFLICT DO NOTHING;
  
 -- ============================================================
+-- Catálogo de Dependencias (entidad Dependencia configurable)
+-- ============================================================
+
+INSERT INTO dependencias (nombre, descripcion, activa) VALUES
+('Biblioteca',  'Biblioteca Central UFPS',                 true),
+('Financiera',  'División Financiera UFPS',                true),
+('Admisiones',  'Registro y Control Académico',            true),
+('Posgrados',   'Oficina de Posgrados UFPS',               true)
+ON CONFLICT (nombre) DO NOTHING;
+
+-- ============================================================
 -- Usuarios para el proceso de Paz y Salvo
 -- ============================================================
- 
--- Director de programa (nuevo, con correo para probar paz y salvo)
-INSERT INTO usuario (cedula, codigo, nombre, contrasena, rol, correo, programa_id) VALUES
-('2000000001', 'DIR001', 'Carlos Director Grado', '123456', 'DIRECTOR', 'director.posgrado@test.com',
+
+-- Director de programa (con correo para probar paz y salvo)
+INSERT INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id, correo, programa_id) VALUES
+('2000000001', 'DIR001', 'Carlos Director Grado', '123456',
+    (SELECT id FROM roles WHERE nombre = 'DIRECTOR'),
+    'director.posgrado@test.com',
     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas'))
 ON CONFLICT (cedula) DO NOTHING;
- 
--- Dependencias (rol DEPENDENCIA)
-INSERT INTO usuario (cedula, codigo, nombre, contrasena, rol, correo, programa_id) VALUES
-('3000000001', 'DEP001', 'Biblioteca Central', '123456', 'DEPENDENCIA', 'kevarias.2195@gmail.com', NULL),
-('3000000002', 'DEP002', 'División Financiera', '123456', 'DEPENDENCIA', 'financiera@test.com', NULL),
-('3000000003', 'DEP003', 'Admisiones y Registro', '123456', 'DEPENDENCIA', 'admisiones@test.com', NULL)
+
+-- Dependencias (rol DEPENDENCIA) — vinculadas al catálogo de dependencias
+INSERT INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id, correo, dependencia_id) VALUES
+('3000000001', 'DEP001', 'Biblioteca Central',    '123456',
+    (SELECT id FROM roles WHERE nombre = 'DEPENDENCIA'), 'kevarias.2195@gmail.com',
+    (SELECT id FROM dependencias WHERE nombre = 'Biblioteca')),
+('3000000002', 'DEP002', 'División Financiera',   '123456',
+    (SELECT id FROM roles WHERE nombre = 'DEPENDENCIA'), 'financiera@test.com',
+    (SELECT id FROM dependencias WHERE nombre = 'Financiera')),
+('3000000003', 'DEP003', 'Admisiones y Registro', '123456',
+    (SELECT id FROM roles WHERE nombre = 'DEPENDENCIA'), 'admisiones@test.com',
+    (SELECT id FROM dependencias WHERE nombre = 'Admisiones'))
 ON CONFLICT (cedula) DO NOTHING;
- 
+
+-- Usuario POSGRADOS (paz y salvos + gestión de convocatorias)
+INSERT INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id, correo, dependencia_id) VALUES
+('4000000001', 'POS001', 'Oficina Posgrados', '123456',
+    (SELECT id FROM roles WHERE nombre = 'POSGRADOS'),
+    'posgrados@ufps.edu.co',
+    (SELECT id FROM dependencias WHERE nombre = 'Posgrados'))
+ON CONFLICT (cedula) DO NOTHING;
+
 -- Estudiante con créditos completos y terminación aprobada (para probar solicitud de grado y paz y salvo)
-INSERT INTO usuario (cedula, codigo, nombre, contrasena, rol, correo, creditos_aprobados, programa_id) VALUES
-('2000000010', 'EST010', 'Andrea Prueba Grado', '123456', 'ESTUDIANTE', 'andrea.grado@test.com', 56,
+INSERT INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id, correo, programa_id) VALUES
+('2000000010', 'EST010', 'Andrea Prueba Grado', '123456',
+    (SELECT id FROM roles WHERE nombre = 'ESTUDIANTE'),
+    'andrea.grado@test.com',
     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas'))
 ON CONFLICT (cedula) DO NOTHING;
  
@@ -106,3 +151,28 @@ ON CONFLICT (codigo) DO UPDATE SET
     dependencia_cedula     = EXCLUDED.dependencia_cedula,
     direccion_oficina      = EXCLUDED.direccion_oficina,
     tiempo_entrega_dias    = EXCLUDED.tiempo_entrega_dias;
+
+-- ============================================================
+-- Perfiles de Estudiante (debe ir DESPUÉS de usuario por el FK usuario_id)
+-- creditosAprobados y estadoGrado viven aquí, no en usuario
+-- ============================================================
+
+INSERT INTO estudiante (nombre, apellido, cedula, codigo, email, es_posgrado, migrado,
+    creditos_aprobados, programa_id, usuario_id)
+VALUES
+    ('Juan',   'Perez',    '1098765432', '20261001', 'juan@example.com',      true, false, 40,
+     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas'),
+     (SELECT id FROM usuario WHERE cedula = '1098765432')),
+    ('Laura',  'Gomez',    '1098765435', '20261005', 'laura@example.com',     true, false, 56,
+     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas'),
+     (SELECT id FROM usuario WHERE cedula = '1098765435')),
+    ('Pedro',  'Martinez', '1098765436', '20261006', 'pedro@example.com',     true, false, 56,
+     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas'),
+     (SELECT id FROM usuario WHERE cedula = '1098765436')),
+    ('Carlos', 'Rueda',    '1098765437', '20261007', 'carlos@example.com',    true, false, 56,
+     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas'),
+     (SELECT id FROM usuario WHERE cedula = '1098765437')),
+    ('Andrea', 'Prueba',   '2000000010', 'EST010',   'andrea.grado@test.com', true, false, 56,
+     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas'),
+     (SELECT id FROM usuario WHERE cedula = '2000000010'))
+ON CONFLICT DO NOTHING;

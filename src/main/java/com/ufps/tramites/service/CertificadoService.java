@@ -87,7 +87,7 @@ public class CertificadoService {
 
     public List<Map<String, Object>> obtenerCertificadosPorCedula(String cedula) {
         List<SolicitudCertificado> solicitudes = certificadoRepository.findByCedula(cedula);
-        Usuario estudiante = usuarioRepository.findById(cedula).orElse(null);
+        Usuario estudiante = usuarioRepository.findByCedula(cedula).orElse(null);
         List<Map<String, Object>> resultado = new ArrayList<>();
         for (SolicitudCertificado s : solicitudes) {
             TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(s.getTipoCertificado()).orElse(null);
@@ -124,7 +124,7 @@ public class CertificadoService {
         generarYNotificar(s.getId());
 
         SolicitudCertificado actualizada = certificadoRepository.findById(s.getId()).orElse(s);
-        Usuario estudiante = usuarioRepository.findById(cedula).orElse(null);
+        Usuario estudiante = usuarioRepository.findByCedula(cedula).orElse(null);
         TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(actualizada.getTipoCertificado()).orElse(null);
         return construirRespuesta(actualizada, estudiante, tipo);
     }
@@ -147,7 +147,7 @@ public class CertificadoService {
 
         TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(s.getTipoCertificado())
             .orElseThrow(() -> new IllegalStateException("Tipo de certificado no existe: " + s.getTipoCertificado()));
-        Usuario estudiante = usuarioRepository.findById(s.getCedula()).orElse(null);
+        Usuario estudiante = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
 
         byte[] pdfBytes;
         try {
@@ -208,7 +208,7 @@ public class CertificadoService {
         }
 
         // Fallback: regenerar el PDF al vuelo si storage no devolvió nada.
-        Usuario estudiante = usuarioRepository.findById(s.getCedula()).orElse(null);
+        Usuario estudiante = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
         try {
             return pdfService.generar(tipo, s, estudiante);
         } catch (Exception e) {
@@ -227,7 +227,7 @@ public class CertificadoService {
             certificadoRepository.findByDependencia(cedulaDependencia, estadoFiltro);
         List<Map<String, Object>> resultado = new ArrayList<>();
         for (SolicitudCertificado s : solicitudes) {
-            Usuario estudiante = usuarioRepository.findById(s.getCedula()).orElse(null);
+            Usuario estudiante = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
             TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(s.getTipoCertificado()).orElse(null);
             resultado.add(construirRespuesta(s, estudiante, tipo));
         }
@@ -251,7 +251,7 @@ public class CertificadoService {
         s.setObservaciones("Documento físico listo para retiro en oficina.");
         certificadoRepository.save(s);
 
-        Usuario estudiante = usuarioRepository.findById(s.getCedula()).orElse(null);
+        Usuario estudiante = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
         try {
             correoService.enviarAvisoListoRetiro(estudiante, tipo, s);
         } catch (Exception e) {
@@ -275,7 +275,7 @@ public class CertificadoService {
         s.setObservaciones("Documento físico entregado al estudiante.");
         certificadoRepository.save(s);
 
-        Usuario estudiante = usuarioRepository.findById(s.getCedula()).orElse(null);
+        Usuario estudiante = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
         return construirRespuesta(s, estudiante, tipo);
     }
 

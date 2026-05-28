@@ -1,8 +1,10 @@
 package com.ufps.tramites.service;
 
+import com.ufps.tramites.model.Estudiante;
 import com.ufps.tramites.model.PazYSalvo;
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
+import com.ufps.tramites.repository.EstudianteRepository;
 import com.ufps.tramites.repository.PazYSalvoRepository;
 import com.ufps.tramites.repository.SolicitudRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
@@ -27,6 +29,7 @@ public class PazYSalvoService {
     @Autowired private PazYSalvoRepository pazYSalvoRepository;
     @Autowired private SolicitudRepository solicitudRepository;
     @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private EstudianteRepository estudianteRepository;
 
     @Autowired(required = false)
     private JavaMailSender mailSender;
@@ -42,21 +45,25 @@ public class PazYSalvoService {
      */
     public void iniciarProcesoPazYSalvo(Solicitud solicitud, Usuario director) {
         // Obtener datos del estudiante para el correo
-        Usuario estudiante = usuarioRepository.findById(solicitud.getCedula()).orElse(null);
+        Usuario estudiante = usuarioRepository.findByCedula(solicitud.getCedula()).orElse(null);
         String nombreEstudiante = estudiante != null ? estudiante.getNombre() : solicitud.getCedula();
 
-        // Buscar todos los usuarios con rol DEPENDENCIA
-        List<Usuario> dependencias = usuarioRepository.findByRol("DEPENDENCIA");
+        // Buscar todos los usuarios con rol DEPENDENCIA o POSGRADOS
+        List<Usuario> dependencias = new ArrayList<>(usuarioRepository.findByRol_Nombre("DEPENDENCIA"));
+        dependencias.addAll(usuarioRepository.findByRol_Nombre("POSGRADOS"));
 
         List<PazYSalvo> nuevos = new ArrayList<>();
 
-        // Crear paz y salvo para cada dependencia
+        // Crear paz y salvo para cada dependencia/posgrados
         for (Usuario dep : dependencias) {
             PazYSalvo ps = new PazYSalvo();
             ps.setSolicitudId(solicitud.getId());
             ps.setCedulaEstudiante(solicitud.getCedula());
             ps.setCedulaResponsable(dep.getCedula());
-            ps.setTipoDependencia(dep.getNombre());
+            ps.setDependencia(dep.getDependencia());
+            ps.setTipoDependencia(dep.getDependencia() != null
+                    ? dep.getDependencia().getNombre()
+                    : dep.getNombre());
             ps.setEstado("PENDIENTE");
             ps.setFechaSolicitud(LocalDateTime.now());
             nuevos.add(ps);
@@ -192,7 +199,7 @@ public class PazYSalvoService {
                 ? director.getProgramaAcademico().getId() : null;
         if (programaId == null) return List.of();
 
-        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRol(programaId, "ESTUDIANTE");
+        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRol_Nombre(programaId, "ESTUDIANTE");
         List<Map<String, Object>> resultado = new ArrayList<>();
         for (Usuario est : estudiantes) {
             resultado.add(calcularEstadoEstudiante(est));
@@ -201,16 +208,17 @@ public class PazYSalvoService {
     }
 
     private Map<String, Object> calcularEstadoEstudiante(Usuario est) {
+        Estudiante perfil = estudianteRepository.findByUsuario(est).orElse(null);
         Map<String, Object> info = new LinkedHashMap<>();
         info.put("cedula", est.getCedula());
         info.put("nombre", est.getNombre());
         info.put("codigo", est.getCodigo());
-        int creditos      = est.getCreditosAprobados() != null ? est.getCreditosAprobados() : 0;
+        int creditos      = perfil != null && perfil.getCreditosAprobados() != null ? perfil.getCreditosAprobados() : 0;
         int totalCreditos = est.getProgramaAcademico() != null ? est.getProgramaAcademico().getTotalCreditos() : 0;
         info.put("creditosAprobados", creditos);
         info.put("totalCreditos",     totalCreditos);
 
-        if ("GRADUADO".equals(est.getEstadoGrado())) {
+        if (perfil != null && "GRADUADO".equals(perfil.getEstadoGrado())) {
             info.put("etapa",      "GRADUADO");
             info.put("etapaLabel", "Graduado");
             return info;
@@ -281,7 +289,7 @@ public class PazYSalvoService {
 
     private Map<String, Object> mapearPazYSalvoConEstudiante(PazYSalvo ps) {
         Map<String, Object> m = mapearPazYSalvo(ps);
-        usuarioRepository.findById(ps.getCedulaEstudiante()).ifPresent(est -> {
+        usuarioRepository.findByCedula(ps.getCedulaEstudiante()).ifPresent(est -> {
             m.put("nombreEstudiante", est.getNombre());
             m.put("codigoEstudiante", est.getCodigo());
             m.put("programa", est.getProgramaAcademico() != null
