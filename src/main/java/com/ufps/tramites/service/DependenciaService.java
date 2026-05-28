@@ -17,6 +17,10 @@ public class DependenciaService {
         return dependenciaRepository.findByActivaTrue();
     }
 
+    public List<Dependencia> obtenerTodasParaAdmin() {
+        return dependenciaRepository.findAll();
+    }
+
     public Dependencia obtenerPorId(Long id) {
         return dependenciaRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Dependencia no encontrada: " + id));
@@ -30,6 +34,19 @@ public class DependenciaService {
     public Dependencia crear(Dependencia dependencia) {
         dependencia.setActiva(true);
         return dependenciaRepository.save(dependencia);
+    }
+
+    public Dependencia actualizar(Long id, Dependencia datos) {
+        Dependencia dep = obtenerPorId(id);
+        dep.setNombre(datos.getNombre());
+        dep.setDescripcion(datos.getDescripcion());
+        return dependenciaRepository.save(dep);
+    }
+
+    public Dependencia setActiva(Long id, boolean valor) {
+        Dependencia dep = obtenerPorId(id);
+        dep.setActiva(valor);
+        return dependenciaRepository.save(dep);
     }
 
     public void desactivar(Long id) {
