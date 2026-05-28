@@ -6,8 +6,10 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.ufps.tramites.dto.LoginRequestDTO;
 import com.ufps.tramites.dto.LoginResponseDTO;
+import com.ufps.tramites.model.Estudiante;
 import com.ufps.tramites.model.Rol;
 import com.ufps.tramites.model.Usuario;
+import com.ufps.tramites.repository.EstudianteRepository;
 import com.ufps.tramites.repository.RolRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
 import com.ufps.tramites.security.JwtService;
@@ -30,6 +32,7 @@ public class AuthController {
 
     @Autowired private JwtService jwtService;
     @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private EstudianteRepository estudianteRepository;
     @Autowired private RolRepository rolRepository;
     @Autowired private PasswordEncoder passwordEncoder;
 
@@ -153,7 +156,10 @@ public class AuthController {
     }
 
     private LoginResponseDTO buildResponse(Usuario usuario) {
-        String token = jwtService.generateToken(usuario);
+        java.util.Optional<Estudiante> estudiante = estudianteRepository.findByUsuario(usuario);
+        String token = jwtService.generateToken(usuario, estudiante);
+        String programaNombre = usuario.getProgramaAcademico() != null
+                ? usuario.getProgramaAcademico().getNombre() : null;
         return new LoginResponseDTO(
                 token,
                 usuario.getId(),
@@ -162,7 +168,9 @@ public class AuthController {
                 usuario.getEmail(),
                 usuario.getCodigo(),
                 usuario.getRolNombre(),
-                usuario.getDependenciaNombre()
+                usuario.getDependenciaNombre(),
+                estudiante.map(Estudiante::getId).orElse(null),
+                programaNombre
         );
     }
 }
