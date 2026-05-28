@@ -9,10 +9,13 @@ public class LoginResponseDTO {
     private String codigo;
     private String rol;
     private String dependenciaNombre;
+    private Long estudianteId;
+    private String programaNombre;
 
     public LoginResponseDTO(String token, Long id, String cedula,
                              String nombreCompleto, String email,
-                             String codigo, String rol, String dependenciaNombre) {
+                             String codigo, String rol, String dependenciaNombre,
+                             Long estudianteId, String programaNombre) {
         this.token = token;
         this.id = id;
         this.cedula = cedula;
@@ -21,6 +24,8 @@ public class LoginResponseDTO {
         this.codigo = codigo;
         this.rol = rol;
         this.dependenciaNombre = dependenciaNombre;
+        this.estudianteId = estudianteId;
+        this.programaNombre = programaNombre;
     }
 
     public String getToken() { return token; }
@@ -31,4 +36,6 @@ public class LoginResponseDTO {
     public String getCodigo() { return codigo; }
     public String getRol() { return rol; }
     public String getDependenciaNombre() { return dependenciaNombre; }
+    public Long getEstudianteId() { return estudianteId; }
+    public String getProgramaNombre() { return programaNombre; }
 }

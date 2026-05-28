@@ -1,8 +1,10 @@
 package com.ufps.tramites.service;
 
+import com.ufps.tramites.model.Estudiante;
 import com.ufps.tramites.model.PazYSalvo;
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
+import com.ufps.tramites.repository.EstudianteRepository;
 import com.ufps.tramites.repository.PazYSalvoRepository;
 import com.ufps.tramites.repository.SolicitudRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
@@ -27,6 +29,7 @@ public class PazYSalvoService {
     @Autowired private PazYSalvoRepository pazYSalvoRepository;
     @Autowired private SolicitudRepository solicitudRepository;
     @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private EstudianteRepository estudianteRepository;
 
     @Autowired(required = false)
     private JavaMailSender mailSender;
@@ -205,16 +208,17 @@ public class PazYSalvoService {
     }
 
     private Map<String, Object> calcularEstadoEstudiante(Usuario est) {
+        Estudiante perfil = estudianteRepository.findByUsuario(est).orElse(null);
         Map<String, Object> info = new LinkedHashMap<>();
         info.put("cedula", est.getCedula());
         info.put("nombre", est.getNombre());
         info.put("codigo", est.getCodigo());
-        int creditos      = est.getCreditosAprobados() != null ? est.getCreditosAprobados() : 0;
+        int creditos      = perfil != null && perfil.getCreditosAprobados() != null ? perfil.getCreditosAprobados() : 0;
         int totalCreditos = est.getProgramaAcademico() != null ? est.getProgramaAcademico().getTotalCreditos() : 0;
         info.put("creditosAprobados", creditos);
         info.put("totalCreditos",     totalCreditos);
 
-        if ("GRADUADO".equals(est.getEstadoGrado())) {
+        if (perfil != null && "GRADUADO".equals(perfil.getEstadoGrado())) {
             info.put("etapa",      "GRADUADO");
             info.put("etapaLabel", "Graduado");
             return info;

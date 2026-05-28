@@ -48,13 +48,6 @@ public class Usuario {
     @JoinColumn(name = "rol_id")
     private Rol rol;
 
-    // Campos propios del módulo de tramites (no existen en el sistema externo aún)
-    @Column(name = "creditos_aprobados")
-    private Integer creditosAprobados;
-
-    @Column(name = "estado_grado")
-    private String estadoGrado;
-
     @ManyToOne
     @JoinColumn(name = "programa_id")
     private ProgramaAcademico programaAcademico;
@@ -103,12 +96,6 @@ public class Usuario {
 
     public Rol getRol() { return rol; }
     public void setRol(Rol rol) { this.rol = rol; }
-
-    public Integer getCreditosAprobados() { return creditosAprobados; }
-    public void setCreditosAprobados(Integer creditosAprobados) { this.creditosAprobados = creditosAprobados; }
-
-    public String getEstadoGrado() { return estadoGrado; }
-    public void setEstadoGrado(String estadoGrado) { this.estadoGrado = estadoGrado; }
 
     public ProgramaAcademico getProgramaAcademico() { return programaAcademico; }
     public void setProgramaAcademico(ProgramaAcademico programaAcademico) { this.programaAcademico = programaAcademico; }
