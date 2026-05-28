@@ -5,46 +5,31 @@ public class UsuarioResponseDTO {
     private String nombre;
     private String codigo;
     private String rol;
+    private String dependenciaNombre;
 
     public UsuarioResponseDTO() {
     }
 
-    public UsuarioResponseDTO(String cedula, String nombre, String codigo, String rol) {
+    public UsuarioResponseDTO(String cedula, String nombre, String codigo, String rol, String dependenciaNombre) {
         this.cedula = cedula;
         this.nombre = nombre;
         this.codigo = codigo;
         this.rol = rol;
+        this.dependenciaNombre = dependenciaNombre;
     }
 
-    public String getCedula() {
-        return cedula;
-    }
+    public String getCedula() { return cedula; }
+    public void setCedula(String cedula) { this.cedula = cedula; }
 
-    public void setCedula(String cedula) {
-        this.cedula = cedula;
-    }
+    public String getNombre() { return nombre; }
+    public void setNombre(String nombre) { this.nombre = nombre; }
 
-    public String getNombre() {
-        return nombre;
-    }
+    public String getCodigo() { return codigo; }
+    public void setCodigo(String codigo) { this.codigo = codigo; }
 
-    public void setNombre(String nombre) {
-        this.nombre = nombre;
-    }
+    public String getRol() { return rol; }
+    public void setRol(String rol) { this.rol = rol; }
 
-    public String getCodigo() {
-        return codigo;
-    }
-
-    public void setCodigo(String codigo) {
-        this.codigo = codigo;
-    }
-
-    public String getRol() {
-        return rol;
-    }
-
-    public void setRol(String rol) {
-        this.rol = rol;
-    }
+    public String getDependenciaNombre() { return dependenciaNombre; }
+    public void setDependenciaNombre(String dependenciaNombre) { this.dependenciaNombre = dependenciaNombre; }
 }

@@ -161,7 +161,8 @@ public class AuthController {
                 usuario.getNombreCompleto(),
                 usuario.getEmail(),
                 usuario.getCodigo(),
-                usuario.getRolNombre()
+                usuario.getRolNombre(),
+                usuario.getDependenciaNombre()
         );
     }
 }

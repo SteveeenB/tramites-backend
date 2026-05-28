@@ -59,6 +59,10 @@ public class Usuario {
     @JoinColumn(name = "programa_id")
     private ProgramaAcademico programaAcademico;
 
+    @ManyToOne
+    @JoinColumn(name = "dependencia_id")
+    private Dependencia dependencia;
+
     public Usuario() {}
 
     public Long getId() { return id; }
@@ -109,8 +113,12 @@ public class Usuario {
     public ProgramaAcademico getProgramaAcademico() { return programaAcademico; }
     public void setProgramaAcademico(ProgramaAcademico programaAcademico) { this.programaAcademico = programaAcademico; }
 
+    public Dependencia getDependencia() { return dependencia; }
+    public void setDependencia(Dependencia dependencia) { this.dependencia = dependencia; }
+
     // Helpers para compatibilidad interna con código existente
     public String getNombre() { return nombreCompleto; }
     public String getCorreo() { return email; }
     public String getRolNombre() { return rol != null ? rol.getNombre() : null; }
+    public String getDependenciaNombre() { return dependencia != null ? dependencia.getNombre() : null; }
 }
