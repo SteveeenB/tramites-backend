@@ -45,18 +45,22 @@ public class PazYSalvoService {
         Usuario estudiante = usuarioRepository.findByCedula(solicitud.getCedula()).orElse(null);
         String nombreEstudiante = estudiante != null ? estudiante.getNombre() : solicitud.getCedula();
 
-        // Buscar todos los usuarios con rol DEPENDENCIA
-        List<Usuario> dependencias = usuarioRepository.findByRol_Nombre("DEPENDENCIA");
+        // Buscar todos los usuarios con rol DEPENDENCIA o POSGRADOS
+        List<Usuario> dependencias = new ArrayList<>(usuarioRepository.findByRol_Nombre("DEPENDENCIA"));
+        dependencias.addAll(usuarioRepository.findByRol_Nombre("POSGRADOS"));
 
         List<PazYSalvo> nuevos = new ArrayList<>();
 
-        // Crear paz y salvo para cada dependencia
+        // Crear paz y salvo para cada dependencia/posgrados
         for (Usuario dep : dependencias) {
             PazYSalvo ps = new PazYSalvo();
             ps.setSolicitudId(solicitud.getId());
             ps.setCedulaEstudiante(solicitud.getCedula());
             ps.setCedulaResponsable(dep.getCedula());
-            ps.setTipoDependencia(dep.getNombre());
+            ps.setDependencia(dep.getDependencia());
+            ps.setTipoDependencia(dep.getDependencia() != null
+                    ? dep.getDependencia().getNombre()
+                    : dep.getNombre());
             ps.setEstado("PENDIENTE");
             ps.setFechaSolicitud(LocalDateTime.now());
             nuevos.add(ps);

@@ -56,20 +56,45 @@ INSERT INTO solicitud (cedula, tipo, estado, fecha_solicitud, costo, observacion
 ON CONFLICT DO NOTHING;
  
 -- ============================================================
+-- Catálogo de Dependencias (entidad Dependencia configurable)
+-- ============================================================
+
+INSERT INTO dependencias (nombre, descripcion, activa) VALUES
+('Biblioteca',  'Biblioteca Central UFPS',                 true),
+('Financiera',  'División Financiera UFPS',                true),
+('Admisiones',  'Registro y Control Académico',            true),
+('Posgrados',   'Oficina de Posgrados UFPS',               true)
+ON CONFLICT (nombre) DO NOTHING;
+
+-- Rol POSGRADOS (id=5 si los existentes son 1-4)
+INSERT INTO roles (id, nombre) VALUES (5, 'POSGRADOS') ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================
 -- Usuarios para el proceso de Paz y Salvo
 -- ============================================================
- 
+
 -- Director de programa (nuevo, con correo para probar paz y salvo)
 INSERT INTO usuario (cedula, codigo, nombre, contrasena, rol, correo, programa_id) VALUES
 ('2000000001', 'DIR001', 'Carlos Director Grado', '123456', 'DIRECTOR', 'director.posgrado@test.com',
     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas'))
 ON CONFLICT (cedula) DO NOTHING;
- 
--- Dependencias (rol DEPENDENCIA)
-INSERT INTO usuario (cedula, codigo, nombre, contrasena, rol, correo, programa_id) VALUES
-('3000000001', 'DEP001', 'Biblioteca Central', '123456', 'DEPENDENCIA', 'kevarias.2195@gmail.com', NULL),
-('3000000002', 'DEP002', 'División Financiera', '123456', 'DEPENDENCIA', 'financiera@test.com', NULL),
-('3000000003', 'DEP003', 'Admisiones y Registro', '123456', 'DEPENDENCIA', 'admisiones@test.com', NULL)
+
+-- Dependencias (rol DEPENDENCIA) — vinculadas al catálogo de dependencias
+INSERT INTO usuario (cedula, codigo, nombre, contrasena, rol, correo, programa_id, dependencia_id) VALUES
+('3000000001', 'DEP001', 'Biblioteca Central',    '123456', 'DEPENDENCIA', 'kevarias.2195@gmail.com', NULL,
+    (SELECT id FROM dependencias WHERE nombre = 'Biblioteca')),
+('3000000002', 'DEP002', 'División Financiera',   '123456', 'DEPENDENCIA', 'financiera@test.com',     NULL,
+    (SELECT id FROM dependencias WHERE nombre = 'Financiera')),
+('3000000003', 'DEP003', 'Admisiones y Registro', '123456', 'DEPENDENCIA', 'admisiones@test.com',    NULL,
+    (SELECT id FROM dependencias WHERE nombre = 'Admisiones'))
+ON CONFLICT (cedula) DO NOTHING;
+
+-- Usuario POSGRADOS (paz y salvos + gestión de convocatorias)
+INSERT INTO usuario (cedula, codigo, nombre, contrasena, rol_id, correo, dependencia_id) VALUES
+('4000000001', 'POS001', 'Oficina Posgrados', '123456',
+    (SELECT id FROM roles WHERE nombre = 'POSGRADOS'),
+    'posgrados@ufps.edu.co',
+    (SELECT id FROM dependencias WHERE nombre = 'Posgrados'))
 ON CONFLICT (cedula) DO NOTHING;
  
 -- Estudiante con créditos completos y terminación aprobada (para probar solicitud de grado y paz y salvo)

@@ -8,10 +8,11 @@ public class LoginResponseDTO {
     private String email;
     private String codigo;
     private String rol;
+    private String dependenciaNombre;
 
     public LoginResponseDTO(String token, Long id, String cedula,
                              String nombreCompleto, String email,
-                             String codigo, String rol) {
+                             String codigo, String rol, String dependenciaNombre) {
         this.token = token;
         this.id = id;
         this.cedula = cedula;
@@ -19,6 +20,7 @@ public class LoginResponseDTO {
         this.email = email;
         this.codigo = codigo;
         this.rol = rol;
+        this.dependenciaNombre = dependenciaNombre;
     }
 
     public String getToken() { return token; }
@@ -28,4 +30,5 @@ public class LoginResponseDTO {
     public String getEmail() { return email; }
     public String getCodigo() { return codigo; }
     public String getRol() { return rol; }
+    public String getDependenciaNombre() { return dependenciaNombre; }
 }
