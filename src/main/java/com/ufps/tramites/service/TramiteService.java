@@ -1,8 +1,10 @@
 package com.ufps.tramites.service;
 
 import com.ufps.tramites.model.Convocatoria;
+import com.ufps.tramites.model.Estudiante;
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
+import com.ufps.tramites.repository.EstudianteRepository;
 import com.ufps.tramites.repository.SolicitudRepository;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -21,6 +23,9 @@ public class TramiteService {
     @Autowired
     private SolicitudRepository solicitudRepository;
 
+    @Autowired
+    private EstudianteRepository estudianteRepository;
+
     public Map<String, Object> construirModuloPorRol(Usuario usuario) {
         String rol = usuario.getRolNombre();
 
@@ -34,7 +39,9 @@ public class TramiteService {
     }
 
     public Map<String, Object> construirProcesoDeGrado(Usuario usuario) {
-        int creditosAprobados = usuario.getCreditosAprobados() != null ? usuario.getCreditosAprobados() : 0;
+        Estudiante perfil = estudianteRepository.findByUsuario(usuario).orElse(null);
+        int creditosAprobados = perfil != null && perfil.getCreditosAprobados() != null
+                ? perfil.getCreditosAprobados() : 0;
         int creditosRequeridos = usuario.getProgramaAcademico() != null
                 ? usuario.getProgramaAcademico().getTotalCreditos() : Integer.MAX_VALUE;
 
@@ -65,20 +72,23 @@ public class TramiteService {
     }
 
     private Map<String, Object> construirUsuario(Usuario usuario) {
+        Estudiante perfil = estudianteRepository.findByUsuario(usuario).orElse(null);
         Map<String, Object> usuarioMap = new LinkedHashMap<>();
         usuarioMap.put("cedula", usuario.getCedula());
         usuarioMap.put("nombre", usuario.getNombre());
         usuarioMap.put("codigo", usuario.getCodigo());
         usuarioMap.put("rol", usuario.getRolNombre());
-        usuarioMap.put("creditosAprobados", usuario.getCreditosAprobados());
+        usuarioMap.put("creditosAprobados", perfil != null ? perfil.getCreditosAprobados() : null);
         usuarioMap.put("programaAcademico", usuario.getProgramaAcademico() != null
                 ? usuario.getProgramaAcademico().getNombre() : null);
         return usuarioMap;
     }
 
     private Map<String, Object> construirCreditos(Usuario usuario) {
+        Estudiante perfil = estudianteRepository.findByUsuario(usuario).orElse(null);
         Map<String, Object> creditos = new LinkedHashMap<>();
-        int aprobados = usuario.getCreditosAprobados() != null ? usuario.getCreditosAprobados() : 0;
+        int aprobados = perfil != null && perfil.getCreditosAprobados() != null
+                ? perfil.getCreditosAprobados() : 0;
         int requeridos = usuario.getProgramaAcademico() != null
                 ? usuario.getProgramaAcademico().getTotalCreditos() : 0;
         creditos.put("aprobados", aprobados);
