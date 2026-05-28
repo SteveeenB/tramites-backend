@@ -15,6 +15,11 @@ public class PazYSalvo {
     private String cedulaEstudiante;
     private String cedulaResponsable; // cédula del usuario DEPENDENCIA o DIRECTOR que debe responder
     private String tipoDependencia;   // BIBLIOTECA, FINANCIERA, ADMISIONES, DIRECTOR_PROGRAMA, etc.
+
+    @ManyToOne
+    @JoinColumn(name = "dependencia_id")
+    private Dependencia dependencia;  // FK a entidad Dependencia (null para DIRECTOR_PROGRAMA)
+
     private String estado;            // PENDIENTE | APROBADO | RECHAZADO
     private String observaciones;
     private LocalDateTime fechaSolicitud;
@@ -31,6 +36,8 @@ public class PazYSalvo {
     public void setCedulaResponsable(String cedulaResponsable) { this.cedulaResponsable = cedulaResponsable; }
     public String getTipoDependencia() { return tipoDependencia; }
     public void setTipoDependencia(String tipoDependencia) { this.tipoDependencia = tipoDependencia; }
+    public Dependencia getDependencia() { return dependencia; }
+    public void setDependencia(Dependencia dependencia) { this.dependencia = dependencia; }
     public String getEstado() { return estado; }
     public void setEstado(String estado) { this.estado = estado; }
     public String getObservaciones() { return observaciones; }
