@@ -30,7 +30,8 @@ public class UsuarioController {
                 usuario.getCedula(),
                 usuario.getNombreCompleto(),
                 usuario.getCodigo(),
-                usuario.getRolNombre()
+                usuario.getRolNombre(),
+                usuario.getDependenciaNombre()
         ));
     }
 
