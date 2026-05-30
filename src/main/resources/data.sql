@@ -115,6 +115,16 @@ INSERT INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id, correo
     (SELECT id FROM dependencias WHERE nombre = 'Posgrados'))
 ON CONFLICT (cedula) DO NOTHING;
 
+-- Usuario ADMIN (configurador del módulo: tipos de certificado, dependencias,
+-- convocatorias, plantillas, etc.). Diferente de POSGRADOS, que es operativo.
+-- Cuando se ejecute el refactor de roles (ver .docs/plan_roles.md) este usuario
+-- migrará a la tabla `admins` con es_super_admin=true.
+INSERT INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id, correo) VALUES
+('9999999990', 'ADMIN1', 'Administrador', '123456',
+    (SELECT id FROM roles WHERE nombre = 'ADMIN'),
+    'admin@ufps.edu.co')
+ON CONFLICT (cedula) DO NOTHING;
+
 -- Estudiante con créditos completos y terminación aprobada (para probar solicitud de grado y paz y salvo)
 INSERT INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id, correo, programa_id) VALUES
 ('2000000010', 'EST010', 'Andrea Prueba Grado', '123456',
