@@ -18,10 +18,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.ufps.tramites.model.Admin;
+import com.ufps.tramites.model.EstadoEstudiante;
 import com.ufps.tramites.model.Estudiante;
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.repository.DocumentoSolicitudRepository;
+import com.ufps.tramites.repository.EstadoEstudianteRepository;
 import com.ufps.tramites.repository.EstudianteRepository;
 import com.ufps.tramites.repository.SolicitudRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
@@ -46,6 +48,9 @@ public class SolicitudService {
 
     @Autowired
     private EstudianteRepository estudianteRepository;
+
+    @Autowired
+    private EstadoEstudianteRepository estadoEstudianteRepository;
 
     @Autowired
     private NotificacionSseService notificacionSseService;
@@ -335,12 +340,13 @@ public class SolicitudService {
 
         notificarEstudiante(s, estadoAnterior);
 
-        // Si es solicitud de GRADO: marcar estadoGrado del estudiante e iniciar paz y salvo
+        // Si es solicitud de GRADO: marcar estado del estudiante e iniciar paz y salvo
         if ("GRADO".equals(s.getTipo())) {
-            // Marcar al estudiante con pago de grado pendiente
+            // Marcar al estudiante con pago de grado pendiente (vía catálogo)
+            EstadoEstudiante pagoPendiente = resolverEstadoEstudiante("PAGO_GRADO_PENDIENTE");
             usuarioRepository.findByCedula(s.getCedula()).ifPresent(est ->
                 estudianteRepository.findByUsuario(est).ifPresent(perfil -> {
-                    perfil.setEstadoGrado("PAGO_GRADO_PENDIENTE");
+                    perfil.setEstadoEstudiante(pagoPendiente);
                     estudianteRepository.save(perfil);
                 })
             );
@@ -381,6 +387,18 @@ public class SolicitudService {
         notificacionSseService.notificarCambioEstado(s, estadoAnterior);
         usuarioRepository.findByCedula(s.getCedula())
                 .ifPresent(est -> notificacionService.notificarEstudianteCambioEstado(s, est));
+    }
+
+    /**
+     * Resuelve un {@link EstadoEstudiante} del catálogo `estados_estudiantes`
+     * por nombre. Si no existe, lanza IllegalStateException — el seed inicial
+     * del catálogo es responsabilidad de la migración SQL del Bloque 5e.
+     */
+    private EstadoEstudiante resolverEstadoEstudiante(String nombre) {
+        return estadoEstudianteRepository.findByNombre(nombre)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Estado de estudiante no encontrado en catálogo: " + nombre
+                        + ". ¿Se ejecutó migracion_bloque5e_estados_estudiantes.sql?"));
     }
 
     /**
@@ -595,11 +613,14 @@ public class SolicitudService {
                     nombre, cedula, codigo, programa,
                     fechaAprobacion, fechaExpedicion, fechaGradoStr, s.getRadicado());
 
-            // Actualizar estado del estudiante a GRADUADO
+            // Actualizar estado del estudiante a GRADUADO (vía catálogo)
             if (est != null) {
+                EstadoEstudiante graduado = resolverEstadoEstudiante("GRADUADO");
                 estudianteRepository.findByUsuario(est).ifPresent(perfil -> {
-                    if (!"GRADUADO".equals(perfil.getEstadoGrado())) {
-                        perfil.setEstadoGrado("GRADUADO");
+                    boolean yaGraduado = perfil.getEstadoEstudiante() != null
+                            && "GRADUADO".equals(perfil.getEstadoEstudiante().getNombre());
+                    if (!yaGraduado) {
+                        perfil.setEstadoEstudiante(graduado);
                         estudianteRepository.save(perfil);
                     }
                 });
