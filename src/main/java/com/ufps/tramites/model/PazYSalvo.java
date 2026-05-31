@@ -12,6 +12,14 @@ public class PazYSalvo {
     private Long id;
 
     private Long solicitudId;        // ID de la solicitud de GRADO
+
+    // FK formal al estudiante (Bloque 5a, plan_roles_v3 §4.1).
+    // Doble-write transicional: cedula_estudiante se sigue poblando por
+    // compatibilidad hasta que todo el código lea del FK.
+    @ManyToOne
+    @JoinColumn(name = "estudiante_id")
+    private Estudiante estudiante;
+
     private String cedulaEstudiante;
 
     // FK polimórficas al responsable (uno de los dos, no ambos):
@@ -41,6 +49,9 @@ public class PazYSalvo {
     public Long getId() { return id; }
     public Long getSolicitudId() { return solicitudId; }
     public void setSolicitudId(Long solicitudId) { this.solicitudId = solicitudId; }
+    public Estudiante getEstudiante() { return estudiante; }
+    public void setEstudiante(Estudiante estudiante) { this.estudiante = estudiante; }
+
     public String getCedulaEstudiante() { return cedulaEstudiante; }
     public void setCedulaEstudiante(String cedulaEstudiante) { this.cedulaEstudiante = cedulaEstudiante; }
 

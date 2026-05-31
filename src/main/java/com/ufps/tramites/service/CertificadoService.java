@@ -13,9 +13,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.ufps.tramites.model.Estudiante;
 import com.ufps.tramites.model.SolicitudCertificado;
 import com.ufps.tramites.model.TipoCertificado;
 import com.ufps.tramites.model.Usuario;
+import com.ufps.tramites.repository.EstudianteRepository;
 import com.ufps.tramites.repository.SolicitudCertificadoRepository;
 import com.ufps.tramites.repository.TipoCertificadoRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
@@ -31,6 +33,7 @@ public class CertificadoService {
     @Autowired private SolicitudCertificadoRepository certificadoRepository;
     @Autowired private TipoCertificadoRepository tipoCertificadoRepository;
     @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private EstudianteRepository estudianteRepository;
     @Autowired private CertificadoConstanciaPdfService pdfService;
     @Autowired private CorreoConstanciaService correoService;
     @Autowired private SupabaseStorageService storage;
@@ -68,8 +71,11 @@ public class CertificadoService {
         LocalDate hoy = LocalDate.now();
         double costo = tipo.precioTotal(modalidadEnvio);
 
+        // Doble-write transicional (Bloque 5a): cedula viejo + FK Estudiante
+        Estudiante perfilEstudiante = estudianteRepository.findByUsuario(estudiante).orElse(null);
         SolicitudCertificado s = new SolicitudCertificado();
         s.setCedula(estudiante.getCedula());
+        s.setEstudiante(perfilEstudiante);
         s.setTipoCertificado(tipoCertificado);
         s.setModalidadEnvio(modalidadEnvio);
         s.setEstado("PENDIENTE_PAGO");
