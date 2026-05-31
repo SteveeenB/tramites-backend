@@ -1,6 +1,5 @@
 package com.ufps.tramites.model;
 
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -27,12 +26,6 @@ public class TipoCertificado {
     @ManyToOne
     @JoinColumn(name = "dependencia_id")
     private Dependencia dependencia;
-
-    // Columna legacy: la BD aún la conserva para datos viejos pero todo el
-    // código nuevo debe usar `dependencia`. Marcada read-only para que
-    // Hibernate no la toque en INSERT/UPDATE.
-    @Column(name = "dependencia_cedula", insertable = false, updatable = false)
-    private String dependenciaCedula;
 
     private String direccionOficina;
     private Integer tiempoEntregaDias;
@@ -69,9 +62,6 @@ public class TipoCertificado {
     public String getDependenciaNombre() {
         return dependencia != null ? dependencia.getNombre() : null;
     }
-
-    @Deprecated
-    public String getDependenciaCedula() { return dependenciaCedula; }
 
     public String getDireccionOficina() { return direccionOficina; }
     public void setDireccionOficina(String direccionOficina) { this.direccionOficina = direccionOficina; }
