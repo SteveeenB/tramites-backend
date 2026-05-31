@@ -13,7 +13,23 @@ public class PazYSalvo {
 
     private Long solicitudId;        // ID de la solicitud de GRADO
     private String cedulaEstudiante;
-    private String cedulaResponsable; // cédula del usuario DEPENDENCIA o DIRECTOR que debe responder
+
+    // FK polimórficas al responsable (uno de los dos, no ambos):
+    //   - DIRECTOR de programa  → responsableUsuario (sigue siendo Usuario)
+    //   - DEPENDENCIA/POSGRADOS → responsableAdmin   (migrados a admins en Bloque 3)
+    @ManyToOne
+    @JoinColumn(name = "responsable_admin_id")
+    private Admin responsableAdmin;
+
+    @ManyToOne
+    @JoinColumn(name = "responsable_usuario_id")
+    private Usuario responsableUsuario;
+
+    // Columna zombie: aún existe en BD para datos viejos. Todo código nuevo
+    // debe usar responsableAdmin o responsableUsuario. Se elimina en Bloque 4.
+    @Column(name = "cedula_responsable", insertable = false, updatable = false)
+    private String cedulaResponsable;
+
     private String tipoDependencia;   // BIBLIOTECA, FINANCIERA, ADMISIONES, DIRECTOR_PROGRAMA, etc.
 
     @ManyToOne
@@ -32,8 +48,23 @@ public class PazYSalvo {
     public void setSolicitudId(Long solicitudId) { this.solicitudId = solicitudId; }
     public String getCedulaEstudiante() { return cedulaEstudiante; }
     public void setCedulaEstudiante(String cedulaEstudiante) { this.cedulaEstudiante = cedulaEstudiante; }
+
+    public Admin getResponsableAdmin() { return responsableAdmin; }
+    public void setResponsableAdmin(Admin responsableAdmin) { this.responsableAdmin = responsableAdmin; }
+
+    public Usuario getResponsableUsuario() { return responsableUsuario; }
+    public void setResponsableUsuario(Usuario responsableUsuario) { this.responsableUsuario = responsableUsuario; }
+
+    public Long getResponsableAdminId() {
+        return responsableAdmin != null ? responsableAdmin.getId() : null;
+    }
+    public Long getResponsableUsuarioId() {
+        return responsableUsuario != null ? responsableUsuario.getId() : null;
+    }
+
+    @Deprecated
     public String getCedulaResponsable() { return cedulaResponsable; }
-    public void setCedulaResponsable(String cedulaResponsable) { this.cedulaResponsable = cedulaResponsable; }
+
     public String getTipoDependencia() { return tipoDependencia; }
     public void setTipoDependencia(String tipoDependencia) { this.tipoDependencia = tipoDependencia; }
     public Dependencia getDependencia() { return dependencia; }

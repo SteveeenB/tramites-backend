@@ -39,12 +39,20 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        String cedula = jwtService.extractCedula(token);
-        String rol    = jwtService.extractRol(token);
+        String principalType = jwtService.extractPrincipalType(token);
+        String rol           = jwtService.extractRol(token);
 
-        if (cedula != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+        // El nombre del principal viaja distinto según el tipo:
+        //   USUARIO → cédula (los controllers académicos resuelven Usuario por cédula)
+        //   ADMIN   → código (los controllers refactorizados a admin resolverán por código)
+        // En Bloque 0 la tabla `admins` está vacía, así que en la práctica siempre es cédula.
+        String principalName = JwtService.PRINCIPAL_ADMIN.equals(principalType)
+                ? jwtService.extractCodigo(token)
+                : jwtService.extractCedula(token);
+
+        if (principalName != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             var auth = new UsernamePasswordAuthenticationToken(
-                    cedula,
+                    principalName,
                     null,
                     List.of(new SimpleGrantedAuthority("ROLE_" + rol))
             );

@@ -183,15 +183,21 @@ public class CertificadoService {
 
     // ── 4) DESCARGA DEL PDF ───────────────────────────────────────────────────
 
-    public byte[] descargarPdf(Long solicitudId, String cedulaSolicitante) {
+    /**
+     * Descarga el PDF de la solicitud. Acepta tanto al dueño (estudiante por cédula)
+     * como a la dependencia encargada (por id de Dependencia). Un caller solo
+     * llenará uno de los dos parámetros según su rol; el otro será null.
+     */
+    public byte[] descargarPdf(Long solicitudId, String cedulaEstudianteActor, Long dependenciaIdActor) {
         SolicitudCertificado s = certificadoRepository.findById(solicitudId)
             .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
 
-        boolean esDueno = cedulaSolicitante != null && cedulaSolicitante.equals(s.getCedula());
+        boolean esDueno = cedulaEstudianteActor != null && cedulaEstudianteActor.equals(s.getCedula());
         boolean esDependenciaEncargada = false;
         TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(s.getTipoCertificado()).orElse(null);
-        if (tipo != null && tipo.getDependenciaCedula() != null
-                && tipo.getDependenciaCedula().equals(cedulaSolicitante)) {
+        if (tipo != null && tipo.getDependencia() != null
+                && dependenciaIdActor != null
+                && tipo.getDependencia().getId().equals(dependenciaIdActor)) {
             esDependenciaEncargada = true;
         }
         if (!esDueno && !esDependenciaEncargada) {
@@ -222,9 +228,9 @@ public class CertificadoService {
 
     // ── 5) FLUJO DE LA DEPENDENCIA (FÍSICOS) ─────────────────────────────────
 
-    public List<Map<String, Object>> obtenerPorDependencia(String cedulaDependencia, String estadoFiltro) {
+    public List<Map<String, Object>> obtenerPorDependencia(Long dependenciaId, String estadoFiltro) {
         List<SolicitudCertificado> solicitudes =
-            certificadoRepository.findByDependencia(cedulaDependencia, estadoFiltro);
+            certificadoRepository.findByDependencia(dependenciaId, estadoFiltro);
         List<Map<String, Object>> resultado = new ArrayList<>();
         for (SolicitudCertificado s : solicitudes) {
             Usuario estudiante = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
@@ -234,11 +240,11 @@ public class CertificadoService {
         return resultado;
     }
 
-    public Map<String, Object> marcarListoRetiro(Long solicitudId, String cedulaDependencia) {
+    public Map<String, Object> marcarListoRetiro(Long solicitudId, Long dependenciaId) {
         SolicitudCertificado s = certificadoRepository.findById(solicitudId)
             .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
         TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(s.getTipoCertificado()).orElse(null);
-        validarDependenciaEncargada(tipo, cedulaDependencia);
+        validarDependenciaEncargada(tipo, dependenciaId);
 
         if (!"FISICA".equals(s.getModalidadEnvio())) {
             throw new IllegalStateException("Esta solicitud no es de modalidad física.");
@@ -260,11 +266,11 @@ public class CertificadoService {
         return construirRespuesta(s, estudiante, tipo);
     }
 
-    public Map<String, Object> marcarEntregado(Long solicitudId, String cedulaDependencia) {
+    public Map<String, Object> marcarEntregado(Long solicitudId, Long dependenciaId) {
         SolicitudCertificado s = certificadoRepository.findById(solicitudId)
             .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
         TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(s.getTipoCertificado()).orElse(null);
-        validarDependenciaEncargada(tipo, cedulaDependencia);
+        validarDependenciaEncargada(tipo, dependenciaId);
 
         if (!"LISTO_RETIRO".equals(s.getEstado())) {
             throw new IllegalStateException(
@@ -279,11 +285,11 @@ public class CertificadoService {
         return construirRespuesta(s, estudiante, tipo);
     }
 
-    private void validarDependenciaEncargada(TipoCertificado tipo, String cedulaDependencia) {
-        if (tipo == null || tipo.getDependenciaCedula() == null) {
+    private void validarDependenciaEncargada(TipoCertificado tipo, Long dependenciaId) {
+        if (tipo == null || tipo.getDependencia() == null) {
             throw new IllegalStateException("El tipo de certificado no tiene dependencia asignada.");
         }
-        if (!tipo.getDependenciaCedula().equals(cedulaDependencia)) {
+        if (!tipo.getDependencia().getId().equals(dependenciaId)) {
             throw new IllegalStateException("Esta dependencia no es responsable de este tipo de certificado.");
         }
     }
@@ -316,7 +322,8 @@ public class CertificadoService {
             t.put("descripcion", tipo.getDescripcion());
             t.put("precioDigital", tipo.getPrecioDigital());
             t.put("costoLogisticaFisica", tipo.getCostoLogisticaFisica());
-            t.put("dependenciaCedula", tipo.getDependenciaCedula());
+            t.put("dependenciaId",     tipo.getDependenciaId());
+            t.put("dependenciaNombre", tipo.getDependenciaNombre());
             t.put("direccionOficina", tipo.getDireccionOficina());
             t.put("tiempoEntregaDias", tipo.getTiempoEntregaDias());
             map.put("tipo", t);

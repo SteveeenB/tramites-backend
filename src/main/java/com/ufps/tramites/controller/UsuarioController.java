@@ -1,8 +1,8 @@
 package com.ufps.tramites.controller;
 
 import com.ufps.tramites.dto.UsuarioResponseDTO;
-import com.ufps.tramites.model.Usuario;
-import com.ufps.tramites.service.UsuarioService;
+import com.ufps.tramites.security.PrincipalResolver;
+import com.ufps.tramites.security.ResolvedPrincipal;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -14,24 +14,23 @@ import org.springframework.web.bind.annotation.*;
 public class UsuarioController {
 
     @Autowired
-    private UsuarioService usuarioService;
+    private PrincipalResolver principalResolver;
 
     @GetMapping("/me")
     public ResponseEntity<?> obtenerUsuarioActual(Authentication auth) {
         if (auth == null) {
             return ResponseEntity.status(401).body(Map.of("error", "No autenticado"));
         }
-        String cedula = auth.getName();
-        Usuario usuario = usuarioService.obtenerUsuarioPorCedula(cedula);
-        if (usuario == null) {
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null) {
             return ResponseEntity.status(404).body(Map.of("error", "Usuario no encontrado"));
         }
         return ResponseEntity.ok(new UsuarioResponseDTO(
-                usuario.getCedula(),
-                usuario.getNombreCompleto(),
-                usuario.getCodigo(),
-                usuario.getRolNombre(),
-                usuario.getDependenciaNombre()
+                p.cedula(),
+                p.nombreCompleto(),
+                p.codigo(),
+                p.rol(),
+                p.dependenciaNombre()
         ));
     }
 

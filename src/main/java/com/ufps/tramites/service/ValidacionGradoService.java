@@ -10,8 +10,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.ufps.tramites.model.Solicitud;
-import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.repository.SolicitudRepository;
+import com.ufps.tramites.security.ResolvedPrincipal;
 
 @Service
 public class ValidacionGradoService {
@@ -24,56 +24,60 @@ public class ValidacionGradoService {
         return solicitudRepository.findByTipoAndEstado("GRADO", "PENDIENTE_VALIDACION");
     }
 
-    // Registra la validación de posgrados sobre una solicitud de grado
+    // Registra la validación de posgrados sobre una solicitud de grado.
+    // El actor puede ser un Admin (POSGRADOS/SUPER) — tras Bloque 2 ya no
+    // viene como Usuario.
     public Map<String, Object> registrarValidacion(Long id, String decision,
                                                 String observaciones,
-                                                Usuario admin) {
-    Optional<Solicitud> optional = solicitudRepository.findById(id);
-    if (optional.isEmpty()) {
-        throw new IllegalArgumentException("Solicitud no encontrada con id: " + id);
+                                                ResolvedPrincipal actor) {
+        Optional<Solicitud> optional = solicitudRepository.findById(id);
+        if (optional.isEmpty()) {
+            throw new IllegalArgumentException("Solicitud no encontrada con id: " + id);
+        }
+
+        Solicitud solicitud = optional.get();
+
+        if (!"GRADO".equals(solicitud.getTipo())) {
+            throw new IllegalStateException("Esta solicitud no es de tipo GRADO");
+        }
+
+        if (!"PENDIENTE_VALIDACION".equals(solicitud.getEstado())) {
+            throw new IllegalStateException(
+                "La solicitud no está pendiente de validación. " +
+                "Estado actual: " + solicitud.getEstado()
+            );
+        }
+
+        if (!"APROBADA".equals(decision) && !"RECHAZADA".equals(decision)) {
+            throw new IllegalStateException(
+                "Decisión inválida: " + decision +
+                ". Valores permitidos: APROBADA, RECHAZADA"
+            );
+        }
+
+        solicitud.setValidacionPosgrados(decision);
+        solicitud.setObservacionesPosgrados(observaciones);
+        solicitud.setFechaValidacion(LocalDateTime.now());
+        if (actor != null && actor.isAdmin()) {
+            solicitud.setPosgradosAdmin(actor.admin());
+        }
+
+        if ("APROBADA".equals(decision)) {
+            solicitud.setEstado("APROBADA_POSGRADOS");
+        } else {
+            solicitud.setEstado("RECHAZADA_POSGRADOS");
+        }
+
+        solicitudRepository.save(solicitud);
+
+        Map<String, Object> respuesta = new LinkedHashMap<>();
+        respuesta.put("id", solicitud.getId());
+        respuesta.put("tipo", solicitud.getTipo());
+        respuesta.put("estado", solicitud.getEstado());
+        respuesta.put("validacionPosgrados", solicitud.getValidacionPosgrados());
+        respuesta.put("observacionesPosgrados", solicitud.getObservacionesPosgrados());
+        respuesta.put("fechaValidacion", solicitud.getFechaValidacion());
+        respuesta.put("validadoPor", actor != null ? actor.nombreCompleto() : null);
+        return respuesta;
     }
-
-    Solicitud solicitud = optional.get();
-
-    if (!"GRADO".equals(solicitud.getTipo())) {
-        throw new IllegalStateException("Esta solicitud no es de tipo GRADO");
-    }
-
-    if (!"PENDIENTE_VALIDACION".equals(solicitud.getEstado())) {
-        throw new IllegalStateException(
-            "La solicitud no está pendiente de validación. " +
-            "Estado actual: " + solicitud.getEstado()
-        );
-    }
-
-    if (!"APROBADA".equals(decision) && !"RECHAZADA".equals(decision)) {
-        throw new IllegalStateException(
-            "Decisión inválida: " + decision +
-            ". Valores permitidos: APROBADA, RECHAZADA"
-        );
-    }
-
-    solicitud.setValidacionPosgrados(decision);
-    solicitud.setObservacionesPosgrados(observaciones);
-    solicitud.setFechaValidacion(LocalDateTime.now());
-    solicitud.setCedulaPosgrados(admin.getCedula());
-
-    if ("APROBADA".equals(decision)) {
-        solicitud.setEstado("APROBADA_POSGRADOS");
-    } else {
-        solicitud.setEstado("RECHAZADA_POSGRADOS");
-    }
-
-    solicitudRepository.save(solicitud);
-
-    Map<String, Object> respuesta = new LinkedHashMap<>();
-    respuesta.put("id", solicitud.getId());
-    respuesta.put("tipo", solicitud.getTipo());
-    respuesta.put("estado", solicitud.getEstado());
-    respuesta.put("validacionPosgrados", solicitud.getValidacionPosgrados());
-    respuesta.put("observacionesPosgrados", solicitud.getObservacionesPosgrados());
-    respuesta.put("fechaValidacion", solicitud.getFechaValidacion());
-    respuesta.put("validadoPor", admin.getNombre());
-    return respuesta;
-}
 }
