@@ -28,6 +28,8 @@ public record ResolvedPrincipal(
     public boolean isUsuario() { return JwtService.PRINCIPAL_USUARIO.equals(type); }
 
     public static ResolvedPrincipal ofUsuario(Usuario u) {
+        // Usuarios académicos (ESTUDIANTE, DIRECTOR) no tienen dependencia —
+        // esa relación vive en Admin. Pasamos null en dependenciaId/Nombre.
         return new ResolvedPrincipal(
                 JwtService.PRINCIPAL_USUARIO,
                 u.getId(),
@@ -36,8 +38,8 @@ public record ResolvedPrincipal(
                 u.getRolNombre(),
                 u.getNombreCompleto(),
                 u.getEmail(),
-                u.getDependencia() != null ? u.getDependencia().getId() : null,
-                u.getDependenciaNombre(),
+                null,
+                null,
                 u,
                 null
         );
