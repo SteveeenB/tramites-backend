@@ -192,6 +192,9 @@ public class AuthController {
         String token = jwtService.generateToken(usuario, estudiante);
         String programaNombre = usuario.getProgramaAcademico() != null
                 ? usuario.getProgramaAcademico().getNombre() : null;
+        // Usuarios académicos (ESTUDIANTE, DIRECTOR) no tienen dependencia —
+        // la dependencia es un concepto del dominio admin (DEPENDENCIA vive
+        // en `admins`). Por eso dependenciaNombre/dependenciaId van como null.
         return new LoginResponseDTO(
                 token,
                 usuario.getId(),
@@ -200,11 +203,11 @@ public class AuthController {
                 usuario.getEmail(),
                 usuario.getCodigo(),
                 usuario.getRolNombre(),
-                usuario.getDependenciaNombre(),
+                null,
                 estudiante.map(Estudiante::getId).orElse(null),
                 programaNombre,
                 JwtService.PRINCIPAL_USUARIO,
-                usuario.getDependencia() != null ? usuario.getDependencia().getId() : null,
+                null,
                 false
         );
     }

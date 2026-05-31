@@ -50,11 +50,6 @@ public class Solicitud {
     @JoinColumn(name = "posgrados_admin_id")
     private Admin posgradosAdmin;
 
-    // Columna zombie: aún existe en BD para datos viejos. Todo código nuevo
-    // debe usar posgradosAdmin. Se elimina en Bloque 4.
-    @Column(name = "cedula_posgrados", insertable = false, updatable = false)
-    private String cedulaPosgrados;
-
     // ── Acta de terminación ────────────────────────────────────────────────
     private Boolean actaGenerada;
 
@@ -134,9 +129,6 @@ public class Solicitud {
     public void setPosgradosAdmin(Admin admin) { this.posgradosAdmin = admin; }
 
     public Long getPosgradosAdminId() { return posgradosAdmin != null ? posgradosAdmin.getId() : null; }
-
-    @Deprecated
-    public String getCedulaPosgrados() { return cedulaPosgrados; }
 
     public boolean isActaGenerada() { return Boolean.TRUE.equals(actaGenerada); }
     public void setActaGenerada(boolean actaGenerada) { this.actaGenerada = actaGenerada; }

@@ -25,11 +25,6 @@ public class PazYSalvo {
     @JoinColumn(name = "responsable_usuario_id")
     private Usuario responsableUsuario;
 
-    // Columna zombie: aún existe en BD para datos viejos. Todo código nuevo
-    // debe usar responsableAdmin o responsableUsuario. Se elimina en Bloque 4.
-    @Column(name = "cedula_responsable", insertable = false, updatable = false)
-    private String cedulaResponsable;
-
     private String tipoDependencia;   // BIBLIOTECA, FINANCIERA, ADMISIONES, DIRECTOR_PROGRAMA, etc.
 
     @ManyToOne
@@ -61,9 +56,6 @@ public class PazYSalvo {
     public Long getResponsableUsuarioId() {
         return responsableUsuario != null ? responsableUsuario.getId() : null;
     }
-
-    @Deprecated
-    public String getCedulaResponsable() { return cedulaResponsable; }
 
     public String getTipoDependencia() { return tipoDependencia; }
     public void setTipoDependencia(String tipoDependencia) { this.tipoDependencia = tipoDependencia; }
