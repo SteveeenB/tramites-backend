@@ -13,41 +13,31 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import com.ufps.tramites.model.Admin;
 import com.ufps.tramites.model.Dependencia;
-import com.ufps.tramites.model.Usuario;
-import com.ufps.tramites.repository.UsuarioRepository;
+import com.ufps.tramites.repository.AdminRepository;
+import com.ufps.tramites.service.AdminService;
 import com.ufps.tramites.service.DependenciaService;
-import com.ufps.tramites.service.UsuarioService;
 
 @Tag(name = "Admin – Dependencias",
-     description = "Gestión del catálogo de dependencias y consulta de usuarios con rol DEPENDENCIA.")
+     description = "Gestión del catálogo de dependencias y consulta de admins con tipo DEPENDENCIA.")
 @RestController
 @RequestMapping("/api/dependencias")
 public class DependenciaController {
 
-    @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private AdminRepository adminRepository;
+    @Autowired private AdminService adminService;
     @Autowired private DependenciaService dependenciaService;
-    @Autowired private UsuarioService usuarioService;
 
-    /** Devuelve usuarios con rol DEPENDENCIA (o POSGRADOS) para poblar dropdowns de tipos de certificado. */
-    @Operation(summary = "Listar usuarios de dependencias",
-               description = "Devuelve cédula, nombre, correo y dependencia asignada de usuarios con rol DEPENDENCIA.")
-    @ApiResponse(responseCode = "200", description = "Lista de dependencias")
+    /** Devuelve admins tipo DEPENDENCIA para poblar dropdowns. */
+    @Operation(summary = "Listar admins de dependencias",
+               description = "Devuelve código, nombre, correo y dependencia asignada de admins con tipo DEPENDENCIA.")
+    @ApiResponse(responseCode = "200", description = "Lista de admins DEPENDENCIA")
     @PreAuthorize("hasAnyRole('ADMIN', 'POSGRADOS')")
     @GetMapping
     public ResponseEntity<List<Map<String, Object>>> listar() {
-        List<Usuario> dependencias = usuarioRepository.findByRol_Nombre("DEPENDENCIA");
-        List<Map<String, Object>> data = dependencias.stream().map(u -> {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("cedula", u.getCedula());
-            m.put("nombre", u.getNombre());
-            m.put("correo", u.getCorreo());
-            if (u.getDependencia() != null) {
-                m.put("dependenciaId", u.getDependencia().getId());
-                m.put("dependenciaNombre", u.getDependencia().getNombre());
-            }
-            return m;
-        }).collect(Collectors.toList());
+        List<Admin> admins = adminRepository.findByTipo("DEPENDENCIA");
+        List<Map<String, Object>> data = admins.stream().map(this::toAdminMap).collect(Collectors.toList());
         return ResponseEntity.ok(data);
     }
 
@@ -86,48 +76,46 @@ public class DependenciaController {
         return ResponseEntity.ok(Map.of("message", "Dependencia desactivada"));
     }
 
-    /** Listar responsables (usuarios con rol DEPENDENCIA) para gestión en admin. */
+    /** Listar responsables (admins tipo DEPENDENCIA) para gestión en admin. */
     @GetMapping("/usuarios-dependencia")
     @PreAuthorize("hasAnyRole('ADMIN', 'POSGRADOS')")
     public ResponseEntity<List<Map<String, Object>>> listarUsuariosDependencia() {
-        List<Usuario> usuarios = usuarioRepository.findByRol_Nombre("DEPENDENCIA");
-        List<Map<String, Object>> data = usuarios.stream().map(u -> {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("cedula",            u.getCedula());
-            m.put("codigo",            u.getCodigo());
-            m.put("nombreCompleto",    u.getNombreCompleto());
-            m.put("correo",            u.getCorreo());
-            m.put("dependenciaId",     u.getDependencia() != null ? u.getDependencia().getId()     : null);
-            m.put("dependenciaNombre", u.getDependencia() != null ? u.getDependencia().getNombre() : null);
-            return m;
-        }).collect(Collectors.toList());
+        List<Admin> admins = adminRepository.findByTipo("DEPENDENCIA");
+        List<Map<String, Object>> data = admins.stream().map(this::toAdminMap).collect(Collectors.toList());
         return ResponseEntity.ok(data);
     }
 
-    /** Crear un nuevo responsable con rol DEPENDENCIA. */
+    /** Crear un nuevo responsable admin tipo DEPENDENCIA. */
     @PostMapping("/usuarios-dependencia")
     @PreAuthorize("hasAnyRole('ADMIN', 'POSGRADOS')")
     public ResponseEntity<?> crearUsuarioDependencia(@RequestBody Map<String, Object> body) {
         String nombreCompleto = (String) body.get("nombreCompleto");
-        String cedula         = (String) body.get("cedula");
         String codigo         = (String) body.get("codigo");
         String correo         = (String) body.get("correo");
         String contrasena     = (String) body.get("contrasena");
         Long dependenciaId    = body.get("dependenciaId") != null
                 ? Long.valueOf(body.get("dependenciaId").toString()) : null;
-        Usuario creado = usuarioService.crearUsuarioDependencia(
-                nombreCompleto, cedula, codigo, correo, contrasena, dependenciaId);
-        Map<String, Object> res = new LinkedHashMap<>();
-        res.put("cedula",         creado.getCedula());
-        res.put("nombreCompleto", creado.getNombreCompleto());
-        return ResponseEntity.ok(res);
+        Admin creado = adminService.crearAdminDependencia(
+                nombreCompleto, codigo, correo, contrasena, dependenciaId);
+        return ResponseEntity.ok(toAdminMap(creado));
     }
 
-    /** Eliminar un responsable por cédula. */
-    @DeleteMapping("/usuarios-dependencia/{cedula}")
+    /** Eliminar un responsable por código (path param). */
+    @DeleteMapping("/usuarios-dependencia/{codigo}")
     @PreAuthorize("hasAnyRole('ADMIN', 'POSGRADOS')")
-    public ResponseEntity<?> eliminarUsuarioDependencia(@PathVariable String cedula) {
-        usuarioService.eliminarUsuarioDependencia(cedula);
+    public ResponseEntity<?> eliminarUsuarioDependencia(@PathVariable String codigo) {
+        adminService.eliminarPorCodigo(codigo);
         return ResponseEntity.ok(Map.of("message", "Responsable eliminado"));
+    }
+
+    private Map<String, Object> toAdminMap(Admin a) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id",                a.getId());
+        m.put("codigo",            a.getCodigo());
+        m.put("nombreCompleto",    a.getNombreCompleto());
+        m.put("correo",            a.getEmail());
+        m.put("dependenciaId",     a.getDependenciaId());
+        m.put("dependenciaNombre", a.getDependenciaNombre());
+        return m;
     }
 }

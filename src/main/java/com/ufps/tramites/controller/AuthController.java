@@ -6,9 +6,11 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.ufps.tramites.dto.LoginRequestDTO;
 import com.ufps.tramites.dto.LoginResponseDTO;
+import com.ufps.tramites.model.Admin;
 import com.ufps.tramites.model.Estudiante;
 import com.ufps.tramites.model.Rol;
 import com.ufps.tramites.model.Usuario;
+import com.ufps.tramites.repository.AdminRepository;
 import com.ufps.tramites.repository.EstudianteRepository;
 import com.ufps.tramites.repository.RolRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
@@ -32,6 +34,7 @@ public class AuthController {
 
     @Autowired private JwtService jwtService;
     @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private AdminRepository adminRepository;
     @Autowired private EstudianteRepository estudianteRepository;
     @Autowired private RolRepository rolRepository;
     @Autowired private PasswordEncoder passwordEncoder;
@@ -44,7 +47,8 @@ public class AuthController {
 
     /**
      * POST /api/auth/login
-     * Login con código + contraseña (tipeo manual).
+     * Login con código + contraseña. Doble búsqueda: primero en admins,
+     * luego en usuario (académicos). Acomoda el patrón híbrido del plan_roles_v2.
      */
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequestDTO request) {
@@ -52,6 +56,17 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", "codigo y contrasena son requeridos"));
         }
 
+        // 1° admins: operadores administrativos (POSGRADOS, DEPENDENCIA, SUPER)
+        Admin admin = adminRepository.findByCodigo(request.getCodigo()).orElse(null);
+        if (admin != null) {
+            if (!passwordEncoder.matches(request.getContrasena(), admin.getPassword())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Credenciales inválidas"));
+            }
+            return ResponseEntity.ok(buildAdminResponse(admin));
+        }
+
+        // 2° usuario: académicos (ESTUDIANTE, DIRECTOR)
         Usuario usuario = usuarioRepository.findByCodigo(request.getCodigo()).orElse(null);
         if (usuario == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -66,13 +81,14 @@ public class AuthController {
                     .body(Map.of("error", "Credenciales inválidas"));
         }
 
-        return ResponseEntity.ok(buildResponse(usuario));
+        return ResponseEntity.ok(buildUsuarioResponse(usuario));
     }
 
     /**
      * POST /api/auth/google
      * Login con id_token de Google OAuth.
      * Busca al usuario por googleId o email; si no existe, lo crea con rol ESTUDIANTE.
+     * Solo aplica a usuarios académicos.
      */
     @PostMapping("/google")
     public ResponseEntity<?> loginGoogle(@RequestBody Map<String, String> body) {
@@ -126,7 +142,7 @@ public class AuthController {
                 usuario = usuarioRepository.save(usuario);
             }
 
-            return ResponseEntity.ok(buildResponse(usuario));
+            return ResponseEntity.ok(buildUsuarioResponse(usuario));
 
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -138,6 +154,8 @@ public class AuthController {
      * POST /api/auth/login-demo?cedula=...
      * Solo disponible cuando demo.auth.enabled=true (perfil dev).
      * Emite un JWT real para el usuario con la cédula indicada sin validar contraseña.
+     * Si la cédula no está en `usuario`, intenta resolver un admin por código equivalente
+     * para mantener compatibilidad con el demo selector del frontend.
      */
     @PostMapping("/login-demo")
     public ResponseEntity<?> loginDemo(@RequestParam String cedula) {
@@ -147,15 +165,29 @@ public class AuthController {
         }
 
         Usuario usuario = usuarioRepository.findByCedula(cedula).orElse(null);
-        if (usuario == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("error", "Usuario no encontrado: " + cedula));
+        if (usuario != null) {
+            return ResponseEntity.ok(buildUsuarioResponse(usuario));
         }
 
-        return ResponseEntity.ok(buildResponse(usuario));
+        // Admin nuevo (vive en `admins`, identificado por código)
+        Admin admin = adminRepository.findByCodigo(cedula).orElse(null);
+        if (admin != null) {
+            return ResponseEntity.ok(buildAdminResponse(admin));
+        }
+
+        // Fallback transicional: durante la migración el frontend puede mandar
+        // un código de admin antes de que la fila exista en `admins` (admin
+        // viejo aún en `usuario`). Permitimos resolver por código en usuario.
+        usuario = usuarioRepository.findByCodigo(cedula).orElse(null);
+        if (usuario != null) {
+            return ResponseEntity.ok(buildUsuarioResponse(usuario));
+        }
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", "Usuario no encontrado: " + cedula));
     }
 
-    private LoginResponseDTO buildResponse(Usuario usuario) {
+    private LoginResponseDTO buildUsuarioResponse(Usuario usuario) {
         java.util.Optional<Estudiante> estudiante = estudianteRepository.findByUsuario(usuario);
         String token = jwtService.generateToken(usuario, estudiante);
         String programaNombre = usuario.getProgramaAcademico() != null
@@ -170,7 +202,29 @@ public class AuthController {
                 usuario.getRolNombre(),
                 usuario.getDependenciaNombre(),
                 estudiante.map(Estudiante::getId).orElse(null),
-                programaNombre
+                programaNombre,
+                JwtService.PRINCIPAL_USUARIO,
+                usuario.getDependencia() != null ? usuario.getDependencia().getId() : null,
+                false
+        );
+    }
+
+    private LoginResponseDTO buildAdminResponse(Admin admin) {
+        String token = jwtService.generateToken(admin);
+        return new LoginResponseDTO(
+                token,
+                admin.getId(),
+                null,                         // admins no tienen cédula
+                admin.getNombreCompleto(),
+                admin.getEmail(),
+                admin.getCodigo(),
+                admin.getRolNombre(),         // mapea SUPER → ADMIN
+                admin.getDependenciaNombre(),
+                null,                         // admins no son estudiantes
+                null,                         // admins no tienen programa
+                JwtService.PRINCIPAL_ADMIN,
+                admin.getDependenciaId(),
+                Boolean.TRUE.equals(admin.getEsSuperAdmin())
         );
     }
 }

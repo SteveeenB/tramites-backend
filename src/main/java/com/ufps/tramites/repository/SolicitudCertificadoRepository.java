@@ -23,15 +23,16 @@ public interface SolicitudCertificadoRepository extends JpaRepository<SolicitudC
     /**
      * Solicitudes físicas que la dependencia debe gestionar (imprimir / entregar).
      * Se hace JOIN lógico por código contra tipo_certificado.
+     * Filtra por id de la entidad Dependencia (refactor del Bloque 1).
      */
     @Query("""
            SELECT s FROM SolicitudCertificado s, TipoCertificado t
            WHERE s.tipoCertificado = t.codigo
-             AND t.dependenciaCedula = :cedulaDependencia
+             AND t.dependencia.id = :dependenciaId
              AND s.modalidadEnvio = 'FISICA'
              AND (:estado IS NULL OR s.estado = :estado)
            ORDER BY s.fechaSolicitud DESC, s.id DESC
            """)
-    List<SolicitudCertificado> findByDependencia(@Param("cedulaDependencia") String cedulaDependencia,
+    List<SolicitudCertificado> findByDependencia(@Param("dependenciaId") Long dependenciaId,
                                                  @Param("estado") String estado);
 }

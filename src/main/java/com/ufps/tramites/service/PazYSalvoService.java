@@ -1,13 +1,16 @@
 package com.ufps.tramites.service;
 
+import com.ufps.tramites.model.Admin;
 import com.ufps.tramites.model.Estudiante;
 import com.ufps.tramites.model.PazYSalvo;
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
+import com.ufps.tramites.repository.AdminRepository;
 import com.ufps.tramites.repository.EstudianteRepository;
 import com.ufps.tramites.repository.PazYSalvoRepository;
 import com.ufps.tramites.repository.SolicitudRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
+import com.ufps.tramites.security.ResolvedPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +32,7 @@ public class PazYSalvoService {
     @Autowired private PazYSalvoRepository pazYSalvoRepository;
     @Autowired private SolicitudRepository solicitudRepository;
     @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private AdminRepository adminRepository;
     @Autowired private EstudianteRepository estudianteRepository;
 
     @Autowired(required = false)
@@ -39,41 +43,38 @@ public class PazYSalvoService {
     private String fromEmail;
 
     /**
-     * Cuando el director aprueba una solicitud de GRADO, se crean los paz y salvos
-     * para cada usuario con rol DEPENDENCIA y para el propio director.
-     * También se envían correos a todos.
+     * Cuando el director aprueba una solicitud de GRADO, se crean los paz y
+     * salvos: uno por cada admin con tipo DEPENDENCIA o POSGRADOS, y uno
+     * para el propio director (sigue siendo Usuario).
      */
     public void iniciarProcesoPazYSalvo(Solicitud solicitud, Usuario director) {
-        // Obtener datos del estudiante para el correo
         Usuario estudiante = usuarioRepository.findByCedula(solicitud.getCedula()).orElse(null);
         String nombreEstudiante = estudiante != null ? estudiante.getNombre() : solicitud.getCedula();
 
-        // Buscar todos los usuarios con rol DEPENDENCIA o POSGRADOS
-        List<Usuario> dependencias = new ArrayList<>(usuarioRepository.findByRol_Nombre("DEPENDENCIA"));
-        dependencias.addAll(usuarioRepository.findByRol_Nombre("POSGRADOS"));
+        List<Admin> admins = new ArrayList<>(adminRepository.findByTipo("DEPENDENCIA"));
+        admins.addAll(adminRepository.findByTipo("POSGRADOS"));
 
         List<PazYSalvo> nuevos = new ArrayList<>();
 
-        // Crear paz y salvo para cada dependencia/posgrados
-        for (Usuario dep : dependencias) {
+        for (Admin admin : admins) {
             PazYSalvo ps = new PazYSalvo();
             ps.setSolicitudId(solicitud.getId());
             ps.setCedulaEstudiante(solicitud.getCedula());
-            ps.setCedulaResponsable(dep.getCedula());
-            ps.setDependencia(dep.getDependencia());
-            ps.setTipoDependencia(dep.getDependencia() != null
-                    ? dep.getDependencia().getNombre()
-                    : dep.getNombre());
+            ps.setResponsableAdmin(admin);
+            ps.setDependencia(admin.getDependencia());
+            ps.setTipoDependencia(admin.getDependencia() != null
+                    ? admin.getDependencia().getNombre()
+                    : admin.getTipo());
             ps.setEstado("PENDIENTE");
             ps.setFechaSolicitud(LocalDateTime.now());
             nuevos.add(ps);
         }
 
-        // Crear paz y salvo para el director (él también debe confirmar)
+        // Paz y salvo del director (sigue siendo Usuario)
         PazYSalvo psDirector = new PazYSalvo();
         psDirector.setSolicitudId(solicitud.getId());
         psDirector.setCedulaEstudiante(solicitud.getCedula());
-        psDirector.setCedulaResponsable(director.getCedula());
+        psDirector.setResponsableUsuario(director);
         psDirector.setTipoDependencia("DIRECTOR_PROGRAMA");
         psDirector.setEstado("PENDIENTE");
         psDirector.setFechaSolicitud(LocalDateTime.now());
@@ -81,13 +82,12 @@ public class PazYSalvoService {
 
         pazYSalvoRepository.saveAll(nuevos);
 
-        // Enviar correos a dependencias
-        for (Usuario dep : dependencias) {
-            enviarCorreoPazYSalvo(dep.getCorreo(), dep.getNombre(), nombreEstudiante, solicitud.getId());
+        for (Admin admin : admins) {
+            enviarCorreoPazYSalvo(admin.getEmail(), admin.getNombreCompleto(),
+                    nombreEstudiante, solicitud.getId());
         }
-
-        // Enviar correo al director
-        enviarCorreoPazYSalvo(director.getCorreo(), "Director de Programa", nombreEstudiante, solicitud.getId());
+        enviarCorreoPazYSalvo(director.getCorreo(), "Director de Programa",
+                nombreEstudiante, solicitud.getId());
     }
 
     private void enviarCorreoPazYSalvo(String correo, String nombreDependencia,
@@ -101,7 +101,6 @@ public class PazYSalvoService {
             + "Atentamente,\nUniversidad Francisco de Paula Santander (UFPS)\n"
             + "Sistema de Trámites de Posgrado";
 
-        // Sin correo registrado: loguear el contenido para auditoría
         if (correo == null || correo.isBlank()) {
             log.warn("[PAZ Y SALVO - SIN CORREO] Destinatario '{}' sin correo registrado.\nAsunto: {}\n{}",
                     nombreDependencia, asunto, cuerpo);
@@ -111,36 +110,38 @@ public class PazYSalvoService {
         if (mailSender != null) {
             try {
                 SimpleMailMessage msg = new SimpleMailMessage();
-                // Remitente explícito — requerido por muchos servidores SMTP
-                if (fromEmail != null && !fromEmail.isBlank()) {
-                    msg.setFrom(fromEmail);
-                }
+                if (fromEmail != null && !fromEmail.isBlank()) msg.setFrom(fromEmail);
                 msg.setTo(correo);
                 msg.setSubject(asunto);
                 msg.setText(cuerpo);
                 mailSender.send(msg);
                 log.info("[PAZ Y SALVO] Correo enviado a {} ({})", nombreDependencia, correo);
             } catch (Exception e) {
-                // No interrumpir el flujo si falla el correo — loguear y continuar
                 log.error("[PAZ Y SALVO] Error enviando correo a {} ({}): {}",
                         nombreDependencia, correo, e.getMessage());
             }
         } else {
-            // Sin SMTP configurado: simular en consola
             log.info("=== [SIMULACIÓN CORREO PAZ Y SALVO] ===\nPara: {} <{}>\nAsunto: {}\n{}\n===",
                     nombreDependencia, correo, asunto, cuerpo);
         }
     }
 
     /**
-     * Permite a una dependencia o director responder su paz y salvo.
+     * Permite a una dependencia (Admin) o director (Usuario) responder su paz y salvo.
+     * Valida que el actor sea el responsable real del registro.
      */
-    public Map<String, Object> responderPazYSalvo(Long pazYSalvoId, String cedulaResponsable,
+    public Map<String, Object> responderPazYSalvo(Long pazYSalvoId, ResolvedPrincipal actor,
                                                    String decision, String observaciones) {
         PazYSalvo ps = pazYSalvoRepository.findById(pazYSalvoId)
             .orElseThrow(() -> new IllegalArgumentException("Paz y salvo no encontrado"));
 
-        if (!ps.getCedulaResponsable().equals(cedulaResponsable)) {
+        boolean autorizado = (actor.isAdmin()
+                && ps.getResponsableAdminId() != null
+                && ps.getResponsableAdminId().equals(actor.id()))
+            || (actor.isUsuario()
+                && ps.getResponsableUsuarioId() != null
+                && ps.getResponsableUsuarioId().equals(actor.id()));
+        if (!autorizado) {
             throw new IllegalStateException("No tiene permiso para responder este paz y salvo");
         }
         if (!"PENDIENTE".equals(ps.getEstado())) {
@@ -159,15 +160,28 @@ public class PazYSalvoService {
     }
 
     /**
-     * Retorna los paz y salvos de un responsable (dependencia o director).
+     * Retorna los paz y salvos asignados al actor (admin DEPENDENCIA/POSGRADOS
+     * o usuario DIRECTOR), filtrando opcionalmente por estado.
      */
-    public List<Map<String, Object>> obtenerPazYSalvosPorResponsable(String cedulaResponsable) {
-        List<PazYSalvo> lista = pazYSalvoRepository.findByCedulaResponsable(cedulaResponsable);
-        return lista.stream().map(this::mapearPazYSalvoConEstudiante).collect(Collectors.toList());
+    public List<Map<String, Object>> obtenerPazYSalvosPorResponsable(ResolvedPrincipal actor) {
+        return cargarPorResponsable(actor, null);
     }
 
-    public List<Map<String, Object>> obtenerPazYSalvosPendientes(String cedulaResponsable) {
-        List<PazYSalvo> lista = pazYSalvoRepository.findByCedulaResponsableAndEstado(cedulaResponsable, "PENDIENTE");
+    public List<Map<String, Object>> obtenerPazYSalvosPendientes(ResolvedPrincipal actor) {
+        return cargarPorResponsable(actor, "PENDIENTE");
+    }
+
+    private List<Map<String, Object>> cargarPorResponsable(ResolvedPrincipal actor, String estado) {
+        List<PazYSalvo> lista;
+        if (actor.isAdmin()) {
+            lista = estado != null
+                    ? pazYSalvoRepository.findByResponsableAdmin_IdAndEstado(actor.id(), estado)
+                    : pazYSalvoRepository.findByResponsableAdmin_Id(actor.id());
+        } else {
+            lista = estado != null
+                    ? pazYSalvoRepository.findByResponsableUsuario_IdAndEstado(actor.id(), estado)
+                    : pazYSalvoRepository.findByResponsableUsuario_Id(actor.id());
+        }
         return lista.stream().map(this::mapearPazYSalvoConEstudiante).collect(Collectors.toList());
     }
 
@@ -229,18 +243,18 @@ public class PazYSalvoService {
         if (solicitudGrado.isPresent()) {
             String estado = solicitudGrado.get().getEstado();
             if ("APROBADA".equals(estado)) {
-    LocalDate fechaGrado = solicitudGrado.get().getFechaGrado();
-    if (fechaGrado != null) {
-        String fechaFmt = fechaGrado.format(
-            java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
-        info.put("etapa",      "FECHA_GRADO_ASIGNADA");
-        info.put("etapaLabel", "Fecha prevista: " + fechaFmt);
-        info.put("fechaGrado", fechaGrado.toString());
-    } else {
-        info.put("etapa",      "SOLICITUD_GRADO_APROBADA");
-        info.put("etapaLabel", "Grado aprobado");
-    }
-} else if ("RECHAZADA".equals(estado)) {
+                LocalDate fechaGrado = solicitudGrado.get().getFechaGrado();
+                if (fechaGrado != null) {
+                    String fechaFmt = fechaGrado.format(
+                        java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+                    info.put("etapa",      "FECHA_GRADO_ASIGNADA");
+                    info.put("etapaLabel", "Fecha prevista: " + fechaFmt);
+                    info.put("fechaGrado", fechaGrado.toString());
+                } else {
+                    info.put("etapa",      "SOLICITUD_GRADO_APROBADA");
+                    info.put("etapaLabel", "Grado aprobado");
+                }
+            } else if ("RECHAZADA".equals(estado)) {
                 info.put("etapa",      "SOLICITUD_GRADO_RECHAZADA");
                 info.put("etapaLabel", "Solicitud de grado rechazada");
             } else {
@@ -278,7 +292,16 @@ public class PazYSalvoService {
         m.put("id",                ps.getId());
         m.put("solicitudId",       ps.getSolicitudId());
         m.put("cedulaEstudiante",  ps.getCedulaEstudiante());
-        m.put("cedulaResponsable", ps.getCedulaResponsable());
+        m.put("responsableAdminId",   ps.getResponsableAdminId());
+        m.put("responsableUsuarioId", ps.getResponsableUsuarioId());
+        // Nombre legible del responsable para la UI
+        if (ps.getResponsableAdmin() != null) {
+            m.put("responsableNombre", ps.getResponsableAdmin().getNombreCompleto());
+        } else if (ps.getResponsableUsuario() != null) {
+            m.put("responsableNombre", ps.getResponsableUsuario().getNombreCompleto());
+        } else {
+            m.put("responsableNombre", null);
+        }
         m.put("tipoDependencia",   ps.getTipoDependencia());
         m.put("estado",            ps.getEstado());
         m.put("observaciones",     ps.getObservaciones());

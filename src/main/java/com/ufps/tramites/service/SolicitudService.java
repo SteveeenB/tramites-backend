@@ -17,6 +17,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.ufps.tramites.model.Admin;
 import com.ufps.tramites.model.Estudiante;
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
@@ -672,7 +673,7 @@ public class SolicitudService {
         }
     }
 
-    public byte[] aprobarPosgrados(Long id) {
+    public byte[] aprobarPosgrados(Long id, Admin posgradosAdmin) {
         Solicitud s = solicitudRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
         if (!"APROBADA_DIRECTOR".equals(s.getEstado())) {
@@ -684,6 +685,7 @@ public class SolicitudService {
             throw new IllegalStateException("Este endpoint solo aplica para solicitudes de terminación de materias.");
         }
         s.setEstado("APROBADA");
+        if (posgradosAdmin != null) s.setPosgradosAdmin(posgradosAdmin);
         solicitudRepository.save(s);
         notificarEstudiante(s, "APROBADA_DIRECTOR");
         byte[] pdfBytes = generarCertificadoPdf(id); // sets actaGenerada=true
