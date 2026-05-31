@@ -108,9 +108,10 @@ public class SolicitudService {
             );
         }
 
-        // 4. Crear y guardar la solicitud
+        // 4. Crear y guardar la solicitud (doble-write: cedula + FK Estudiante)
         Solicitud solicitud = new Solicitud();
         solicitud.setCedula(estudiante.getCedula());
+        solicitud.setEstudiante(perfilEstudiante);
         solicitud.setTipo("TERMINACION_MATERIAS");
         solicitud.setEstado("PENDIENTE_PAGO");
         solicitud.setFechaSolicitud(hoy);
@@ -159,8 +160,11 @@ public class SolicitudService {
         }
 
         // 3. Crear y guardar la solicitud con los datos del proyecto
+        //    (doble-write: cedula + FK Estudiante)
+        Estudiante perfilEstudiante = estudianteRepository.findByUsuario(estudiante).orElse(null);
         Solicitud solicitud = new Solicitud();
         solicitud.setCedula(estudiante.getCedula());
+        solicitud.setEstudiante(perfilEstudiante);
         solicitud.setTipo("GRADO");
         solicitud.setEstado("EN_REVISION");
         solicitud.setFechaSolicitud(LocalDate.now());
