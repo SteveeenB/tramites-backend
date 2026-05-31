@@ -7,6 +7,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
@@ -16,6 +18,14 @@ public class SolicitudCertificado {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    // FK formal al estudiante (Bloque 5a, plan_roles_v3 §4.1).
+    // Doble-write transicional: el campo `cedula` se sigue poblando por
+    // compatibilidad. Se elimina en un sprint posterior una vez todo
+    // el código nuevo lea del FK.
+    @ManyToOne
+    @JoinColumn(name = "estudiante_id")
+    private Estudiante estudiante;
 
     private String cedula;
     private String tipoCertificado;
@@ -38,6 +48,9 @@ public class SolicitudCertificado {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
+    public Estudiante getEstudiante() { return estudiante; }
+    public void setEstudiante(Estudiante estudiante) { this.estudiante = estudiante; }
 
     public String getCedula() { return cedula; }
     public void setCedula(String cedula) { this.cedula = cedula; }

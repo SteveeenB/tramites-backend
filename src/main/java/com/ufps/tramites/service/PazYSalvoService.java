@@ -10,6 +10,7 @@ import com.ufps.tramites.repository.EstudianteRepository;
 import com.ufps.tramites.repository.PazYSalvoRepository;
 import com.ufps.tramites.repository.SolicitudRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
+
 import com.ufps.tramites.security.ResolvedPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,6 +52,15 @@ public class PazYSalvoService {
         Usuario estudiante = usuarioRepository.findByCedula(solicitud.getCedula()).orElse(null);
         String nombreEstudiante = estudiante != null ? estudiante.getNombre() : solicitud.getCedula();
 
+        // FK formal al estudiante (Bloque 5a). Lee del FK de la solicitud; si
+        // no estuviera populado (solicitud vieja sin backfill), hace fallback
+        // al lookup por cédula.
+        Estudiante estudianteFk = solicitud.getEstudiante();
+        if (estudianteFk == null && estudiante != null) {
+            estudianteFk = estudianteRepository.findByUsuario(estudiante).orElse(null);
+        }
+        final Estudiante estudianteFkFinal = estudianteFk;
+
         List<Admin> admins = new ArrayList<>(adminRepository.findByTipo("DEPENDENCIA"));
         admins.addAll(adminRepository.findByTipo("POSGRADOS"));
 
@@ -60,6 +70,7 @@ public class PazYSalvoService {
             PazYSalvo ps = new PazYSalvo();
             ps.setSolicitudId(solicitud.getId());
             ps.setCedulaEstudiante(solicitud.getCedula());
+            ps.setEstudiante(estudianteFkFinal);
             ps.setResponsableAdmin(admin);
             ps.setDependencia(admin.getDependencia());
             ps.setTipoDependencia(admin.getDependencia() != null
@@ -74,6 +85,7 @@ public class PazYSalvoService {
         PazYSalvo psDirector = new PazYSalvo();
         psDirector.setSolicitudId(solicitud.getId());
         psDirector.setCedulaEstudiante(solicitud.getCedula());
+        psDirector.setEstudiante(estudianteFkFinal);
         psDirector.setResponsableUsuario(director);
         psDirector.setTipoDependencia("DIRECTOR_PROGRAMA");
         psDirector.setEstado("PENDIENTE");

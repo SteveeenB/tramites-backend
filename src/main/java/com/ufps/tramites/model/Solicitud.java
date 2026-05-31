@@ -18,6 +18,13 @@ public class Solicitud {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // FK formal al estudiante (Bloque 5a, plan_roles_v3 §4.1).
+    // Doble-write transicional: el campo `cedula` se sigue poblando por
+    // compatibilidad hasta que todo el código lea del FK.
+    @ManyToOne
+    @JoinColumn(name = "estudiante_id")
+    private Estudiante estudiante;
+
     private String cedula;
     private String tipo;
     private String estado;
@@ -71,6 +78,9 @@ public class Solicitud {
     // ── Getters y setters ─────────────────────────────────────────────────
 
     public Long getId() { return id; }
+
+    public Estudiante getEstudiante() { return estudiante; }
+    public void setEstudiante(Estudiante estudiante) { this.estudiante = estudiante; }
 
     public String getCedula() { return cedula; }
     public void setCedula(String cedula) { this.cedula = cedula; }
