@@ -94,36 +94,32 @@ INSERT INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id, correo
     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas'))
 ON CONFLICT (cedula) DO NOTHING;
 
--- Dependencias (rol DEPENDENCIA) — vinculadas al catálogo de dependencias
-INSERT INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id, correo, dependencia_id) VALUES
-('3000000001', 'DEP001', 'Biblioteca Central',    '123456',
-    (SELECT id FROM roles WHERE nombre = 'DEPENDENCIA'), 'kevarias.2195@gmail.com',
-    (SELECT id FROM dependencias WHERE nombre = 'Biblioteca')),
-('3000000002', 'DEP002', 'División Financiera',   '123456',
-    (SELECT id FROM roles WHERE nombre = 'DEPENDENCIA'), 'financiera@test.com',
-    (SELECT id FROM dependencias WHERE nombre = 'Financiera')),
-('3000000003', 'DEP003', 'Admisiones y Registro', '123456',
-    (SELECT id FROM roles WHERE nombre = 'DEPENDENCIA'), 'admisiones@test.com',
-    (SELECT id FROM dependencias WHERE nombre = 'Admisiones'))
-ON CONFLICT (cedula) DO NOTHING;
-
--- Usuario POSGRADOS (paz y salvos + gestión de convocatorias)
-INSERT INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id, correo, dependencia_id) VALUES
-('4000000001', 'POS001', 'Oficina Posgrados', '123456',
-    (SELECT id FROM roles WHERE nombre = 'POSGRADOS'),
-    'posgrados@ufps.edu.co',
-    (SELECT id FROM dependencias WHERE nombre = 'Posgrados'))
-ON CONFLICT (cedula) DO NOTHING;
-
--- Usuario ADMIN (configurador del módulo: tipos de certificado, dependencias,
--- convocatorias, plantillas, etc.). Diferente de POSGRADOS, que es operativo.
--- Cuando se ejecute el refactor de roles (ver .docs/plan_roles.md) este usuario
--- migrará a la tabla `admins` con es_super_admin=true.
-INSERT INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id, correo) VALUES
-('9999999990', 'ADMIN1', 'Administrador', '123456',
-    (SELECT id FROM roles WHERE nombre = 'ADMIN'),
-    'admin@ufps.edu.co')
-ON CONFLICT (cedula) DO NOTHING;
+-- ============================================================
+-- Admins (POSGRADOS, DEPENDENCIA, SUPER) — viven en `admins`
+-- tras el refactor del modelo híbrido de identidad
+-- (ver tramites-frontend/src/docs/plan_roles_v2.md).
+--
+-- Las contraseñas son el hash BCrypt de "123456" — el mismo
+-- documentado en security/AUTH.md.
+-- ============================================================
+INSERT INTO admins (codigo, nombre_completo, email, password, tipo, es_super_admin, dependencia_id)
+VALUES
+  ('ADMIN1', 'Administrador',         'admin@ufps.edu.co',
+      '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
+      'SUPER',       true,  NULL),
+  ('POS001', 'Oficina Posgrados',     'posgrados@ufps.edu.co',
+      '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
+      'POSGRADOS',   false, NULL),
+  ('DEP001', 'Biblioteca Central',    'kevarias.2195@gmail.com',
+      '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
+      'DEPENDENCIA', false, (SELECT id FROM dependencias WHERE nombre = 'Biblioteca')),
+  ('DEP002', 'División Financiera',   'financiera@test.com',
+      '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
+      'DEPENDENCIA', false, (SELECT id FROM dependencias WHERE nombre = 'Financiera')),
+  ('DEP003', 'Admisiones y Registro', 'admisiones@test.com',
+      '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
+      'DEPENDENCIA', false, (SELECT id FROM dependencias WHERE nombre = 'Admisiones'))
+ON CONFLICT (codigo) DO NOTHING;
 
 -- Estudiante con créditos completos y terminación aprobada (para probar solicitud de grado y paz y salvo)
 INSERT INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id, correo, programa_id) VALUES

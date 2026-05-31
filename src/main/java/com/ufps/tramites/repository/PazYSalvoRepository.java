@@ -8,9 +8,13 @@ import java.util.List;
 @Repository
 public interface PazYSalvoRepository extends JpaRepository<PazYSalvo, Long> {
     List<PazYSalvo> findBySolicitudId(Long solicitudId);
-    List<PazYSalvo> findByCedulaResponsable(String cedulaResponsable);
-    List<PazYSalvo> findByCedulaResponsableAndEstado(String cedulaResponsable, String estado);
-    List<PazYSalvo> findBySolicitudIdAndCedulaResponsable(Long solicitudId, String cedulaResponsable);
+
+    List<PazYSalvo> findByResponsableAdmin_Id(Long responsableAdminId);
+    List<PazYSalvo> findByResponsableAdmin_IdAndEstado(Long responsableAdminId, String estado);
+
+    List<PazYSalvo> findByResponsableUsuario_Id(Long responsableUsuarioId);
+    List<PazYSalvo> findByResponsableUsuario_IdAndEstado(Long responsableUsuarioId, String estado);
+
     boolean existsBySolicitudIdAndEstado(Long solicitudId, String estado);
     long countBySolicitudId(Long solicitudId);
     long countBySolicitudIdAndEstado(Long solicitudId, String estado);

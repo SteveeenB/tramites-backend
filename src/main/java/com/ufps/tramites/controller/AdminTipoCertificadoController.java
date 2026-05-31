@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 import com.ufps.tramites.model.TipoCertificado;
 import com.ufps.tramites.repository.TipoCertificadoRepository;
-import com.ufps.tramites.repository.UsuarioRepository;
+import com.ufps.tramites.service.DependenciaService;
 
 /**
  * CRUD de tipos de certificado. Lo consume el panel de administrador
@@ -32,7 +32,7 @@ import com.ufps.tramites.repository.UsuarioRepository;
 public class AdminTipoCertificadoController {
 
     @Autowired private TipoCertificadoRepository repository;
-    @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private DependenciaService dependenciaService;
 
     @Operation(summary = "Listar todos los tipos de certificado",
                description = "Devuelve el catálogo completo (activos e inactivos) con el nombre de la dependencia responsable.")
@@ -61,7 +61,7 @@ public class AdminTipoCertificadoController {
     }
 
     @Operation(summary = "Crear un nuevo tipo de certificado",
-               description = "El campo `codigo` es obligatorio y debe ser único. `precioDigital` es el precio base; `costoLogisticaFisica` es el delta para entrega física.")
+               description = "El campo `codigo` es obligatorio y debe ser único. `precioDigital` es el precio base; `costoLogisticaFisica` es el delta para entrega física. `dependenciaId` es el id de la entidad Dependencia responsable.")
     @ApiResponses({
         @ApiResponse(responseCode = "201", description = "Tipo creado exitosamente"),
         @ApiResponse(responseCode = "409", description = "Ya existe un tipo con ese código"),
@@ -128,7 +128,10 @@ public class AdminTipoCertificadoController {
         if (body.containsKey("descripcion"))          t.setDescripcion(strOrNull(body.get("descripcion")));
         if (body.containsKey("precioDigital"))        t.setPrecioDigital(numOrNull(body.get("precioDigital")));
         if (body.containsKey("costoLogisticaFisica")) t.setCostoLogisticaFisica(numOrNull(body.get("costoLogisticaFisica")));
-        if (body.containsKey("dependenciaCedula"))    t.setDependenciaCedula(strOrNull(body.get("dependenciaCedula")));
+        if (body.containsKey("dependenciaId")) {
+            Long depId = longOrNull(body.get("dependenciaId"));
+            t.setDependencia(depId != null ? dependenciaService.obtenerPorId(depId) : null);
+        }
         if (body.containsKey("direccionOficina"))     t.setDireccionOficina(strOrNull(body.get("direccionOficina")));
         if (body.containsKey("tiempoEntregaDias"))    t.setTiempoEntregaDias(intOrNull(body.get("tiempoEntregaDias")));
         if (body.containsKey("activo"))               t.setActivo(boolOrNull(body.get("activo")));
@@ -142,15 +145,11 @@ public class AdminTipoCertificadoController {
         m.put("descripcion", t.getDescripcion());
         m.put("precioDigital", t.getPrecioDigital());
         m.put("costoLogisticaFisica", t.getCostoLogisticaFisica());
-        m.put("dependenciaCedula", t.getDependenciaCedula());
+        m.put("dependenciaId",     t.getDependenciaId());
+        m.put("dependenciaNombre", t.getDependenciaNombre());
         m.put("direccionOficina", t.getDireccionOficina());
         m.put("tiempoEntregaDias", t.getTiempoEntregaDias());
         m.put("activo", t.getActivo());
-
-        if (t.getDependenciaCedula() != null) {
-            usuarioRepository.findByCedula(t.getDependenciaCedula()).ifPresent(u ->
-                m.put("dependenciaNombre", u.getNombre()));
-        }
         return m;
     }
 
@@ -169,6 +168,13 @@ public class AdminTipoCertificadoController {
         if (v == null) return null;
         if (v instanceof Number n) return n.intValue();
         try { return Integer.parseInt(v.toString()); } catch (Exception e) { return null; }
+    }
+    private static Long longOrNull(Object v) {
+        if (v == null) return null;
+        if (v instanceof Number n) return n.longValue();
+        String s = v.toString().trim();
+        if (s.isEmpty()) return null;
+        try { return Long.parseLong(s); } catch (Exception e) { return null; }
     }
     private static Boolean boolOrNull(Object v) {
         if (v == null) return null;

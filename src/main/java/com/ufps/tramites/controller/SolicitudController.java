@@ -1,13 +1,12 @@
 package com.ufps.tramites.controller;
 
-import com.ufps.tramites.model.Usuario;
+import com.ufps.tramites.security.PrincipalResolver;
+import com.ufps.tramites.security.ResolvedPrincipal;
 import com.ufps.tramites.service.DocumentoService;
 import com.ufps.tramites.service.SolicitudService;
-import com.ufps.tramites.service.UsuarioService;
 import com.ufps.tramites.service.ValidacionGradoService;
 import java.io.IOException;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -29,7 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class SolicitudController {
 
     @Autowired private SolicitudService solicitudService;
-    @Autowired private UsuarioService usuarioService;
+    @Autowired private PrincipalResolver principalResolver;
     @Autowired private DocumentoService documentoService;
     @Autowired private ValidacionGradoService validacionGradoService;
 
@@ -37,11 +36,11 @@ public class SolicitudController {
     @PreAuthorize("hasRole('ESTUDIANTE')")
     @PostMapping("/terminacion-materias")
     public ResponseEntity<?> crearSolicitudTerminacion(Authentication auth) {
-        Usuario estudiante = resolverUsuario(auth);
-        if (estudiante == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
         try {
             return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(solicitudService.crearSolicitudTerminacion(estudiante));
+                    .body(solicitudService.crearSolicitudTerminacion(p.usuario()));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(422).body(error(e.getMessage()));
         }
@@ -59,11 +58,11 @@ public class SolicitudController {
             @RequestParam MultipartFile actaSustentacion,
             @RequestParam(required = false) MultipartFile certificadoIngles) {
 
-        Usuario estudiante = resolverUsuario(auth);
-        if (estudiante == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
         try {
             return ResponseEntity.status(HttpStatus.CREATED).body(
-                    solicitudService.crearSolicitudGrado(estudiante, tituloProyecto, resumen,
+                    solicitudService.crearSolicitudGrado(p.usuario(), tituloProyecto, resumen,
                             tipoProyecto, foto, actaSustentacion, certificadoIngles));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(422).body(error(e.getMessage()));
@@ -77,31 +76,27 @@ public class SolicitudController {
     @PreAuthorize("hasRole('ESTUDIANTE')")
     @GetMapping
     public ResponseEntity<?> obtenerSolicitudes(Authentication auth) {
-        Usuario estudiante = resolverUsuario(auth);
-        if (estudiante == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
-        return ResponseEntity.ok(solicitudService.obtenerSolicitudesPorCedula(estudiante.getCedula()));
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        return ResponseEntity.ok(solicitudService.obtenerSolicitudesPorCedula(p.cedula()));
     }
 
     /** GET /api/solicitudes/bandeja — bandeja del director */
     @PreAuthorize("hasRole('DIRECTOR')")
     @GetMapping("/bandeja")
     public ResponseEntity<?> obtenerBandeja(Authentication auth) {
-        Usuario director = resolverUsuario(auth);
-        if (director == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
-        if (!"DIRECTOR".equals(director.getRolNombre()))
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores de programa"));
-        return ResponseEntity.ok(solicitudService.obtenerBandejaDirector(director));
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        return ResponseEntity.ok(solicitudService.obtenerBandejaDirector(p.usuario()));
     }
 
     /** GET /api/solicitudes/bandeja-grado */
     @PreAuthorize("hasRole('DIRECTOR')")
     @GetMapping("/bandeja-grado")
     public ResponseEntity<?> obtenerBandejaGrado(Authentication auth) {
-        Usuario director = resolverUsuario(auth);
-        if (director == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
-        if (!"DIRECTOR".equals(director.getRolNombre()))
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores de programa"));
-        return ResponseEntity.ok(solicitudService.obtenerBandejaGrado(director));
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        return ResponseEntity.ok(solicitudService.obtenerBandejaGrado(p.usuario()));
     }
 
     /** POST /api/solicitudes/{id}/documentos */
@@ -146,12 +141,10 @@ public class SolicitudController {
     @PreAuthorize("hasRole('DIRECTOR')")
     @PostMapping("/{id}/aprobar")
     public ResponseEntity<?> aprobarSolicitud(@PathVariable Long id, Authentication auth) {
-        Usuario director = resolverUsuario(auth);
-        if (director == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
-        if (!"DIRECTOR".equals(director.getRolNombre()))
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores"));
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
         try {
-            return ResponseEntity.ok(solicitudService.aprobarSolicitudConDirector(id, director.getCedula()));
+            return ResponseEntity.ok(solicitudService.aprobarSolicitudConDirector(id, p.cedula()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
         } catch (IllegalStateException e) {
@@ -165,10 +158,8 @@ public class SolicitudController {
     public ResponseEntity<?> rechazarSolicitud(@PathVariable Long id,
             Authentication auth,
             @RequestParam(required = false) String motivo) {
-        Usuario director = resolverUsuario(auth);
-        if (director == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
-        if (!"DIRECTOR".equals(director.getRolNombre()))
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido a directores"));
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
         try {
             return ResponseEntity.ok(solicitudService.rechazarSolicitud(id, motivo));
         } catch (IllegalArgumentException e) {
@@ -218,8 +209,8 @@ public class SolicitudController {
     @PreAuthorize("hasAnyRole('ADMIN', 'POSGRADOS')")
     @GetMapping("/posgrados/pendientes")
     public ResponseEntity<?> obtenerPendientesValidacion(Authentication auth) {
-        Usuario admin = resolverUsuario(auth);
-        if (admin == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
         return ResponseEntity.ok(validacionGradoService.obtenerSolicitudesPendientesValidacion());
     }
 
@@ -231,10 +222,10 @@ public class SolicitudController {
             Authentication auth,
             @RequestParam String decision,
             @RequestParam(required = false) String observaciones) {
-        Usuario admin = resolverUsuario(auth);
-        if (admin == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
         try {
-            return ResponseEntity.ok(validacionGradoService.registrarValidacion(id, decision, observaciones, admin));
+            return ResponseEntity.ok(validacionGradoService.registrarValidacion(id, decision, observaciones, p));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
         } catch (IllegalStateException e) {
@@ -274,10 +265,8 @@ public class SolicitudController {
     @PreAuthorize("hasRole('POSGRADOS')")
     @GetMapping("/posgrados/bandeja")
     public ResponseEntity<?> getBandejaPosgrados(Authentication auth) {
-        Usuario u = resolverUsuario(auth);
-        if (u == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
-        if (!"POSGRADOS".equals(u.getRolNombre()))
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido"));
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
         return ResponseEntity.ok(solicitudService.getBandejaPosgrados());
     }
 
@@ -285,9 +274,8 @@ public class SolicitudController {
     @PreAuthorize("hasRole('POSGRADOS')")
     @GetMapping("/{id}/certificado-pdf")
     public ResponseEntity<byte[]> descargarCertificadoPdf(@PathVariable Long id, Authentication auth) {
-        Usuario u = resolverUsuario(auth);
-        if (u == null || !"POSGRADOS".equals(u.getRolNombre()))
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             byte[] pdf = solicitudService.generarCertificadoPdf(id);
             return ResponseEntity.ok()
@@ -304,9 +292,8 @@ public class SolicitudController {
     @PostMapping("/{id}/rechazar-posgrados")
     public ResponseEntity<?> rechazarPosgrados(@PathVariable Long id,
             Authentication auth, @RequestParam(required = false) String motivo) {
-        Usuario u = resolverUsuario(auth);
-        if (u == null || !"POSGRADOS".equals(u.getRolNombre()))
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido"));
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido"));
         try {
             return ResponseEntity.ok(solicitudService.rechazarSolicitud(id, motivo));
         } catch (IllegalArgumentException e) { return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage())); }
@@ -317,18 +304,18 @@ public class SolicitudController {
     @PreAuthorize("hasRole('POSGRADOS')")
     @PostMapping("/{id}/aprobar-posgrados")
     public ResponseEntity<?> aprobarPosgrados(@PathVariable Long id, Authentication auth) {
-        Usuario u = resolverUsuario(auth);
-        if (u == null || !"POSGRADOS".equals(u.getRolNombre()))
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido"));
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso restringido"));
         try {
-            return ResponseEntity.ok(solicitudService.aprobarPosgrados(id));
+            byte[] pdf = solicitudService.aprobarPosgrados(id, p.admin());
+            // No es download endpoint — devolvemos JSON con confirmación
+            return ResponseEntity.ok(Map.of(
+                "ok", true,
+                "id", id,
+                "pdfBytes", pdf != null ? pdf.length : 0
+            ));
         } catch (IllegalArgumentException e) { return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage())); }
         catch (IllegalStateException e)      { return ResponseEntity.status(422).body(error(e.getMessage())); }
-    }
-
-    private Usuario resolverUsuario(Authentication auth) {
-        if (auth == null) return null;
-        return usuarioService.obtenerUsuarioPorCedula(auth.getName());
     }
 
     private Map<String, Object> error(String mensaje) {

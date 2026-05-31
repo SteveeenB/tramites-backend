@@ -3,10 +3,13 @@ package com.ufps.tramites.model;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 
 @Entity
 public class Solicitud {
@@ -34,25 +37,38 @@ public class Solicitud {
     private String tituloProyecto;
     private String tipoProyecto;
 
-    @jakarta.persistence.Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT")
     private String resumenProyecto;
 
     // ── HU-09 ─────────────────────────────────────────────────────────────
     private String validacionPosgrados;
     private String observacionesPosgrados;
     private LocalDateTime fechaValidacion;
+
+    // FK formal al admin POSGRADOS que validó/aprobó (refactor Bloque 2)
+    @ManyToOne
+    @JoinColumn(name = "posgrados_admin_id")
+    private Admin posgradosAdmin;
+
+    // Columna zombie: aún existe en BD para datos viejos. Todo código nuevo
+    // debe usar posgradosAdmin. Se elimina en Bloque 4.
+    @Column(name = "cedula_posgrados", insertable = false, updatable = false)
     private String cedulaPosgrados;
 
     // ── Acta de terminación ────────────────────────────────────────────────
     private Boolean actaGenerada;
 
     // ── Radicado ──────────────────────────────────────────────────────────
-    @jakarta.persistence.Column(unique = true)
+    @Column(unique = true)
     private String radicado;
 
     // ── Proceso de Grado (pago y fecha) ───────────────────────────────────
     private String estadoPagoGrado;   // null | APROBADO
     private LocalDate fechaGrado;
+
+    // ── Modalidad de grado ─────────────────────────────────────────────────
+    private String modalidadGrado;         // CEREMONIA | SECRETARIA
+    private Boolean pagoModalidadRealizado = false;
 
     // ── Constructor ───────────────────────────────────────────────────────
     public Solicitud() {}
@@ -114,8 +130,13 @@ public class Solicitud {
     public LocalDateTime getFechaValidacion() { return fechaValidacion; }
     public void setFechaValidacion(LocalDateTime f) { this.fechaValidacion = f; }
 
+    public Admin getPosgradosAdmin() { return posgradosAdmin; }
+    public void setPosgradosAdmin(Admin admin) { this.posgradosAdmin = admin; }
+
+    public Long getPosgradosAdminId() { return posgradosAdmin != null ? posgradosAdmin.getId() : null; }
+
+    @Deprecated
     public String getCedulaPosgrados() { return cedulaPosgrados; }
-    public void setCedulaPosgrados(String c) { this.cedulaPosgrados = c; }
 
     public boolean isActaGenerada() { return Boolean.TRUE.equals(actaGenerada); }
     public void setActaGenerada(boolean actaGenerada) { this.actaGenerada = actaGenerada; }
@@ -129,13 +150,9 @@ public class Solicitud {
     public LocalDate getFechaGrado() { return fechaGrado; }
     public void setFechaGrado(LocalDate fechaGrado) { this.fechaGrado = fechaGrado; }
 
-    // ── Modalidad de grado ─────────────────────────────────────────────────
-    private String modalidadGrado;         // CEREMONIA | SECRETARIA
-    private Boolean pagoModalidadRealizado = false;
-    
     public String getModalidadGrado() { return modalidadGrado; }
     public void setModalidadGrado(String modalidadGrado) { this.modalidadGrado = modalidadGrado; }
-    
+
     public Boolean getPagoModalidadRealizado() { return pagoModalidadRealizado; }
     public void setPagoModalidadRealizado(Boolean v) { this.pagoModalidadRealizado = v; }
 }

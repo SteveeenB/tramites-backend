@@ -1,11 +1,10 @@
 package com.ufps.tramites.controller;
 
-import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.repository.TipoCertificadoRepository;
+import com.ufps.tramites.security.PrincipalResolver;
+import com.ufps.tramites.security.ResolvedPrincipal;
 import com.ufps.tramites.service.CertificadoService;
-import com.ufps.tramites.service.UsuarioService;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -26,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class CertificadoController {
 
     @Autowired private CertificadoService certificadoService;
-    @Autowired private UsuarioService usuarioService;
+    @Autowired private PrincipalResolver principalResolver;
     @Autowired private TipoCertificadoRepository tipoCertificadoRepository;
 
     @GetMapping("/tipos")
@@ -41,11 +40,11 @@ public class CertificadoController {
             @RequestParam String modalidad,
             @RequestParam(required = false) String destinatario,
             Authentication auth) {
-        Usuario estudiante = resolverUsuario(auth);
-        if (estudiante == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
         try {
             return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(certificadoService.solicitarCertificado(estudiante, tipo, modalidad, destinatario));
+                    .body(certificadoService.solicitarCertificado(p.usuario(), tipo, modalidad, destinatario));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
         }
@@ -54,18 +53,18 @@ public class CertificadoController {
     @PreAuthorize("hasRole('ESTUDIANTE')")
     @GetMapping
     public ResponseEntity<?> obtenerCertificados(Authentication auth) {
-        Usuario estudiante = resolverUsuario(auth);
-        if (estudiante == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
-        return ResponseEntity.ok(certificadoService.obtenerCertificadosPorCedula(estudiante.getCedula()));
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        return ResponseEntity.ok(certificadoService.obtenerCertificadosPorCedula(p.cedula()));
     }
 
     @PreAuthorize("hasRole('ESTUDIANTE')")
     @PostMapping("/{id}/pagar")
     public ResponseEntity<?> simularPago(@PathVariable Long id, Authentication auth) {
-        Usuario estudiante = resolverUsuario(auth);
-        if (estudiante == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
         try {
-            return ResponseEntity.ok(certificadoService.simularPago(id, estudiante.getCedula()));
+            return ResponseEntity.ok(certificadoService.simularPago(id, p.cedula()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
         } catch (IllegalStateException e) {
@@ -76,10 +75,10 @@ public class CertificadoController {
     @PreAuthorize("hasAnyRole('ESTUDIANTE', 'DEPENDENCIA')")
     @GetMapping("/{id}/pdf")
     public ResponseEntity<?> descargarPdf(@PathVariable Long id, Authentication auth) {
-        Usuario u = resolverUsuario(auth);
-        if (u == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
         try {
-            byte[] bytes = certificadoService.descargarPdf(id, u.getCedula());
+            byte[] bytes = certificadoService.descargarPdf(id, p.cedula(), p.dependenciaId());
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_PDF);
             headers.setContentDispositionFormData("attachment", "constancia-" + id + ".pdf");
@@ -92,25 +91,26 @@ public class CertificadoController {
     }
 
     @PreAuthorize("hasRole('DEPENDENCIA')")
-    @GetMapping("/dependencia/{cedulaDependencia}")
-    public ResponseEntity<?> bandejaDependencia(@PathVariable String cedulaDependencia,
+    @GetMapping("/dependencia/{dependenciaId}")
+    public ResponseEntity<?> bandejaDependencia(@PathVariable Long dependenciaId,
                                                 @RequestParam(required = false) String estado,
                                                 Authentication auth) {
-        Usuario u = resolverUsuario(auth);
-        if (u == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
-        if (!u.getCedula().equals(cedulaDependencia))
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        if (p.dependenciaId() == null || !p.dependenciaId().equals(dependenciaId))
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso denegado"));
         String filtro = (estado == null || estado.isBlank() || "TODOS".equalsIgnoreCase(estado)) ? null : estado;
-        return ResponseEntity.ok(certificadoService.obtenerPorDependencia(cedulaDependencia, filtro));
+        return ResponseEntity.ok(certificadoService.obtenerPorDependencia(dependenciaId, filtro));
     }
 
     @PreAuthorize("hasRole('DEPENDENCIA')")
     @PostMapping("/{id}/marcar-listo")
     public ResponseEntity<?> marcarListo(@PathVariable Long id, Authentication auth) {
-        Usuario u = resolverUsuario(auth);
-        if (u == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        if (p.dependenciaId() == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Sin dependencia asignada"));
         try {
-            return ResponseEntity.ok(certificadoService.marcarListoRetiro(id, u.getCedula()));
+            return ResponseEntity.ok(certificadoService.marcarListoRetiro(id, p.dependenciaId()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
         } catch (IllegalStateException e) {
@@ -121,20 +121,16 @@ public class CertificadoController {
     @PreAuthorize("hasRole('DEPENDENCIA')")
     @PostMapping("/{id}/marcar-entregado")
     public ResponseEntity<?> marcarEntregado(@PathVariable Long id, Authentication auth) {
-        Usuario u = resolverUsuario(auth);
-        if (u == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        if (p.dependenciaId() == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Sin dependencia asignada"));
         try {
-            return ResponseEntity.ok(certificadoService.marcarEntregado(id, u.getCedula()));
+            return ResponseEntity.ok(certificadoService.marcarEntregado(id, p.dependenciaId()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
         }
-    }
-
-    private Usuario resolverUsuario(Authentication auth) {
-        if (auth == null) return null;
-        return usuarioService.obtenerUsuarioPorCedula(auth.getName());
     }
 
     private Map<String, Object> error(String mensaje) {

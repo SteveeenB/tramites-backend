@@ -66,9 +66,14 @@ public class Estudiante {
     @Column(name = "pensum_id")
     private Long pensumId;
 
-    // FK a Usuario — igual que edu_virtual_ufps: Estudiante apunta a Usuario
+    // FK a Usuario — igual que edu_virtual_ufps: Estudiante apunta a Usuario.
+    // referencedColumnName = "id" es obligatorio porque la PK real de
+    // `usuario` en BD es `cedula` (varchar), no `id`. Sin esto Hibernate
+    // genera `references usuario` sin columna y PostgreSQL asume la PK,
+    // fallando con type mismatch (bigint vs varchar). El UNIQUE en
+    // usuario.id ya se añadió en migracion_admins_bloque2_3.sql §3a.
     @OneToOne
-    @JoinColumn(name = "usuario_id", unique = true)
+    @JoinColumn(name = "usuario_id", referencedColumnName = "id", unique = true)
     private Usuario usuario;
 
     public Estudiante() {}
