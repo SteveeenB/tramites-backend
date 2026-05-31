@@ -45,10 +45,23 @@ public class Estudiante {
     private Boolean migrado;
 
     // Campos propios del módulo de trámites (movidos desde Usuario)
+    // Snapshot/caché del cálculo oficial (DIVISIT). Documentado como decisión
+    // en plan_roles_v2.md §11.7 y plan_roles_v3.md §3 (decisión #4): el valor
+    // canónico se calcula en la oficial sumando materias.creditos desde
+    // notas_divisit; nosotros lo guardamos como snapshot que se sincroniza
+    // cuando el módulo se integre con DIVISIT (Fase 3 de plan_integracion).
     @Column(name = "creditos_aprobados")
     private Integer creditosAprobados;
 
-    @Column(name = "estado_grado")
+    // FK al catálogo estados_estudiantes (Bloque 5e, plan_roles_v3 §4.4).
+    // Reemplaza el campo string libre `estadoGrado` que queda como zombie
+    // (insertable=false, updatable=false) hasta el cleanup de un sprint
+    // futuro. Todo código nuevo debe leer/escribir vía estadoEstudiante.
+    @ManyToOne
+    @JoinColumn(name = "estado_estudiante_id")
+    private EstadoEstudiante estadoEstudiante;
+
+    @Column(name = "estado_grado", insertable = false, updatable = false)
     private String estadoGrado;
 
     // FK a ProgramaAcademico (entidad existente)
@@ -124,8 +137,20 @@ public class Estudiante {
     public Integer getCreditosAprobados() { return creditosAprobados; }
     public void setCreditosAprobados(Integer creditosAprobados) { this.creditosAprobados = creditosAprobados; }
 
+    public EstadoEstudiante getEstadoEstudiante() { return estadoEstudiante; }
+    public void setEstadoEstudiante(EstadoEstudiante estadoEstudiante) { this.estadoEstudiante = estadoEstudiante; }
+
+    /** Nombre del estado del estudiante (helper). Lee de la FK al catálogo. */
+    public String getEstadoEstudianteNombre() {
+        return estadoEstudiante != null ? estadoEstudiante.getNombre() : null;
+    }
+
+    /**
+     * Columna zombie — se elimina en cleanup futuro. Todo código nuevo
+     * debe usar {@link #getEstadoEstudiante()} o {@link #getEstadoEstudianteNombre()}.
+     */
+    @Deprecated
     public String getEstadoGrado() { return estadoGrado; }
-    public void setEstadoGrado(String estadoGrado) { this.estadoGrado = estadoGrado; }
 
     public ProgramaAcademico getPrograma() { return programa; }
     public void setPrograma(ProgramaAcademico programa) { this.programa = programa; }
