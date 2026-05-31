@@ -232,7 +232,10 @@ public class PazYSalvoService {
         info.put("creditosAprobados", creditos);
         info.put("totalCreditos",     totalCreditos);
 
-        if (perfil != null && "GRADUADO".equals(perfil.getEstadoGrado())) {
+        boolean graduado = perfil != null
+                && perfil.getEstadoEstudiante() != null
+                && "GRADUADO".equals(perfil.getEstadoEstudiante().getNombre());
+        if (graduado) {
             info.put("etapa",      "GRADUADO");
             info.put("etapaLabel", "Graduado");
             return info;
