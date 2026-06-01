@@ -35,7 +35,7 @@ public class SecurityConfig {
                 // Endpoints públicos
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/solicitudes/verificar").permitAll()
-                .requestMatchers("/api/notificaciones/subscribe").permitAll()
+                .requestMatchers("/api/notificaciones/subscribe", "/api/notificaciones/stream").permitAll()
                 .requestMatchers("/swagger-ui/**", "/api-docs/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/error").permitAll()
                 // Todo lo demás requiere autenticación
