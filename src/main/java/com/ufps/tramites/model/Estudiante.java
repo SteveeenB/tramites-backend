@@ -69,12 +69,10 @@ public class Estudiante {
     @JoinColumn(name = "programa_id")
     private ProgramaAcademico programa;
 
-    // FK stubs — entidades pendientes de crear (Cohorte, EstadoEstudiante, Pensum)
+    // FK stubs — entidades pendientes de crear (Cohorte, Pensum).
+    // estado_estudiante ya es @ManyToOne formal arriba (Bloque 5e).
     @Column(name = "cohorte_id")
     private Long cohorteId;
-
-    @Column(name = "estado_estudiante_id")
-    private Long estadoEstudianteId;
 
     @Column(name = "pensum_id")
     private Long pensumId;
@@ -157,9 +155,6 @@ public class Estudiante {
 
     public Long getCohorteId() { return cohorteId; }
     public void setCohorteId(Long cohorteId) { this.cohorteId = cohorteId; }
-
-    public Long getEstadoEstudianteId() { return estadoEstudianteId; }
-    public void setEstadoEstudianteId(Long estadoEstudianteId) { this.estadoEstudianteId = estadoEstudianteId; }
 
     public Long getPensumId() { return pensumId; }
     public void setPensumId(Long pensumId) { this.pensumId = pensumId; }
