@@ -77,6 +77,9 @@ public class SolicitudService {
     @Autowired
     private CorreoCertificadoService correoService;
 
+    @Autowired
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     /**
      * Crea una solicitud de terminación de materias. Valida: período de
      * convocatoria, créditos aprobados y duplicados.
@@ -388,10 +391,15 @@ public class SolicitudService {
     }
 
     private void notificarEstudiante(Solicitud s, String estadoAnterior) {
-        notificacionSseService.notificarCambioEstado(s, estadoAnterior);
-        usuarioRepository.findByCedula(s.getCedula())
-                .ifPresent(est -> notificacionService.notificarEstudianteCambioEstado(s, est));
-    }
+    notificacionSseService.notificarCambioEstado(s, estadoAnterior);
+    usuarioRepository.findByCedula(s.getCedula()).ifPresent(est -> {
+        notificacionService.notificarEstudianteCambioEstado(s, est);
+        // Publica evento para que HistorialEstadoListener persista en BD
+        eventPublisher.publishEvent(
+            new com.ufps.tramites.event.SolicitudEstadoCambiadoEvent(this, s, est, estadoAnterior)
+        );
+    });
+}
 
     /**
      * Resuelve un {@link EstadoEstudiante} del catálogo `estados_estudiantes`
