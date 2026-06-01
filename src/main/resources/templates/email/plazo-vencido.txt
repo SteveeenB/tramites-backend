@@ -1,0 +1,11 @@
+Estimado/a %s,
+
+Le informamos que la solicitud con radicado %s (tipo: %s) lleva más de %d horas pendiente de decisión.
+
+Fecha en que entró a revisión: %s
+
+Por favor, ingrese al sistema y tome la decisión a la brevedad posible.
+
+Atentamente,
+Universidad Francisco de Paula Santander (UFPS)
+Sistema de Trámites de Posgrado

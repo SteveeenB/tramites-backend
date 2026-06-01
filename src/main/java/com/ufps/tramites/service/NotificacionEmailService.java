@@ -3,58 +3,67 @@ package com.ufps.tramites.service;
 import com.ufps.tramites.event.SolicitudEstadoCambiadoEvent;
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StreamUtils;
 
 @Service
 public class NotificacionEmailService {
 
     private static final Logger log = LoggerFactory.getLogger(NotificacionEmailService.class);
 
-    // required = false: si no hay SMTP configurado en application.properties,
-    // Spring no crea el bean y el servicio cae al modo de simulación por consola
     @Autowired(required = false)
     private JavaMailSender mailSender;
+
+    @Autowired
+    private NotificacionService notificacionService;
 
     @EventListener
     public void onEstadoCambiado(SolicitudEstadoCambiadoEvent evento) {
         Solicitud solicitud = evento.getSolicitud();
         Usuario estudiante = evento.getEstudiante();
 
+        notificacionService.notificarEstudianteCambioEstado(solicitud, estudiante);
+
         if (!"APROBADA".equals(solicitud.getEstado()) && !"RECHAZADA".equals(solicitud.getEstado())) {
             return;
         }
 
-        String asunto = construirAsunto(solicitud);
-        String cuerpo = construirCuerpo(solicitud, estudiante);
-        String correo = estudiante.getCorreo();
+        String correo = estudiante.getEmail();
+        enviarEmail(correo, construirAsunto(solicitud), construirCuerpo(solicitud, estudiante));
+    }
 
+    /** Envía correo al director cuando una solicitud excede el plazo sin decisión. */
+    public void enviarEmailPlazoVencido(Solicitud solicitud, Usuario director, int plazoHoras) {
+        if (director == null) return;
+        String correo = director.getEmail();
         if (correo == null || correo.isBlank()) {
-            log.warn("[CORREO SIN DESTINATARIO] El estudiante {} no tiene correo registrado.\n--- Contenido ---\nAsunto: {}\n{}\n---",
-                    estudiante.getNombre(), asunto, cuerpo);
+            log.warn("[PLAZO_VENCIDO] Director {} sin email registrado, solicitud #{}",
+                    director.getCedula(), solicitud.getId());
             return;
         }
+        String tipo    = solicitud.getTipo().replace("_", " ");
+        String asunto  = "[UFPS] Solicitud pendiente de decisión - " + tipo;
+        String nombre  = director.getNombreCompleto() != null ? director.getNombreCompleto() : director.getCedula();
+        String radicado = solicitud.getRadicado() != null ? solicitud.getRadicado() : "#" + solicitud.getId();
 
-        if (mailSender != null) {
-            try {
-                SimpleMailMessage mensaje = new SimpleMailMessage();
-                mensaje.setTo(correo);
-                mensaje.setSubject(asunto);
-                mensaje.setText(cuerpo);
-                mailSender.send(mensaje);
-                log.info("Correo enviado a {} para solicitud #{} ({})", correo, solicitud.getId(), solicitud.getEstado());
-            } catch (Exception e) {
-                log.error("[FALLO DE ENVÍO] No se pudo enviar correo a {}. Contenido:\nAsunto: {}\n{}", correo, asunto, cuerpo, e);
-            }
-        } else {
-            log.info("=== [SIMULACIÓN DE CORREO] ===\nPara: {}\nAsunto: {}\n{}\n==============================",
-                    correo, asunto, cuerpo);
-        }
+        String plantilla = cargarPlantilla("plazo-vencido.txt");
+        String cuerpo = String.format(plantilla,
+                nombre,
+                radicado,
+                tipo,
+                plazoHoras,
+                solicitud.getFechaEnRevision());
+
+        enviarEmail(correo, asunto, cuerpo);
     }
 
     private String construirAsunto(Solicitud solicitud) {
@@ -65,30 +74,64 @@ public class NotificacionEmailService {
     }
 
     private String construirCuerpo(Solicitud solicitud, Usuario estudiante) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Estimado/a ").append(estudiante.getNombre()).append(",\n\n");
+        String nombre   = estudiante.getNombreCompleto() != null ? estudiante.getNombreCompleto() : estudiante.getCedula();
+        String radicado = solicitud.getRadicado() != null ? solicitud.getRadicado() : "#" + solicitud.getId();
+        String tipo     = solicitud.getTipo().replace("_", " ");
 
+        String mensajeEstado;
+        String extra = "";
         if ("APROBADA".equals(solicitud.getEstado())) {
-            sb.append("Nos complace informarle que su solicitud ha sido APROBADA.\n\n");
-            sb.append("Tipo de trámite: ").append(solicitud.getTipo()).append("\n");
-            sb.append("Fecha: ").append(solicitud.getFechaSolicitud()).append("\n");
+            mensajeEstado = "Nos complace informarle que su solicitud ha sido APROBADA.";
             if ("TERMINACION_MATERIAS".equals(solicitud.getTipo())) {
-                sb.append("\nSu certificado de terminación de materias ya está disponible ")
-                  .append("en el panel de estudiante. Ingrese al sistema para descargarlo.\n");
+                extra = "Su certificado de terminación de materias ya está disponible en el panel de estudiante.\n";
             }
         } else {
-            sb.append("Le informamos que su solicitud ha sido RECHAZADA.\n\n");
-            sb.append("Tipo de trámite: ").append(solicitud.getTipo()).append("\n");
-            sb.append("Fecha: ").append(solicitud.getFechaSolicitud()).append("\n");
+            mensajeEstado = "Le informamos que su solicitud ha sido RECHAZADA.";
             String motivo = solicitud.getObservaciones();
             if (motivo != null && !motivo.isBlank()) {
-                sb.append("\nMotivo del rechazo:\n").append(motivo).append("\n");
+                extra = "Motivo del rechazo: " + motivo + "\n";
             }
-            sb.append("\nPuede presentar una nueva solicitud una vez subsane la situación indicada.\n");
         }
 
-        sb.append("\nAtentamente,\nUniversidad Francisco de Paula Santander (UFPS)\n");
-        sb.append("Sistema de Trámites de Posgrado");
-        return sb.toString();
+        String plantilla = cargarPlantilla("estado-cambiado.txt");
+        return String.format(plantilla,
+                nombre,
+                mensajeEstado,
+                tipo,
+                radicado,
+                solicitud.getFechaSolicitud(),
+                extra);
+    }
+
+    private void enviarEmail(String correo, String asunto, String cuerpo) {
+        if (correo == null || correo.isBlank()) {
+            log.warn("[CORREO SIN DESTINATARIO] No hay email registrado.\nAsunto: {}\n{}", asunto, cuerpo);
+            return;
+        }
+        if (mailSender != null) {
+            try {
+                SimpleMailMessage mensaje = new SimpleMailMessage();
+                mensaje.setTo(correo);
+                mensaje.setSubject(asunto);
+                mensaje.setText(cuerpo);
+                mailSender.send(mensaje);
+                log.info("Correo enviado a {} — Asunto: {}", correo, asunto);
+            } catch (Exception e) {
+                log.error("[FALLO DE ENVÍO] No se pudo enviar correo a {}. Asunto: {}", correo, asunto, e);
+            }
+        } else {
+            log.info("=== [SIMULACIÓN DE CORREO] ===\nPara: {}\nAsunto: {}\n{}\n==============================",
+                    correo, asunto, cuerpo);
+        }
+    }
+
+    private String cargarPlantilla(String nombre) {
+        try {
+            ClassPathResource resource = new ClassPathResource("templates/email/" + nombre);
+            return StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            log.error("No se pudo cargar la plantilla de correo: {}", nombre, e);
+            return "%s\n%s\nTipo: %s\nRadicado: %s\nFecha: %s\n%s";
+        }
     }
 }
