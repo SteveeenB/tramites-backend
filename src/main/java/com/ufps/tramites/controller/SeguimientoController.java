@@ -15,6 +15,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -80,13 +81,15 @@ public class SeguimientoController {
     }
 
     /**
-     * GET /api/tramites/mis/stream
+     * GET /api/tramites/mis/stream?token=...
      * SSE stream con keep-alive cada 30s para Render.
+     * No consulta BD — usa auth.getName() que viene del JWT.
      */
     @GetMapping(value = "/mis/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter stream(Authentication auth) {
-        Usuario usuario = resolverUsuario(auth);
-        String cedula = usuario != null ? usuario.getCedula() : "anonimo";
+    public SseEmitter stream(Authentication auth,
+                             @RequestParam(required = false) String token) {
+        // Extraer cédula del JWT sin consultar BD
+        String cedula = auth != null ? auth.getName() : "anonimo";
 
         SseEmitter emitter = notificacionSseService.suscribir(cedula);
 
