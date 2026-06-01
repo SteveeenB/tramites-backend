@@ -16,15 +16,19 @@ public class NotificacionEmailService {
 
     private static final Logger log = LoggerFactory.getLogger(NotificacionEmailService.class);
 
-    // required = false: si no hay SMTP configurado en application.properties,
-    // Spring no crea el bean y el servicio cae al modo de simulación por consola
     @Autowired(required = false)
     private JavaMailSender mailSender;
+
+    @Autowired
+    private NotificacionService notificacionService;
 
     @EventListener
     public void onEstadoCambiado(SolicitudEstadoCambiadoEvent evento) {
         Solicitud solicitud = evento.getSolicitud();
         Usuario estudiante = evento.getEstudiante();
+
+        // Notificación in-app (siempre, independiente del correo)
+        notificacionService.notificarEstudianteCambioEstado(solicitud, estudiante);
 
         if (!"APROBADA".equals(solicitud.getEstado()) && !"RECHAZADA".equals(solicitud.getEstado())) {
             return;
