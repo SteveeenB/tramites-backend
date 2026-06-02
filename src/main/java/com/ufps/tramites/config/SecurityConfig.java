@@ -35,6 +35,7 @@ public class SecurityConfig {
                 // Endpoints públicos
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/solicitudes/verificar").permitAll()
+                .requestMatchers("/api/pagos/webhook").permitAll()
                 .requestMatchers("/api/notificaciones/subscribe").permitAll()
                 .requestMatchers("/swagger-ui/**", "/api-docs/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/error").permitAll()
