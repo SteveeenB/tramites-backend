@@ -48,7 +48,7 @@ public class TramiteService {
         boolean etapa1Habilitada = creditosAprobados >= creditosRequeridos;
 
         Optional<Solicitud> solicitudTerminacion = solicitudRepository
-                .findFirstByCedulaAndTipo(usuario.getCedula(), "TERMINACION_MATERIAS");
+                .findFirstByCedulaAndTipoOrderByIdDesc(usuario.getCedula(), "TERMINACION_MATERIAS");
 
         boolean terminacionAprobada = solicitudTerminacion.isPresent()
                 && "APROBADA".equals(solicitudTerminacion.get().getEstado());
@@ -56,7 +56,7 @@ public class TramiteService {
         boolean certificadoDisponible = terminacionAprobada;
 
         Optional<Solicitud> solicitudGrado = solicitudRepository
-                .findFirstByCedulaAndTipo(usuario.getCedula(), "GRADO");
+                .findFirstByCedulaAndTipoOrderByIdDesc(usuario.getCedula(), "GRADO");
 
         Map<String, Object> response = new LinkedHashMap<>();
 
