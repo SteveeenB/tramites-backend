@@ -28,4 +28,18 @@ public class HistorialEstadoListener {
         registro.setFechaCambio(LocalDateTime.now());
         historialRepository.save(registro);
     }
+
+    @EventListener
+    public void onCertificadoEstadoCambiado(CertificadoEstadoCambiadoEvent event) {
+        HistorialEstadoTramite registro = new HistorialEstadoTramite();
+        registro.setSolicitudId(event.getSolicitud().getId());
+        registro.setTipoTramite("CERTIFICADO_" + event.getSolicitud().getTipoCertificado());
+        registro.setEstadoAnterior(event.getEstadoAnterior());
+        registro.setEstadoNuevo(event.getSolicitud().getEstado());
+        registro.setActor(event.getActor().getCedula());
+        registro.setRolActor(event.getActor().getRolNombre());
+        registro.setObservaciones(event.getSolicitud().getObservaciones());
+        registro.setFechaCambio(LocalDateTime.now());
+        historialRepository.save(registro);
+    }
 }

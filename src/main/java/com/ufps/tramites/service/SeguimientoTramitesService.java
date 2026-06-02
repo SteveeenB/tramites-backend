@@ -19,19 +19,14 @@ import com.ufps.tramites.repository.SolicitudRepository;
 @Service
 public class SeguimientoTramitesService {
 
-    @Autowired
-    private SolicitudRepository solicitudRepository;
-
-    @Autowired
-    private SolicitudCertificadoRepository certificadoRepository;
-
-    @Autowired
-    private HistorialEstadoTramiteRepository historialRepository;
+    @Autowired private SolicitudRepository solicitudRepository;
+    @Autowired private SolicitudCertificadoRepository certificadoRepository;
+    @Autowired private HistorialEstadoTramiteRepository historialRepository;
 
     public List<TramiteResumenDto> obtenerMisTramites(String cedula) {
         List<TramiteResumenDto> resultado = new ArrayList<>();
 
-        // Terminaciones y grados — busca por cedula del estudiante
+        // Terminaciones y grados
         List<Solicitud> solicitudes = solicitudRepository.findByCedula(cedula);
         for (Solicitud s : solicitudes) {
             resultado.add(new TramiteResumenDto(
@@ -67,10 +62,31 @@ public class SeguimientoTramitesService {
         return resultado;
     }
 
+    /**
+     * Historial de solicitudes (TERMINACION_MATERIAS, GRADO).
+     * Filtra por tipoTramite que NO empiece por CERTIFICADO_ para
+     * evitar colisiones de id entre las dos tablas.
+     */
     public List<CambioHistorialDto> obtenerHistorial(Long solicitudId) {
         List<HistorialEstadoTramite> registros = historialRepository
-            .findBySolicitudIdOrderByFechaCambioAsc(solicitudId);
+            .findBySolicitudIdAndTipoTramiteNotStartingWithOrderByFechaCambioAsc(
+                solicitudId, "CERTIFICADO_");
+        return mapearHistorial(registros);
+    }
 
+    /**
+     * Historial de certificados.
+     * Filtra por tipoTramite que empiece por CERTIFICADO_ para
+     * evitar colisiones de id entre las dos tablas.
+     */
+    public List<CambioHistorialDto> obtenerHistorialCertificado(Long certificadoId) {
+        List<HistorialEstadoTramite> registros = historialRepository
+            .findBySolicitudIdAndTipoTramiteStartingWithOrderByFechaCambioAsc(
+                certificadoId, "CERTIFICADO_");
+        return mapearHistorial(registros);
+    }
+
+    private List<CambioHistorialDto> mapearHistorial(List<HistorialEstadoTramite> registros) {
         List<CambioHistorialDto> resultado = new ArrayList<>();
         for (HistorialEstadoTramite r : registros) {
             resultado.add(new CambioHistorialDto(
