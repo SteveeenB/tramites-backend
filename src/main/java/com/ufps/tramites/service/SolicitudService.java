@@ -483,6 +483,18 @@ public class SolicitudService {
         return construirRespuestaSolicitud(s);
     }
 
+    public Map<String, Object> registrarPagoTerminacion(Long id) {
+    Solicitud s = solicitudRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+    if (!"PENDIENTE_PAGO".equals(s.getEstado()) || !"TERMINACION_MATERIAS".equals(s.getTipo())) {
+        throw new IllegalStateException("La solicitud no está pendiente de pago");
+    }
+    s.setEstado("EN_REVISION");
+    solicitudRepository.save(s);
+    notificarEstudiante(s, "PENDIENTE_PAGO");
+    return construirRespuestaSolicitud(s);
+}
+
     /**
      * Registra la fecha de graduación elegida por el estudiante. Requiere que
      * el pago ya esté registrado.
