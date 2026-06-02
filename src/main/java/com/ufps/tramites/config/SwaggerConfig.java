@@ -1,8 +1,11 @@
 package com.ufps.tramites.config;
 
+import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,6 +14,8 @@ import java.util.List;
 
 @Configuration
 public class SwaggerConfig {
+
+    private static final String BEARER_SCHEME = "bearerAuth";
 
     @Bean
     public OpenAPI tramitesOpenAPI() {
@@ -27,7 +32,11 @@ public class SwaggerConfig {
                                 - `DEPENDENCIA` – Gestiona paz y salvos y entrega de certificados físicos
                                 - `ADMIN` – Administra catálogo de certificados y convocatorias
 
-                                **Autenticación:** Se pasa la cédula del usuario como query param `?cedula=` en cada endpoint que requiere rol.
+                                **Autenticación:** JWT Bearer token. Obtén el token en `POST /api/auth/login` \
+                                y agrégalo con el botón **Authorize** (formato: `Bearer <token>`).
+
+                                Endpoints públicos (no requieren token): `POST /api/auth/**`, \
+                                `GET /api/solicitudes/verificar`, `GET /api/notificaciones/subscribe`.
                                 """)
                         .version("1.0.0")
                         .contact(new Contact()
@@ -36,6 +45,14 @@ public class SwaggerConfig {
                 .servers(List.of(
                         new Server().url("https://tramites-backend.onrender.com").description("Producción (Render)"),
                         new Server().url("http://localhost:8080").description("Local")
-                ));
+                ))
+                .addSecurityItem(new SecurityRequirement().addList(BEARER_SCHEME))
+                .components(new Components()
+                        .addSecuritySchemes(BEARER_SCHEME, new SecurityScheme()
+                                .name(BEARER_SCHEME)
+                                .type(SecurityScheme.Type.HTTP)
+                                .scheme("bearer")
+                                .bearerFormat("JWT")
+                                .description("Token JWT obtenido en POST /api/auth/login")));
     }
 }
