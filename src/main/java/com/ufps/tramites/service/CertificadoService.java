@@ -11,8 +11,10 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import com.ufps.tramites.event.CertificadoEstadoCambiadoEvent;
 import com.ufps.tramites.model.Estudiante;
 import com.ufps.tramites.model.SolicitudCertificado;
 import com.ufps.tramites.model.TipoCertificado;
@@ -26,8 +28,6 @@ import com.ufps.tramites.repository.UsuarioRepository;
 public class CertificadoService {
 
     private static final Logger log = LoggerFactory.getLogger(CertificadoService.class);
-
-    /** Días que tiene el estudiante para pagar antes de que el recibo se considere vencido. */
     private static final int DIAS_VIGENCIA_PAGO = 3;
 
     @Autowired private SolicitudCertificadoRepository certificadoRepository;
@@ -37,6 +37,7 @@ public class CertificadoService {
     @Autowired private CertificadoConstanciaPdfService pdfService;
     @Autowired private CorreoConstanciaService correoService;
     @Autowired private SupabaseStorageService storage;
+    @Autowired private ApplicationEventPublisher eventPublisher;
 
     // ── 1) SOLICITUD ──────────────────────────────────────────────────────────
 
@@ -47,31 +48,24 @@ public class CertificadoService {
         TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(tipoCertificado)
             .orElseThrow(() -> new IllegalStateException("Tipo de certificado inválido: " + tipoCertificado));
 
-        if (Boolean.FALSE.equals(tipo.getActivo())) {
+        if (Boolean.FALSE.equals(tipo.getActivo()))
             throw new IllegalStateException("Este tipo de certificado no está disponible actualmente.");
-        }
 
-        if (!"FISICA".equals(modalidadEnvio) && !"DIGITAL".equals(modalidadEnvio)) {
+        if (!"FISICA".equals(modalidadEnvio) && !"DIGITAL".equals(modalidadEnvio))
             throw new IllegalStateException("Modalidad de envío inválida: " + modalidadEnvio);
-        }
 
         List<SolicitudCertificado> existentes = certificadoRepository
             .findByCedulaAndTipoCertificado(estudiante.getCedula(), tipoCertificado);
         boolean tieneVigente = existentes.stream()
             .anyMatch(s -> "PENDIENTE_PAGO".equals(s.getEstado()));
-        if (tieneVigente) {
+        if (tieneVigente)
             throw new IllegalStateException(
                 "Ya tienes una solicitud vigente de este tipo de certificado. " +
-                "Debes pagar o esperar a que venza el recibo antes de generar uno nuevo."
-            );
-        }
-
-        // Sin validación de créditos: los certificados son trámites administrativos básicos.
+                "Debes pagar o esperar a que venza el recibo antes de generar uno nuevo.");
 
         LocalDate hoy = LocalDate.now();
         double costo = tipo.precioTotal(modalidadEnvio);
 
-        // Doble-write transicional (Bloque 5a): cedula viejo + FK Estudiante
         Estudiante perfilEstudiante = estudianteRepository.findByUsuario(estudiante).orElse(null);
         SolicitudCertificado s = new SolicitudCertificado();
         s.setCedula(estudiante.getCedula());
@@ -102,46 +96,40 @@ public class CertificadoService {
         return resultado;
     }
 
-    // ── 3) PAGO + GENERACIÓN INMEDIATA (Regla PRD: 3-5 min) ──────────────────
+    // ── 3) PAGO + GENERACIÓN INMEDIATA ────────────────────────────────────────
 
     public Map<String, Object> simularPago(Long id, String cedula) {
         SolicitudCertificado s = certificadoRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada con id: " + id));
 
-        if (!cedula.equals(s.getCedula())) {
+        if (!cedula.equals(s.getCedula()))
             throw new IllegalStateException("Esta solicitud no pertenece al estudiante.");
-        }
-        if (!"PENDIENTE_PAGO".equals(s.getEstado())) {
-            throw new IllegalStateException(
-                "Esta solicitud no está pendiente de pago. Estado actual: " + s.getEstado());
-        }
+        if (!"PENDIENTE_PAGO".equals(s.getEstado()))
+            throw new IllegalStateException("Esta solicitud no está pendiente de pago. Estado actual: " + s.getEstado());
         if (s.getFechaVencimientoPago() != null && LocalDate.now().isAfter(s.getFechaVencimientoPago())) {
             s.setEstado("VENCIDA");
             certificadoRepository.save(s);
             throw new IllegalStateException("El recibo de pago está vencido. Genera una nueva solicitud.");
         }
 
+        String estadoAnterior = s.getEstado();
         s.setEstado("PAGADO");
         s.setFechaPago(LocalDateTime.now());
         s.setObservaciones("Pago confirmado por el sistema.");
         certificadoRepository.save(s);
 
-        // Generación inmediata: PDF + storage + correo + transición a GENERADO.
+        // Publicar evento PENDIENTE_PAGO → PAGADO
+        Usuario estudianteEvento = usuarioRepository.findByCedula(cedula).orElse(null);
+        publicarCambioEstado(s, estadoAnterior, estudianteEvento);
+
+        // Generación inmediata
         generarYNotificar(s.getId());
 
         SolicitudCertificado actualizada = certificadoRepository.findById(s.getId()).orElse(s);
-        Usuario estudiante = usuarioRepository.findByCedula(cedula).orElse(null);
         TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(actualizada.getTipoCertificado()).orElse(null);
-        return construirRespuesta(actualizada, estudiante, tipo);
+        return construirRespuesta(actualizada, estudianteEvento, tipo);
     }
 
-    /**
-     * Genera el PDF, lo sube a storage, calcula hash y envía el correo.
-     *
-     * Punto de extensión para firma digital: aplicar la firma sobre `pdfBytes`
-     * antes de calcular el hash y subirlo a storage. Si la firma falla, NO
-     * se sube el PDF y la solicitud queda en PAGADO para reintento.
-     */
     public void generarYNotificar(Long solicitudId) {
         SolicitudCertificado s = certificadoRepository.findById(solicitudId)
             .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada con id: " + solicitudId));
@@ -170,30 +158,27 @@ public class CertificadoService {
             s.setUrlPdf(path);
         } catch (Exception e) {
             log.warn("[CONSTANCIA] Fallback: storage no disponible para solicitud {}: {}", solicitudId, e.getMessage());
-            // Sin storage configurado: continuar — el PDF se puede re-generar bajo demanda.
         }
 
+        String estadoAnterior = s.getEstado();
         s.setHashPdf(hash);
         s.setEstado("GENERADO");
         s.setFechaGeneracion(LocalDateTime.now());
         s.setObservaciones("Certificado generado y notificado por correo.");
         certificadoRepository.save(s);
 
+        // Publicar evento PAGADO → GENERADO
+        publicarCambioEstado(s, estadoAnterior, estudiante);
+
         try {
             correoService.enviarConstancia(estudiante, tipo, s, pdfBytes);
         } catch (Exception e) {
             log.error("[CONSTANCIA] PDF generado pero correo falló para solicitud {}: {}", solicitudId, e.getMessage());
-            // No revertimos el estado: el PDF existe y es descargable.
         }
     }
 
     // ── 4) DESCARGA DEL PDF ───────────────────────────────────────────────────
 
-    /**
-     * Descarga el PDF de la solicitud. Acepta tanto al dueño (estudiante por cédula)
-     * como a la dependencia encargada (por id de Dependencia). Un caller solo
-     * llenará uno de los dos parámetros según su rol; el otro será null.
-     */
     public byte[] descargarPdf(Long solicitudId, String cedulaEstudianteActor, Long dependenciaIdActor) {
         SolicitudCertificado s = certificadoRepository.findById(solicitudId)
             .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
@@ -206,20 +191,16 @@ public class CertificadoService {
                 && tipo.getDependencia().getId().equals(dependenciaIdActor)) {
             esDependenciaEncargada = true;
         }
-        if (!esDueno && !esDependenciaEncargada) {
+        if (!esDueno && !esDependenciaEncargada)
             throw new IllegalStateException("No autorizado para descargar este certificado.");
-        }
-
-        if (!estadoPermiteDescarga(s.getEstado())) {
+        if (!estadoPermiteDescarga(s.getEstado()))
             throw new IllegalStateException("El certificado todavía no está generado.");
-        }
 
         if (s.getUrlPdf() != null) {
             byte[] bytes = storage.descargar(s.getUrlPdf());
             if (bytes != null) return bytes;
         }
 
-        // Fallback: regenerar el PDF al vuelo si storage no devolvió nada.
         Usuario estudiante = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
         try {
             return pdfService.generar(tipo, s, estudiante);
@@ -252,18 +233,22 @@ public class CertificadoService {
         TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(s.getTipoCertificado()).orElse(null);
         validarDependenciaEncargada(tipo, dependenciaId);
 
-        if (!"FISICA".equals(s.getModalidadEnvio())) {
+        if (!"FISICA".equals(s.getModalidadEnvio()))
             throw new IllegalStateException("Esta solicitud no es de modalidad física.");
-        }
-        if (!"GENERADO".equals(s.getEstado())) {
+        if (!"GENERADO".equals(s.getEstado()))
             throw new IllegalStateException(
                 "Solo se puede marcar como listo un certificado en estado GENERADO. Estado actual: " + s.getEstado());
-        }
+
+        String estadoAnterior = s.getEstado();
         s.setEstado("LISTO_RETIRO");
         s.setObservaciones("Documento físico listo para retiro en oficina.");
         certificadoRepository.save(s);
 
         Usuario estudiante = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
+
+        // Publicar evento GENERADO → LISTO_RETIRO
+        publicarCambioEstado(s, estadoAnterior, estudiante);
+
         try {
             correoService.enviarAvisoListoRetiro(estudiante, tipo, s);
         } catch (Exception e) {
@@ -278,29 +263,41 @@ public class CertificadoService {
         TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(s.getTipoCertificado()).orElse(null);
         validarDependenciaEncargada(tipo, dependenciaId);
 
-        if (!"LISTO_RETIRO".equals(s.getEstado())) {
+        if (!"LISTO_RETIRO".equals(s.getEstado()))
             throw new IllegalStateException(
                 "Solo se puede marcar como entregado un certificado en estado LISTO_RETIRO. Estado actual: " + s.getEstado());
-        }
+
+        String estadoAnterior = s.getEstado();
         s.setEstado("ENTREGADO");
         s.setFechaEntrega(LocalDateTime.now());
         s.setObservaciones("Documento físico entregado al estudiante.");
         certificadoRepository.save(s);
 
         Usuario estudiante = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
+
+        // Publicar evento LISTO_RETIRO → ENTREGADO
+        publicarCambioEstado(s, estadoAnterior, estudiante);
+
         return construirRespuesta(s, estudiante, tipo);
     }
 
     private void validarDependenciaEncargada(TipoCertificado tipo, Long dependenciaId) {
-        if (tipo == null || tipo.getDependencia() == null) {
+        if (tipo == null || tipo.getDependencia() == null)
             throw new IllegalStateException("El tipo de certificado no tiene dependencia asignada.");
-        }
-        if (!tipo.getDependencia().getId().equals(dependenciaId)) {
+        if (!tipo.getDependencia().getId().equals(dependenciaId))
             throw new IllegalStateException("Esta dependencia no es responsable de este tipo de certificado.");
-        }
     }
 
-    // ── 6) SERIALIZACIÓN ──────────────────────────────────────────────────────
+    // ── 6) HELPER: PUBLICAR EVENTO ────────────────────────────────────────────
+
+    private void publicarCambioEstado(SolicitudCertificado s, String estadoAnterior, Usuario actor) {
+        if (actor == null) return;
+        eventPublisher.publishEvent(
+            new CertificadoEstadoCambiadoEvent(this, s, actor, estadoAnterior)
+        );
+    }
+
+    // ── 7) SERIALIZACIÓN ──────────────────────────────────────────────────────
 
     private Map<String, Object> construirRespuesta(SolicitudCertificado s, Usuario estudiante, TipoCertificado tipo) {
         Map<String, Object> map = new LinkedHashMap<>();
@@ -330,17 +327,17 @@ public class CertificadoService {
             t.put("costoLogisticaFisica", tipo.getCostoLogisticaFisica());
             t.put("dependenciaId",     tipo.getDependenciaId());
             t.put("dependenciaNombre", tipo.getDependenciaNombre());
-            t.put("direccionOficina", tipo.getDireccionOficina());
+            t.put("direccionOficina",  tipo.getDireccionOficina());
             t.put("tiempoEntregaDias", tipo.getTiempoEntregaDias());
             map.put("tipo", t);
         }
 
         if (estudiante != null) {
             Map<String, Object> est = new LinkedHashMap<>();
-            est.put("nombre", estudiante.getNombre());
-            est.put("cedula", estudiante.getCedula());
-            est.put("codigo", estudiante.getCodigo());
-            est.put("correo", estudiante.getCorreo());
+            est.put("nombre",  estudiante.getNombre());
+            est.put("cedula",  estudiante.getCedula());
+            est.put("codigo",  estudiante.getCodigo());
+            est.put("correo",  estudiante.getCorreo());
             est.put("programa", estudiante.getProgramaAcademico() != null
                     ? estudiante.getProgramaAcademico().getNombre() : null);
             map.put("estudiante", est);
@@ -353,8 +350,7 @@ public class CertificadoService {
         liq.put("concepto", "Certificado Académico — " + s.getTipoCertificado());
         liq.put("valor", s.getCosto());
         liq.put("fechaLimite", s.getFechaVencimientoPago() != null ? s.getFechaVencimientoPago().toString() : null);
-        liq.put("instrucciones",
-                "Realiza el pago por PSE o en la ventanilla de Tesorería antes de la fecha límite.");
+        liq.put("instrucciones", "Realiza el pago por PSE o en la ventanilla de Tesorería antes de la fecha límite.");
         return liq;
     }
 

@@ -121,4 +121,24 @@ public class SeguimientoController {
         map.put("error", mensaje);
         return map;
     }
+
+    /**
+ * GET /api/tramites/certificado/{id}/historial
+ * Retorna el historial cronológico de un certificado.
+ */
+@GetMapping("/certificado/{id}/historial")
+public ResponseEntity<?> obtenerHistorialCertificado(@PathVariable Long id, Authentication auth) {
+    Usuario usuario = resolverUsuario(auth);
+    if (usuario == null) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(error("No autenticado"));
+    }
+    try {
+        List<CambioHistorialDto> historial = seguimientoService.obtenerHistorialCertificado(id);
+        return ResponseEntity.ok(historial);
+    } catch (Exception e) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(error("Error al obtener historial: " + e.getMessage()));
+    }
+}
 }
