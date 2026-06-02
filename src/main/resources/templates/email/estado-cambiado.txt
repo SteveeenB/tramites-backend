@@ -1,0 +1,11 @@
+Estimado/a %s,
+
+%s
+
+Tipo de trámite: %s
+Radicado: %s
+Fecha de solicitud: %s
+%s
+Atentamente,
+Universidad Francisco de Paula Santander (UFPS)
+Sistema de Trámites de Posgrado
