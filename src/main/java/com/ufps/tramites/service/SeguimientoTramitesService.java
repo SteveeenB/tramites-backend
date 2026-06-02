@@ -68,11 +68,10 @@ public class SeguimientoTramitesService {
      * evitar colisiones de id entre las dos tablas.
      */
     public List<CambioHistorialDto> obtenerHistorial(Long solicitudId) {
-        List<HistorialEstadoTramite> registros = historialRepository
-            .findBySolicitudIdAndTipoTramiteNotStartingWithOrderByFechaCambioAsc(
-                solicitudId, "CERTIFICADO_");
-        return mapearHistorial(registros);
-    }
+    List<HistorialEstadoTramite> registros = historialRepository
+        .findSolicitudHistorial(solicitudId, "CERTIFICADO_");
+    return mapearHistorial(registros);
+}
 
     /**
      * Historial de certificados.
