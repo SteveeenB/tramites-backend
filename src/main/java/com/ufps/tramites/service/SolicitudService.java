@@ -102,10 +102,10 @@ public class SolicitudService {
         LocalDate hoy = LocalDate.now();
 
         // 3. Verificar que no exista una solicitud activa del mismo tipo
-        Optional<Solicitud> existente = solicitudRepository.findFirstByCedulaAndTipo(
+        Optional<Solicitud> existente = solicitudRepository.findFirstByCedulaAndTipoOrderByIdDesc(
                 estudiante.getCedula(), "TERMINACION_MATERIAS"
         );
-        if (existente.isPresent()) {
+        if (existente.isPresent() && !"RECHAZADA".equals(existente.get().getEstado())) {
             throw new IllegalStateException(
                     "Ya existe una solicitud de terminación de materias con estado: " + existente.get().getEstado()
             );
@@ -143,7 +143,7 @@ public class SolicitudService {
             MultipartFile certificadoIngles) throws IOException {
 
         // 1. Verificar que la terminación de materias esté aprobada (requisito previo)
-        Optional<Solicitud> terminacion = solicitudRepository.findFirstByCedulaAndTipo(
+        Optional<Solicitud> terminacion = solicitudRepository.findFirstByCedulaAndTipoOrderByIdDesc(
                 estudiante.getCedula(), "TERMINACION_MATERIAS"
         );
         if (terminacion.isEmpty() || !"APROBADA".equals(terminacion.get().getEstado())) {
@@ -153,7 +153,7 @@ public class SolicitudService {
         }
 
         // 2. Verificar que no exista ya una solicitud de grado activa
-        Optional<Solicitud> existente = solicitudRepository.findFirstByCedulaAndTipo(
+        Optional<Solicitud> existente = solicitudRepository.findFirstByCedulaAndTipoOrderByIdDesc(
                 estudiante.getCedula(), "GRADO"
         );
         if (existente.isPresent() && !"RECHAZADA".equals(existente.get().getEstado())) {
@@ -490,6 +490,18 @@ public class SolicitudService {
         solicitudRepository.save(s);
         return construirRespuestaSolicitud(s);
     }
+
+    public Map<String, Object> registrarPagoTerminacion(Long id) {
+    Solicitud s = solicitudRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+    if (!"PENDIENTE_PAGO".equals(s.getEstado()) || !"TERMINACION_MATERIAS".equals(s.getTipo())) {
+        throw new IllegalStateException("La solicitud no está pendiente de pago");
+    }
+    s.setEstado("EN_REVISION");
+    solicitudRepository.save(s);
+    notificarEstudiante(s, "PENDIENTE_PAGO");
+    return construirRespuestaSolicitud(s);
+}
 
     /**
      * Registra la fecha de graduación elegida por el estudiante. Requiere que
