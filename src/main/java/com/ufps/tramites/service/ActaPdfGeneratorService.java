@@ -72,7 +72,7 @@ public class ActaPdfGeneratorService {
                 .add(new Paragraph("UNIVERSIDAD FRANCISCO DE PAULA SANTANDER")
                         .setFontColor(ColorConstants.WHITE).setBold().setFontSize(14)
                         .setTextAlignment(TextAlignment.CENTER).setMarginBottom(2))
-                .add(new Paragraph("Vicerrectoría Académica · Sección de Posgrados")
+                .add(new Paragraph("Vicerrectoría Académica · Oficina de Posgrados")
                         .setFontColor(ColorConstants.WHITE).setFontSize(10)
                         .setTextAlignment(TextAlignment.CENTER))
                 .setBackgroundColor(COLOR_ROJO)

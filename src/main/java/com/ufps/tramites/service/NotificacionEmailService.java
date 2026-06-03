@@ -37,14 +37,14 @@ public class NotificacionEmailService {
             return;
         }
 
-        String correo = estudiante.getEmail();
+        String correo = estudiante.getCorreo();
         enviarEmail(correo, construirAsunto(solicitud), construirCuerpo(solicitud, estudiante));
     }
 
     /** Envía correo al director cuando una solicitud excede el plazo sin decisión. */
     public void enviarEmailPlazoVencido(Solicitud solicitud, Usuario director, int plazoHoras) {
         if (director == null) return;
-        String correo = director.getEmail();
+        String correo = director.getCorreo();
         if (correo == null || correo.isBlank()) {
             log.warn("[PLAZO_VENCIDO] Director {} sin email registrado, solicitud #{}",
                     director.getCedula(), solicitud.getId());
