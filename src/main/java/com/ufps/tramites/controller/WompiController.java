@@ -44,6 +44,25 @@ public class WompiController {
     }
 
     /**
+     * POST /api/pagos/certificado/crear
+     * Crea el pago de un certificado y devuelve la URL de checkout de Wompi.
+     * Body: { certificadoId, cedula }
+     */
+    @PostMapping("/certificado/crear")
+    public ResponseEntity<?> crearPagoCertificado(@RequestBody Map<String, Object> body) {
+        try {
+            Long certId = Long.valueOf(body.get("certificadoId").toString());
+            String cedula = (String) body.get("cedula");
+            return ResponseEntity.ok(wompiService.crearPagoCertificado(certId, cedula));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error creando el pago: " + e.getMessage()));
+        }
+    }
+
+    /**
      * GET /api/pagos/estado/{referencia}
      * Consulta el estado de un pago por su referencia.
      * Se llama desde ResultadoPago.jsx después de que Wompi redirige.
