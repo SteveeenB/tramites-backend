@@ -27,6 +27,7 @@ import com.ufps.tramites.repository.EstadoEstudianteRepository;
 import com.ufps.tramites.repository.EstudianteRepository;
 import com.ufps.tramites.repository.SolicitudRepository;
 import com.ufps.tramites.repository.TipoCertificadoRepository;
+import com.ufps.tramites.repository.TipoSolicitudRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
 
 @Service
@@ -79,6 +80,9 @@ public class SolicitudService {
     private TipoCertificadoRepository tipoCertificadoRepository;
 
     @Autowired
+    private TipoSolicitudRepository tipoSolicitudRepository;
+
+    @Autowired
     private PlantillaCertificadoService plantillaCertificadoService;
 
     @Autowired
@@ -125,7 +129,8 @@ public class SolicitudService {
         solicitud.setTipo("TERMINACION_MATERIAS");
         solicitud.setEstado("PENDIENTE_PAGO");
         solicitud.setFechaSolicitud(hoy);
-        solicitud.setCosto(COSTO_TERMINACION);
+        solicitud.setCosto(tipoSolicitudRepository.findByCodigo("TERMINACION_MATERIAS")
+                .map(t -> t.getCosto()).orElse(COSTO_TERMINACION));
         solicitud.setObservaciones("Solicitud registrada por el sistema.");
 
         solicitudRepository.save(solicitud);
@@ -185,7 +190,8 @@ public class SolicitudService {
         solicitud.setTipo("GRADO");
         solicitud.setEstado("EN_REVISION");
         solicitud.setFechaSolicitud(LocalDate.now());
-        solicitud.setCosto(COSTO_GRADO);
+        solicitud.setCosto(tipoSolicitudRepository.findByCodigo("GRADO")
+                .map(t -> t.getCosto()).orElse(COSTO_GRADO));
         solicitud.setObservaciones("Solicitud de grado registrada por el sistema.");
         solicitud.setTituloProyecto(tituloProyecto);
         solicitud.setResumenProyecto(resumen);

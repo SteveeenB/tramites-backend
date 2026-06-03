@@ -171,6 +171,12 @@ ON CONFLICT (codigo) DO UPDATE SET
     direccion_oficina      = EXCLUDED.direccion_oficina,
     tiempo_entrega_dias    = EXCLUDED.tiempo_entrega_dias;
 
+-- ── Costos configurables de solicitudes ──────────────────────────────
+INSERT INTO tipos_solicitud (codigo, nombre, costo, activo) VALUES
+('TERMINACION_MATERIAS', 'Terminación de Materias', 150000, true),
+('GRADO', 'Solicitud de Grado', 250000, true)
+ON CONFLICT (codigo) DO NOTHING;
+
 -- ============================================================
 -- Perfiles de Estudiante (después de usuario por el FK usuario_id)
 -- ============================================================
