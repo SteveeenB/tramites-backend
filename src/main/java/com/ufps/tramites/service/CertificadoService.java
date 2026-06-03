@@ -13,9 +13,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
+
+import com.ufps.tramites.model.Estudiante;
 import com.ufps.tramites.model.SolicitudCertificado;
 import com.ufps.tramites.model.TipoCertificado;
 import com.ufps.tramites.model.Usuario;
+import com.ufps.tramites.repository.EstudianteRepository;
 import com.ufps.tramites.repository.SolicitudCertificadoRepository;
 import com.ufps.tramites.repository.TipoCertificadoRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
@@ -31,7 +36,9 @@ public class CertificadoService {
     @Autowired private SolicitudCertificadoRepository certificadoRepository;
     @Autowired private TipoCertificadoRepository tipoCertificadoRepository;
     @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private EstudianteRepository estudianteRepository;
     @Autowired private CertificadoConstanciaPdfService pdfService;
+    @Autowired private PlantillaCertificadoService plantillaService;
     @Autowired private CorreoConstanciaService correoService;
     @Autowired private SupabaseStorageService storage;
 
@@ -68,8 +75,11 @@ public class CertificadoService {
         LocalDate hoy = LocalDate.now();
         double costo = tipo.precioTotal(modalidadEnvio);
 
+        // Doble-write transicional (Bloque 5a): cedula viejo + FK Estudiante
+        Estudiante perfilEstudiante = estudianteRepository.findByUsuario(estudiante).orElse(null);
         SolicitudCertificado s = new SolicitudCertificado();
         s.setCedula(estudiante.getCedula());
+        s.setEstudiante(perfilEstudiante);
         s.setTipoCertificado(tipoCertificado);
         s.setModalidadEnvio(modalidadEnvio);
         s.setEstado("PENDIENTE_PAGO");
@@ -87,7 +97,7 @@ public class CertificadoService {
 
     public List<Map<String, Object>> obtenerCertificadosPorCedula(String cedula) {
         List<SolicitudCertificado> solicitudes = certificadoRepository.findByCedula(cedula);
-        Usuario estudiante = usuarioRepository.findById(cedula).orElse(null);
+        Usuario estudiante = usuarioRepository.findByCedula(cedula).orElse(null);
         List<Map<String, Object>> resultado = new ArrayList<>();
         for (SolicitudCertificado s : solicitudes) {
             TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(s.getTipoCertificado()).orElse(null);
@@ -124,7 +134,7 @@ public class CertificadoService {
         generarYNotificar(s.getId());
 
         SolicitudCertificado actualizada = certificadoRepository.findById(s.getId()).orElse(s);
-        Usuario estudiante = usuarioRepository.findById(cedula).orElse(null);
+        Usuario estudiante = usuarioRepository.findByCedula(cedula).orElse(null);
         TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(actualizada.getTipoCertificado()).orElse(null);
         return construirRespuesta(actualizada, estudiante, tipo);
     }
@@ -147,11 +157,11 @@ public class CertificadoService {
 
         TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(s.getTipoCertificado())
             .orElseThrow(() -> new IllegalStateException("Tipo de certificado no existe: " + s.getTipoCertificado()));
-        Usuario estudiante = usuarioRepository.findById(s.getCedula()).orElse(null);
+        Usuario estudiante = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
 
         byte[] pdfBytes;
         try {
-            pdfBytes = pdfService.generar(tipo, s, estudiante);
+            pdfBytes = generarPdfConstancia(tipo, s, estudiante);
         } catch (Exception e) {
             log.error("[CONSTANCIA] Error generando PDF para solicitud {}: {}", solicitudId, e.getMessage());
             throw new IllegalStateException("No se pudo generar el certificado PDF. Intenta de nuevo en unos minutos.");
@@ -181,17 +191,47 @@ public class CertificadoService {
         }
     }
 
+    private byte[] generarPdfConstancia(TipoCertificado tipo, SolicitudCertificado s, Usuario estudiante) throws Exception {
+        if (tipo.getPlantillaHtml() != null && !tipo.getPlantillaHtml().isBlank()) {
+            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", new Locale("es", "CO"));
+            String fechaExpedicion = LocalDate.now().format(fmt);
+            String codigoVerif = "UFPS-CERT-" + s.getId() + "-"
+                    + s.getCedula().substring(Math.max(0, s.getCedula().length() - 4));
+            Map<String, String> vars = new LinkedHashMap<>();
+            vars.put("nombre_completo", estudiante != null ? estudiante.getNombre() : "—");
+            vars.put("cedula", s.getCedula());
+            vars.put("codigo_estudiantil", estudiante != null ? estudiante.getCodigo() : "—");
+            vars.put("programa", estudiante != null && estudiante.getProgramaAcademico() != null
+                    ? estudiante.getProgramaAcademico().getNombre() : "—");
+            vars.put("tipo_certificado", tipo.getLabel());
+            vars.put("fecha_expedicion", fechaExpedicion);
+            vars.put("fecha_aprobacion", fechaExpedicion);
+            vars.put("numero_solicitud", String.valueOf(s.getId()));
+            vars.put("codigo_verificacion", codigoVerif);
+            vars.put("dependencia", tipo.getDependenciaNombre() != null ? tipo.getDependenciaNombre() : "—");
+            String html = plantillaService.aplicarVariables(tipo.getPlantillaHtml(), vars);
+            return plantillaService.renderizarPdf(html);
+        }
+        return pdfService.generar(tipo, s, estudiante);
+    }
+
     // ── 4) DESCARGA DEL PDF ───────────────────────────────────────────────────
 
-    public byte[] descargarPdf(Long solicitudId, String cedulaSolicitante) {
+    /**
+     * Descarga el PDF de la solicitud. Acepta tanto al dueño (estudiante por cédula)
+     * como a la dependencia encargada (por id de Dependencia). Un caller solo
+     * llenará uno de los dos parámetros según su rol; el otro será null.
+     */
+    public byte[] descargarPdf(Long solicitudId, String cedulaEstudianteActor, Long dependenciaIdActor) {
         SolicitudCertificado s = certificadoRepository.findById(solicitudId)
             .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
 
-        boolean esDueno = cedulaSolicitante != null && cedulaSolicitante.equals(s.getCedula());
+        boolean esDueno = cedulaEstudianteActor != null && cedulaEstudianteActor.equals(s.getCedula());
         boolean esDependenciaEncargada = false;
         TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(s.getTipoCertificado()).orElse(null);
-        if (tipo != null && tipo.getDependenciaCedula() != null
-                && tipo.getDependenciaCedula().equals(cedulaSolicitante)) {
+        if (tipo != null && tipo.getDependencia() != null
+                && dependenciaIdActor != null
+                && tipo.getDependencia().getId().equals(dependenciaIdActor)) {
             esDependenciaEncargada = true;
         }
         if (!esDueno && !esDependenciaEncargada) {
@@ -208,7 +248,7 @@ public class CertificadoService {
         }
 
         // Fallback: regenerar el PDF al vuelo si storage no devolvió nada.
-        Usuario estudiante = usuarioRepository.findById(s.getCedula()).orElse(null);
+        Usuario estudiante = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
         try {
             return pdfService.generar(tipo, s, estudiante);
         } catch (Exception e) {
@@ -222,23 +262,23 @@ public class CertificadoService {
 
     // ── 5) FLUJO DE LA DEPENDENCIA (FÍSICOS) ─────────────────────────────────
 
-    public List<Map<String, Object>> obtenerPorDependencia(String cedulaDependencia, String estadoFiltro) {
+    public List<Map<String, Object>> obtenerPorDependencia(Long dependenciaId, String estadoFiltro) {
         List<SolicitudCertificado> solicitudes =
-            certificadoRepository.findByDependencia(cedulaDependencia, estadoFiltro);
+            certificadoRepository.findByDependencia(dependenciaId, estadoFiltro);
         List<Map<String, Object>> resultado = new ArrayList<>();
         for (SolicitudCertificado s : solicitudes) {
-            Usuario estudiante = usuarioRepository.findById(s.getCedula()).orElse(null);
+            Usuario estudiante = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
             TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(s.getTipoCertificado()).orElse(null);
             resultado.add(construirRespuesta(s, estudiante, tipo));
         }
         return resultado;
     }
 
-    public Map<String, Object> marcarListoRetiro(Long solicitudId, String cedulaDependencia) {
+    public Map<String, Object> marcarListoRetiro(Long solicitudId, Long dependenciaId) {
         SolicitudCertificado s = certificadoRepository.findById(solicitudId)
             .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
         TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(s.getTipoCertificado()).orElse(null);
-        validarDependenciaEncargada(tipo, cedulaDependencia);
+        validarDependenciaEncargada(tipo, dependenciaId);
 
         if (!"FISICA".equals(s.getModalidadEnvio())) {
             throw new IllegalStateException("Esta solicitud no es de modalidad física.");
@@ -251,7 +291,7 @@ public class CertificadoService {
         s.setObservaciones("Documento físico listo para retiro en oficina.");
         certificadoRepository.save(s);
 
-        Usuario estudiante = usuarioRepository.findById(s.getCedula()).orElse(null);
+        Usuario estudiante = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
         try {
             correoService.enviarAvisoListoRetiro(estudiante, tipo, s);
         } catch (Exception e) {
@@ -260,11 +300,11 @@ public class CertificadoService {
         return construirRespuesta(s, estudiante, tipo);
     }
 
-    public Map<String, Object> marcarEntregado(Long solicitudId, String cedulaDependencia) {
+    public Map<String, Object> marcarEntregado(Long solicitudId, Long dependenciaId) {
         SolicitudCertificado s = certificadoRepository.findById(solicitudId)
             .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
         TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(s.getTipoCertificado()).orElse(null);
-        validarDependenciaEncargada(tipo, cedulaDependencia);
+        validarDependenciaEncargada(tipo, dependenciaId);
 
         if (!"LISTO_RETIRO".equals(s.getEstado())) {
             throw new IllegalStateException(
@@ -275,15 +315,15 @@ public class CertificadoService {
         s.setObservaciones("Documento físico entregado al estudiante.");
         certificadoRepository.save(s);
 
-        Usuario estudiante = usuarioRepository.findById(s.getCedula()).orElse(null);
+        Usuario estudiante = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
         return construirRespuesta(s, estudiante, tipo);
     }
 
-    private void validarDependenciaEncargada(TipoCertificado tipo, String cedulaDependencia) {
-        if (tipo == null || tipo.getDependenciaCedula() == null) {
+    private void validarDependenciaEncargada(TipoCertificado tipo, Long dependenciaId) {
+        if (tipo == null || tipo.getDependencia() == null) {
             throw new IllegalStateException("El tipo de certificado no tiene dependencia asignada.");
         }
-        if (!tipo.getDependenciaCedula().equals(cedulaDependencia)) {
+        if (!tipo.getDependencia().getId().equals(dependenciaId)) {
             throw new IllegalStateException("Esta dependencia no es responsable de este tipo de certificado.");
         }
     }
@@ -316,7 +356,8 @@ public class CertificadoService {
             t.put("descripcion", tipo.getDescripcion());
             t.put("precioDigital", tipo.getPrecioDigital());
             t.put("costoLogisticaFisica", tipo.getCostoLogisticaFisica());
-            t.put("dependenciaCedula", tipo.getDependenciaCedula());
+            t.put("dependenciaId",     tipo.getDependenciaId());
+            t.put("dependenciaNombre", tipo.getDependenciaNombre());
             t.put("direccionOficina", tipo.getDireccionOficina());
             t.put("tiempoEntregaDias", tipo.getTiempoEntregaDias());
             map.put("tipo", t);
