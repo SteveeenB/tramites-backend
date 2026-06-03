@@ -15,7 +15,9 @@ import org.springframework.stereotype.Service;
 
 import com.ufps.tramites.model.Pago;
 import com.ufps.tramites.model.Solicitud;
+import com.ufps.tramites.model.SolicitudCertificado;
 import com.ufps.tramites.repository.PagoRepository;
+import com.ufps.tramites.repository.SolicitudCertificadoRepository;
 import com.ufps.tramites.repository.SolicitudRepository;
 
 @Service
@@ -45,7 +47,13 @@ public class WompiService {
     private SolicitudRepository solicitudRepository;
 
     @Autowired
+    private SolicitudCertificadoRepository certificadoRepository;
+
+    @Autowired
     private SolicitudService solicitudService;
+
+    @Autowired
+    private CertificadoService certificadoService;
 
     // ─────────────────────────────────────────────────────────────────────
     // CREAR PAGO
@@ -97,6 +105,56 @@ public class WompiService {
                 + "&reference=" + referencia
                 + "&signature:integrity=" + firma
             + "&redirect-url=" + URLEncoder.encode(redirectConRef, StandardCharsets.UTF_8)
+                + "&customer-data:email=" + URLEncoder.encode(cedula + "@estudiante.ufps.edu.co", StandardCharsets.UTF_8);
+
+        return Map.of(
+                "referencia", referencia,
+                "checkoutUrl", url,
+                "monto", montoCOP,
+                "montoCentavos", montoCentavos
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // CREAR PAGO CERTIFICADO
+    // ─────────────────────────────────────────────────────────────────────
+    public Map<String, Object> crearPagoCertificado(Long certId, String cedula) {
+        SolicitudCertificado cert = certificadoRepository.findById(certId)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud de certificado no encontrada"));
+
+        if (!"PENDIENTE_PAGO".equals(cert.getEstado()))
+            throw new IllegalStateException("El certificado no está pendiente de pago. Estado: " + cert.getEstado());
+
+        long montoCOP = cert.getCosto() != null ? cert.getCosto().longValue() : 0L;
+        long montoCentavos = montoCOP * 100L;
+
+        String referencia = "UFPS-CER-" + certId
+                + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+
+        Pago pago = new Pago();
+        pago.setReferencia(referencia);
+        pago.setSolicitudId(certId);
+        pago.setCedulaEstudiante(cedula);
+        pago.setTipoPago("CERTIFICADO");
+        pago.setMontoCentavos(montoCentavos);
+        pago.setEstado("PENDIENTE");
+        String redirectConRef = redirectUrl
+                + (redirectUrl.contains("?") ? "&" : "?")
+                + "reference=" + referencia;
+        pago.setRedirectUrl(redirectConRef);
+        pago.setFechaCreacion(LocalDateTime.now());
+        pago.setFechaActualizacion(LocalDateTime.now());
+        pagoRepository.save(pago);
+
+        String firma = generarFirmaIntegridad(referencia, montoCentavos, "COP");
+
+        String url = checkoutUrl
+                + "?public-key=" + publicKey
+                + "&currency=COP"
+                + "&amount-in-cents=" + montoCentavos
+                + "&reference=" + referencia
+                + "&signature:integrity=" + firma
+                + "&redirect-url=" + URLEncoder.encode(redirectConRef, StandardCharsets.UTF_8)
                 + "&customer-data:email=" + URLEncoder.encode(cedula + "@estudiante.ufps.edu.co", StandardCharsets.UTF_8);
 
         return Map.of(
@@ -266,6 +324,8 @@ public class WompiService {
                     solicitudService.registrarPagoGrado(pago.getSolicitudId());
                 case "MODALIDAD_CEREMONIA" ->
                     solicitudService.registrarPagoModalidad(pago.getSolicitudId());
+                case "CERTIFICADO" ->
+                    certificadoService.registrarPagoCertificado(pago.getSolicitudId());
             }
         } catch (Exception e) {
             log.error("[WOMPI] Error actualizando solicitud {} tras pago: {}",
