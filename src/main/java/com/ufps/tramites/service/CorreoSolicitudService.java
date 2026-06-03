@@ -6,16 +6,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
 
 /**
- * Envía correos transaccionales para los eventos del flujo de solicitudes:
- * nueva solicitud, aprobación, rechazo y confirmación de pago.
- * Todos los métodos son seguros ante fallos: si el envío falla, solo loguean
- * el error sin interrumpir el flujo del trámite.
+ * Envía correos transaccionales para los eventos del flujo de solicitudes.
+ * Todos los métodos públicos son @Async para no bloquear el hilo del request.
  */
 @Service
 public class CorreoSolicitudService {
@@ -30,6 +29,7 @@ public class CorreoSolicitudService {
 
     // ── Correos al director ───────────────────────────────────────────────────
 
+    @Async
     public void notificarDirectorNuevaSolicitud(Solicitud s, String correoDirector) {
         if (correoDirector == null || correoDirector.isBlank()) return;
         String tipo = labelTipo(s);
@@ -50,6 +50,7 @@ public class CorreoSolicitudService {
 
     // ── Correos al estudiante ─────────────────────────────────────────────────
 
+    @Async
     public void notificarEstudianteAprobacion(Solicitud s, Usuario estudiante) {
         if (estudiante == null || estudiante.getCorreo() == null) return;
         String tipo = labelTipo(s);
@@ -71,6 +72,7 @@ public class CorreoSolicitudService {
         enviar(estudiante.getCorreo(), asunto, cuerpo);
     }
 
+    @Async
     public void notificarEstudianteRechazo(Solicitud s, Usuario estudiante) {
         if (estudiante == null || estudiante.getCorreo() == null) return;
         String tipo = labelTipo(s);
@@ -90,6 +92,7 @@ public class CorreoSolicitudService {
         enviar(estudiante.getCorreo(), asunto, cuerpo);
     }
 
+    @Async
     public void notificarEstudiantePagoConfirmado(Solicitud s, Usuario estudiante) {
         if (estudiante == null || estudiante.getCorreo() == null) return;
         String tipo = "TERMINACION_MATERIAS".equals(s.getTipo())
