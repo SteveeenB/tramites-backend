@@ -76,6 +76,9 @@ INSERT IGNORE INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id,
     (SELECT id FROM roles WHERE nombre = 'POSGRADOS' LIMIT 1),
     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1));
 
+-- Asignar correo real al director de Maestría en Gerencia de Empresas
+UPDATE usuario SET email = 'steven.bueno.06.604@gmail.com' WHERE cedula = '1098765433';
+
 INSERT IGNORE INTO solicitud (cedula, tipo, estado, fecha_solicitud, costo, observaciones) VALUES
 ('1098765435', 'TERMINACION_MATERIAS', 'APROBADA',       '2026-04-10', 150000, 'Aprobada por el director.'),
 ('1098765436', 'TERMINACION_MATERIAS', 'PENDIENTE_PAGO', '2026-04-12', 150000, 'En espera de pago.'),
