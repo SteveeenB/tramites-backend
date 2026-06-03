@@ -3,6 +3,7 @@ package com.ufps.tramites.service;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.net.URLEncoder;
 import java.util.Map;
 import java.util.UUID;
 
@@ -77,7 +78,10 @@ public class WompiService {
         pago.setTipoPago(tipoPago);
         pago.setMontoCentavos(montoCentavos);
         pago.setEstado("PENDIENTE");
-        pago.setRedirectUrl(redirectUrl);
+        String redirectConRef = redirectUrl
+            + (redirectUrl.contains("?") ? "&" : "?")
+            + "reference=" + referencia;
+        pago.setRedirectUrl(redirectConRef);
         pago.setFechaCreacion(LocalDateTime.now());
         pago.setFechaActualizacion(LocalDateTime.now());
         pagoRepository.save(pago);
@@ -92,8 +96,8 @@ public class WompiService {
                 + "&amount-in-cents=" + montoCentavos
                 + "&reference=" + referencia
                 + "&signature:integrity=" + firma
-                + "&redirect-url=" + redirectUrl
-                + "&customer-data:email=" + cedula + "@estudiante.ufps.edu.co";
+            + "&redirect-url=" + URLEncoder.encode(redirectConRef, StandardCharsets.UTF_8)
+                + "&customer-data:email=" + URLEncoder.encode(cedula + "@estudiante.ufps.edu.co", StandardCharsets.UTF_8);
 
         return Map.of(
                 "referencia", referencia,
