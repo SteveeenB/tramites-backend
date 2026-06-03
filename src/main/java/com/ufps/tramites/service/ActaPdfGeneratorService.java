@@ -26,9 +26,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class ActaPdfGeneratorService {
 
-    private static final DeviceRgb COLOR_UFPS    = new DeviceRgb(0, 71, 133);
-    private static final DeviceRgb COLOR_FILA    = new DeviceRgb(235, 242, 252);
-    private static final DeviceRgb COLOR_BORDE   = new DeviceRgb(180, 200, 225);
+    private static final DeviceRgb COLOR_ROJO  = new DeviceRgb(188, 0, 23);   // #BC0017
+    private static final DeviceRgb COLOR_NEGRO = new DeviceRgb(0, 0, 0);      // #000000
+    private static final DeviceRgb COLOR_GRIS  = new DeviceRgb(129, 131, 134); // #818386
+    private static final DeviceRgb COLOR_FILA  = new DeviceRgb(245, 245, 245); // gris claro filas
 
     /**
      * Genera el PDF del acta de grado.
@@ -74,7 +75,7 @@ public class ActaPdfGeneratorService {
                 .add(new Paragraph("Vicerrectoría Académica · Sección de Posgrados")
                         .setFontColor(ColorConstants.WHITE).setFontSize(10)
                         .setTextAlignment(TextAlignment.CENTER))
-                .setBackgroundColor(COLOR_UFPS)
+                .setBackgroundColor(COLOR_ROJO)
                 .setBorder(Border.NO_BORDER)
                 .setPadding(14);
 
@@ -88,13 +89,13 @@ public class ActaPdfGeneratorService {
                 .setWidth(UnitValue.createPercentValue(100))
                 .setMarginBottom(0);
         sep.addCell(new Cell().setHeight(3)
-                .setBackgroundColor(new DeviceRgb(200, 160, 0))
+                .setBackgroundColor(COLOR_NEGRO)
                 .setBorder(Border.NO_BORDER));
         doc.add(sep);
 
         doc.add(new Paragraph("ACTA DE GRADO")
                 .setBold().setFontSize(22)
-                .setFontColor(COLOR_UFPS)
+                .setFontColor(COLOR_ROJO)
                 .setTextAlignment(TextAlignment.CENTER)
                 .setMarginTop(24).setMarginBottom(20));
     }
@@ -129,7 +130,7 @@ public class ActaPdfGeneratorService {
     }
 
     private void agregarFila(Table tabla, String etiqueta, String valor) {
-        SolidBorder borde = new SolidBorder(COLOR_BORDE, 0.5f);
+        SolidBorder borde = new SolidBorder(COLOR_GRIS, 0.5f);
 
         tabla.addCell(new Cell()
                 .add(new Paragraph(etiqueta).setBold().setFontSize(10))
