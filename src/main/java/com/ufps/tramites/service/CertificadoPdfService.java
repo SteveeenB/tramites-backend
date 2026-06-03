@@ -77,7 +77,7 @@ public class CertificadoPdfService {
                 .add(new Paragraph("UNIVERSIDAD FRANCISCO DE PAULA SANTANDER")
                         .setFontColor(ColorConstants.WHITE).setBold().setFontSize(14)
                         .setTextAlignment(TextAlignment.CENTER).setMarginBottom(2))
-                .add(new Paragraph("Vicerrectoría Académica · Sección de Posgrados")
+                .add(new Paragraph("Vicerrectoría Académica · Oficina de Posgrados")
                         .setFontColor(ColorConstants.WHITE).setFontSize(10)
                         .setTextAlignment(TextAlignment.CENTER))
                 .setBackgroundColor(COLOR_ROJO)
@@ -110,7 +110,7 @@ public class CertificadoPdfService {
                 + "académicos establecidos por la institución para la Terminación de Materias del "
                 + "programa de posgrado, según resolución aprobada el " + fechaAprobacion
                 + ". Este certificado lo habilita para continuar con las siguientes etapas del "
-                + "proceso de grado ante la Sección de Posgrados.")
+                + "proceso de grado ante la Oficina de Posgrados.")
                 .setFontSize(11)
                 .setTextAlignment(TextAlignment.JUSTIFIED)
                 .setMarginBottom(18));
