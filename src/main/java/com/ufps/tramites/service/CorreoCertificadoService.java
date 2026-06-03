@@ -32,15 +32,15 @@ public class CorreoCertificadoService {
         String asunto = "[UFPS Posgrados] Tu certificado de Terminación de Materias";
         String cuerpo = "Estimado/a " + nombre + ",\n\n"
             + "Nos complace informarte que tu solicitud de Terminación de Materias ha sido "
-            + "aprobada por la Sección de Posgrados de la Universidad Francisco de Paula Santander.\n\n"
+            + "aprobada por la Oficina de Posgrados de la Universidad Francisco de Paula Santander.\n\n"
             + "Adjunto a este correo encontrarás tu certificado oficial en formato PDF. "
             + "El documento incluye un código QR y un código de verificación para validar "
             + "su autenticidad ante terceros.\n\n"
             + "Número de solicitud: " + solicitudId + "\n\n"
             + "Este certificado te habilita para continuar con el proceso de grado. "
-            + "Si tienes alguna inquietud, comunícate con la Sección de Posgrados.\n\n"
+            + "Si tienes alguna inquietud, comunícate con la Oficina de Posgrados.\n\n"
             + "Atentamente,\n"
-            + "Sección de Posgrados\n"
+            + "Oficina de Posgrados\n"
             + "Universidad Francisco de Paula Santander (UFPS)\n"
             + "San José de Cúcuta, Colombia";
 
