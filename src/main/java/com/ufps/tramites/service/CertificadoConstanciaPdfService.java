@@ -178,7 +178,7 @@ public class CertificadoConstanciaPdfService {
             Image qrImg = new Image(ImageDataFactory.create(qrBytes)).setWidth(80).setHeight(80);
             celdaQr.add(qrImg);
         } catch (Exception e) {
-            celdaQr.add(new Paragraph("[QR]").setFontSize(8).setFontColor(ColorConstants.GRAY));
+            celdaQr.add(new Paragraph("[QR]").setFontSize(8).setFontColor(COLOR_GRIS));
         }
         verif.addCell(celdaQr);
 
@@ -187,11 +187,11 @@ public class CertificadoConstanciaPdfService {
                         .setFontColor(COLOR_ROJO).setMarginBottom(3))
                 .add(new Paragraph("Escanea el código QR o ingresa el siguiente código en el portal "
                         + "de trámites de la UFPS para verificar la autenticidad de este certificado.")
-                        .setFontSize(9).setFontColor(ColorConstants.DARK_GRAY).setMarginBottom(5))
+                        .setFontSize(9).setFontColor(COLOR_GRIS).setMarginBottom(5))
                 .add(new Paragraph("Código: " + codigoVerif)
                         .setBold().setFontSize(10).setFontColor(COLOR_ROJO))
                 .add(new Paragraph("Expedido el: " + fechaExpedicion)
-                        .setFontSize(9).setFontColor(ColorConstants.GRAY).setMarginTop(3))
+                        .setFontSize(9).setFontColor(COLOR_GRIS).setMarginTop(3))
                 .setBorder(Border.NO_BORDER)
                 .setPadding(4);
         verif.addCell(celdaTexto);
@@ -216,7 +216,7 @@ public class CertificadoConstanciaPdfService {
                         .setTextAlignment(TextAlignment.CENTER))
                 .add(new Paragraph("Universidad Francisco de Paula Santander")
                         .setFontSize(8).setTextAlignment(TextAlignment.CENTER)
-                        .setFontColor(ColorConstants.GRAY))
+                        .setFontColor(COLOR_GRIS))
                 .setBorder(Border.NO_BORDER).setPaddingTop(6);
     }
 
