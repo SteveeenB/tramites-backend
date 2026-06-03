@@ -150,8 +150,14 @@ public class WompiService {
             String referencia = (String) transaction.get("reference");
             String checksum = (String) signature.get("checksum");
 
+            // Wompi incluye el timestamp del evento en el hash de la firma
+            Object tsObj = evento.get("timestamp");
+            long timestamp = tsObj instanceof Integer
+                    ? ((Integer) tsObj).longValue()
+                    : tsObj instanceof Long ? (Long) tsObj : 0L;
+
             // Verificar firma del webhook
-            if (!verificarFirmaWebhook(transactionId, status, amountInCents, checksum)) {
+            if (!verificarFirmaWebhook(transactionId, status, amountInCents, timestamp, checksum)) {
                 log.warn("[WOMPI] Firma inválida para transacción {}", transactionId);
                 return;
             }
@@ -214,19 +220,22 @@ public class WompiService {
     }
 
     /**
-     * SHA256(transactionId + status + amountInCents + eventsSecret)
+     * SHA256(transactionId + status + amountInCents + timestamp + eventsSecret)
      */
     private boolean verificarFirmaWebhook(String transactionId, String status,
-            long amountInCents, String checksum) {
+            long amountInCents, long timestamp, String checksum) {
         try {
-            String datos = transactionId + status + amountInCents + eventsSecret;
+            String datos = transactionId + status + amountInCents + timestamp + eventsSecret;
+            log.info("[WOMPI] Webhook firma input: '{}'", datos);
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(datos.getBytes(StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder();
             for (byte b : hash) {
                 sb.append(String.format("%02x", b));
             }
-            return sb.toString().equals(checksum);
+            String calculado = sb.toString();
+            log.info("[WOMPI] Webhook firma calculada: '{}' | recibida: '{}'", calculado, checksum);
+            return calculado.equals(checksum);
         } catch (Exception e) {
             log.error("[WOMPI] Error verificando firma webhook: {}", e.getMessage());
             return false;
