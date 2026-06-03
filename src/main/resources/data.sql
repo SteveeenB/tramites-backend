@@ -143,6 +143,8 @@ INSERT IGNORE INTO solicitud (cedula, tipo, estado, fecha_solicitud, costo, obse
 ('2000000010', 'TERMINACION_MATERIAS', 'APROBADA', '2026-04-15', 150000, 'Aprobada por el director.');
 
 -- ── Tipos de certificado ──────────────────────────────────────────────
+-- precio_digital      = precio base del documento
+-- costo_logistica_fisica = delta adicional cuando se elige modalidad física (impresión + sello + manejo)
 
 INSERT IGNORE INTO tipo_certificado (codigo, label, descripcion, precio_digital, costo_logistica_fisica,
                                      tiempo_entrega_dias, activo)
@@ -161,13 +163,13 @@ INSERT INTO tipo_certificado (codigo, label, descripcion, precio_digital, costo_
 ('CONSTANCIA_BUENA_CONDUCTA', 'CONSTANCIA BUENA CONDUCTA POSGRADO',
     'Constancia de comportamiento disciplinario y académico del estudiante.',
     7200, 3800, 'Bloque A - Oficina Admisiones y Registro', 3, true)
-ON DUPLICATE KEY UPDATE
-    label                  = VALUES(label),
-    descripcion            = VALUES(descripcion),
-    precio_digital         = VALUES(precio_digital),
-    costo_logistica_fisica = VALUES(costo_logistica_fisica),
-    direccion_oficina      = VALUES(direccion_oficina),
-    tiempo_entrega_dias    = VALUES(tiempo_entrega_dias);
+ON CONFLICT (codigo) DO UPDATE SET
+    label                  = EXCLUDED.label,
+    descripcion            = EXCLUDED.descripcion,
+    precio_digital         = EXCLUDED.precio_digital,
+    costo_logistica_fisica = EXCLUDED.costo_logistica_fisica,
+    direccion_oficina      = EXCLUDED.direccion_oficina,
+    tiempo_entrega_dias    = EXCLUDED.tiempo_entrega_dias;
 
 -- ============================================================
 -- Perfiles de Estudiante (después de usuario por el FK usuario_id)
@@ -176,9 +178,9 @@ ON DUPLICATE KEY UPDATE
 INSERT IGNORE INTO estudiante (nombre, apellido, cedula, codigo, email, es_posgrado, migrado,
     creditos_aprobados, programa_id, usuario_id)
 VALUES
-    ('Juan',   'Perez',    '1098765432', '20261001', 'juan@example.com',      true, false, 40,
-     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1),
-     (SELECT id FROM usuario WHERE cedula = '1098765432' LIMIT 1)),
+    ('Juan',   'Perez',    '1098765432', '20261001', 'raulbaezjxd123@gmail.com',      true, false, 40,
+     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas'),
+     (SELECT id FROM usuario WHERE cedula = '1098765432')),
     ('Laura',  'Gomez',    '1098765435', '20261005', 'laura@example.com',     true, false, 56,
      (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1),
      (SELECT id FROM usuario WHERE cedula = '1098765435' LIMIT 1)),
