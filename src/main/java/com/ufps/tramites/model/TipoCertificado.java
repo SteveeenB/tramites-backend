@@ -5,8 +5,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
@@ -23,10 +21,6 @@ public class TipoCertificado {
 
     private Double precioDigital;
     private Double costoLogisticaFisica;
-
-    @ManyToOne
-    @JoinColumn(name = "dependencia_id")
-    private Dependencia dependencia;
 
     private String direccionOficina;
     private Integer tiempoEntregaDias;
@@ -55,17 +49,6 @@ public class TipoCertificado {
 
     public Double getCostoLogisticaFisica() { return costoLogisticaFisica; }
     public void setCostoLogisticaFisica(Double costoLogisticaFisica) { this.costoLogisticaFisica = costoLogisticaFisica; }
-
-    public Dependencia getDependencia() { return dependencia; }
-    public void setDependencia(Dependencia dependencia) { this.dependencia = dependencia; }
-
-    public Long getDependenciaId() {
-        return dependencia != null ? dependencia.getId() : null;
-    }
-
-    public String getDependenciaNombre() {
-        return dependencia != null ? dependencia.getNombre() : null;
-    }
 
     public String getDireccionOficina() { return direccionOficina; }
     public void setDireccionOficina(String direccionOficina) { this.direccionOficina = direccionOficina; }

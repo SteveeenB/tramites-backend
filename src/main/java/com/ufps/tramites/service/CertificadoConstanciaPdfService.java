@@ -84,7 +84,7 @@ public class CertificadoConstanciaPdfService {
                 .add(new Paragraph("UNIVERSIDAD FRANCISCO DE PAULA SANTANDER")
                         .setFontColor(ColorConstants.WHITE).setBold().setFontSize(14)
                         .setTextAlignment(TextAlignment.CENTER).setMarginBottom(2))
-                .add(new Paragraph("Vicerrectoría Académica · Sección de Posgrados")
+                .add(new Paragraph("Vicerrectoría Académica · Oficina de Posgrados")
                         .setFontColor(ColorConstants.WHITE).setFontSize(10)
                         .setTextAlignment(TextAlignment.CENTER))
                 .setBackgroundColor(COLOR_ROJO)
@@ -118,7 +118,7 @@ public class CertificadoConstanciaPdfService {
                 ? estudiante.getProgramaAcademico().getNombre()
                 : "—";
 
-        String texto = "La Sección de Posgrados de la Universidad Francisco de Paula Santander hace constar que el/la "
+        String texto = "La Oficina de Posgrados de la Universidad Francisco de Paula Santander hace constar que el/la "
                 + "estudiante identificado(a) con los datos relacionados a continuación se encuentra registrado(a) "
                 + "en el programa de " + programa + ". "
                 + descripcion + " "
