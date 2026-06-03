@@ -84,6 +84,9 @@ public class SolicitudService {
     @Autowired
     private CorreoCertificadoService correoService;
 
+    @Autowired
+    private CorreoSolicitudService correoSolicitudService;
+
     /**
      * Crea una solicitud de terminación de materias. Valida: período de
      * convocatoria, créditos aprobados y duplicados.
@@ -128,6 +131,13 @@ public class SolicitudService {
         solicitudRepository.save(solicitud);
         solicitud.setRadicado(generarRadicado(solicitud));
         solicitudRepository.save(solicitud);
+
+        // Notificar al director del programa
+        if (estudiante.getProgramaAcademico() != null) {
+            usuarioRepository
+                .findByProgramaAcademicoIdAndRol_Nombre(estudiante.getProgramaAcademico().getId(), "DIRECTOR")
+                .forEach(d -> correoSolicitudService.notificarDirectorNuevaSolicitud(solicitud, d.getCorreo()));
+        }
 
         return construirRespuestaSolicitud(solicitud);
     }
@@ -191,6 +201,13 @@ public class SolicitudService {
         // 5. Certificado de inglés es opcional
         if (certificadoIngles != null && !certificadoIngles.isEmpty()) {
             documentoService.guardarDocumento(solicitud.getId(), certificadoIngles, "CERTIFICADO_INGLES");
+        }
+
+        // Notificar al director del programa
+        if (estudiante.getProgramaAcademico() != null) {
+            usuarioRepository
+                .findByProgramaAcademicoIdAndRol_Nombre(estudiante.getProgramaAcademico().getId(), "DIRECTOR")
+                .forEach(d -> correoSolicitudService.notificarDirectorNuevaSolicitud(solicitud, d.getCorreo()));
         }
 
         return construirRespuestaSolicitud(solicitud);
@@ -350,6 +367,8 @@ public class SolicitudService {
         solicitudRepository.save(s);
 
         notificarEstudiante(s, estadoAnterior);
+        usuarioRepository.findByCedula(s.getCedula())
+                .ifPresent(est -> correoSolicitudService.notificarEstudianteAprobacion(s, est));
 
         // Si es solicitud de GRADO: marcar estado del estudiante e iniciar paz y salvo
         if ("GRADO".equals(s.getTipo())) {
@@ -391,6 +410,8 @@ public class SolicitudService {
         solicitudRepository.save(s);
 
         notificarEstudiante(s, estadoAnterior);
+        usuarioRepository.findByCedula(s.getCedula())
+                .ifPresent(est -> correoSolicitudService.notificarEstudianteRechazo(s, est));
         return construirRespuestaSolicitud(s);
     }
 
