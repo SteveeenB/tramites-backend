@@ -33,9 +33,10 @@ import java.util.Map;
 @Service
 public class CertificadoPdfService {
 
-    private static final DeviceRgb COLOR_UFPS  = new DeviceRgb(0, 71, 133);
-    private static final DeviceRgb COLOR_FILA  = new DeviceRgb(235, 242, 252);
-    private static final DeviceRgb COLOR_BORDE = new DeviceRgb(180, 200, 225);
+    private static final DeviceRgb COLOR_ROJO  = new DeviceRgb(188, 0, 23);    // #BC0017
+    private static final DeviceRgb COLOR_NEGRO = new DeviceRgb(0, 0, 0);       // #000000
+    private static final DeviceRgb COLOR_GRIS  = new DeviceRgb(129, 131, 134); // #818386
+    private static final DeviceRgb COLOR_FILA  = new DeviceRgb(245, 245, 245); // gris claro filas
 
     /**
      * Genera el PDF del certificado de terminación de materias con QR de verificación.
@@ -79,7 +80,7 @@ public class CertificadoPdfService {
                 .add(new Paragraph("Vicerrectoría Académica · Sección de Posgrados")
                         .setFontColor(ColorConstants.WHITE).setFontSize(10)
                         .setTextAlignment(TextAlignment.CENTER))
-                .setBackgroundColor(COLOR_UFPS)
+                .setBackgroundColor(COLOR_ROJO)
                 .setBorder(Border.NO_BORDER)
                 .setPadding(14);
         header.addCell(celda);
@@ -89,7 +90,7 @@ public class CertificadoPdfService {
         Table sep = new Table(UnitValue.createPercentArray(new float[]{100}))
                 .setWidth(UnitValue.createPercentValue(100)).setMarginBottom(0);
         sep.addCell(new Cell().setHeight(3)
-                .setBackgroundColor(new DeviceRgb(200, 160, 0))
+                .setBackgroundColor(COLOR_NEGRO)
                 .setBorder(Border.NO_BORDER));
         doc.add(sep);
     }
@@ -97,7 +98,7 @@ public class CertificadoPdfService {
     private void agregarTitulo(Document doc) {
         doc.add(new Paragraph("CERTIFICADO DE TERMINACIÓN DE MATERIAS")
                 .setBold().setFontSize(20)
-                .setFontColor(COLOR_UFPS)
+                .setFontColor(COLOR_ROJO)
                 .setTextAlignment(TextAlignment.CENTER)
                 .setMarginTop(24).setMarginBottom(20));
     }
@@ -132,7 +133,7 @@ public class CertificadoPdfService {
     }
 
     private void agregarFila(Table tabla, String etiqueta, String valor) {
-        SolidBorder borde = new SolidBorder(COLOR_BORDE, 0.5f);
+        SolidBorder borde = new SolidBorder(COLOR_GRIS, 0.5f);
         tabla.addCell(new Cell()
                 .add(new Paragraph(etiqueta).setBold().setFontSize(10))
                 .setBackgroundColor(COLOR_FILA).setBorder(borde).setPadding(7));
@@ -168,12 +169,12 @@ public class CertificadoPdfService {
         // Celda texto de verificación
         Cell celdaTexto = new Cell()
                 .add(new Paragraph("Verificación de autenticidad").setBold().setFontSize(10)
-                        .setFontColor(COLOR_UFPS).setMarginBottom(3))
+                        .setFontColor(COLOR_ROJO).setMarginBottom(3))
                 .add(new Paragraph("Escanea el código QR o ingresa el siguiente código en el portal "
                         + "de trámites de la UFPS para verificar la autenticidad de este certificado.")
                         .setFontSize(9).setFontColor(ColorConstants.DARK_GRAY).setMarginBottom(5))
                 .add(new Paragraph("Código: " + codigoVerif)
-                        .setBold().setFontSize(10).setFontColor(COLOR_UFPS))
+                        .setBold().setFontSize(10).setFontColor(COLOR_ROJO))
                 .add(new Paragraph("Expedido el: " + fechaExpedicion)
                         .setFontSize(9).setFontColor(ColorConstants.GRAY).setMarginTop(3))
                 .setBorder(Border.NO_BORDER)
