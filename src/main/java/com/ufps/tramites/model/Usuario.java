@@ -31,6 +31,10 @@ public class Usuario {
     private String nombreCompleto;
 
     private String email;
+
+    @Column(name = "correo")
+    private String correo;
+
     @Column(name = "contrasena")
     private String password;
 
@@ -97,8 +101,10 @@ public class Usuario {
     public ProgramaAcademico getProgramaAcademico() { return programaAcademico; }
     public void setProgramaAcademico(ProgramaAcademico programaAcademico) { this.programaAcademico = programaAcademico; }
 
+    public void setCorreo(String correo) { this.correo = correo; }
+
     // Helpers para compatibilidad interna con código existente
     public String getNombre() { return nombreCompleto; }
-    public String getCorreo() { return email; }
+    public String getCorreo() { return correo != null && !correo.isBlank() ? correo : email; }
     public String getRolNombre() { return rol != null ? rol.getNombre() : null; }
 }

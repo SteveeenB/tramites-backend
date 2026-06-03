@@ -72,13 +72,14 @@ public class CertificadoController {
         }
     }
 
-    @PreAuthorize("hasAnyRole('ESTUDIANTE', 'DEPENDENCIA')")
+    @PreAuthorize("hasAnyRole('ESTUDIANTE', 'POSGRADOS')")
     @GetMapping("/{id}/pdf")
     public ResponseEntity<?> descargarPdf(@PathVariable Long id, Authentication auth) {
         ResolvedPrincipal p = principalResolver.resolve(auth);
         if (p == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
         try {
-            byte[] bytes = certificadoService.descargarPdf(id, p.cedula(), p.dependenciaId());
+            boolean esPosgrados = "POSGRADOS".equals(p.rol());
+            byte[] bytes = certificadoService.descargarPdf(id, p.cedula(), esPosgrados);
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_PDF);
             headers.setContentDispositionFormData("attachment", "constancia-" + id + ".pdf");
@@ -90,27 +91,25 @@ public class CertificadoController {
         }
     }
 
-    @PreAuthorize("hasRole('DEPENDENCIA')")
-    @GetMapping("/dependencia/{dependenciaId}")
-    public ResponseEntity<?> bandejaDependencia(@PathVariable Long dependenciaId,
-                                                @RequestParam(required = false) String estado,
-                                                Authentication auth) {
+    @PreAuthorize("hasRole('POSGRADOS')")
+    @GetMapping("/posgrados")
+    public ResponseEntity<?> bandejaPosgrados(@RequestParam(required = false) String estado,
+                                              Authentication auth) {
         ResolvedPrincipal p = principalResolver.resolve(auth);
         if (p == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
-        if (p.dependenciaId() == null || !p.dependenciaId().equals(dependenciaId))
+        if (!"POSGRADOS".equals(p.rol()))
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso denegado"));
         String filtro = (estado == null || estado.isBlank() || "TODOS".equalsIgnoreCase(estado)) ? null : estado;
-        return ResponseEntity.ok(certificadoService.obtenerPorDependencia(dependenciaId, filtro));
+        return ResponseEntity.ok(certificadoService.obtenerBandejaPosgrados(filtro));
     }
 
-    @PreAuthorize("hasRole('DEPENDENCIA')")
+    @PreAuthorize("hasRole('POSGRADOS')")
     @PostMapping("/{id}/marcar-listo")
     public ResponseEntity<?> marcarListo(@PathVariable Long id, Authentication auth) {
         ResolvedPrincipal p = principalResolver.resolve(auth);
         if (p == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
-        if (p.dependenciaId() == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Sin dependencia asignada"));
         try {
-            return ResponseEntity.ok(certificadoService.marcarListoRetiro(id, p.dependenciaId()));
+            return ResponseEntity.ok(certificadoService.marcarListoRetiro(id));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
         } catch (IllegalStateException e) {
@@ -118,14 +117,13 @@ public class CertificadoController {
         }
     }
 
-    @PreAuthorize("hasRole('DEPENDENCIA')")
+    @PreAuthorize("hasRole('POSGRADOS')")
     @PostMapping("/{id}/marcar-entregado")
     public ResponseEntity<?> marcarEntregado(@PathVariable Long id, Authentication auth) {
         ResolvedPrincipal p = principalResolver.resolve(auth);
         if (p == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
-        if (p.dependenciaId() == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Sin dependencia asignada"));
         try {
-            return ResponseEntity.ok(certificadoService.marcarEntregado(id, p.dependenciaId()));
+            return ResponseEntity.ok(certificadoService.marcarEntregado(id));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
         } catch (IllegalStateException e) {
