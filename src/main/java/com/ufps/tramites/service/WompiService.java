@@ -3,6 +3,7 @@ package com.ufps.tramites.service;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.net.URLEncoder;
 import java.util.Map;
 import java.util.UUID;
 
@@ -14,8 +15,11 @@ import org.springframework.stereotype.Service;
 
 import com.ufps.tramites.model.Pago;
 import com.ufps.tramites.model.Solicitud;
+import com.ufps.tramites.model.SolicitudCertificado;
 import com.ufps.tramites.repository.PagoRepository;
+import com.ufps.tramites.repository.SolicitudCertificadoRepository;
 import com.ufps.tramites.repository.SolicitudRepository;
+import com.ufps.tramites.repository.UsuarioRepository;
 
 @Service
 public class WompiService {
@@ -44,7 +48,19 @@ public class WompiService {
     private SolicitudRepository solicitudRepository;
 
     @Autowired
+    private SolicitudCertificadoRepository certificadoRepository;
+
+    @Autowired
     private SolicitudService solicitudService;
+
+    @Autowired
+    private CertificadoService certificadoService;
+
+    @Autowired
+    private CorreoSolicitudService correoSolicitudService;
+
+    @Autowired
+    private com.ufps.tramites.repository.UsuarioRepository usuarioRepository;
 
     // ─────────────────────────────────────────────────────────────────────
     // CREAR PAGO
@@ -77,7 +93,10 @@ public class WompiService {
         pago.setTipoPago(tipoPago);
         pago.setMontoCentavos(montoCentavos);
         pago.setEstado("PENDIENTE");
-        pago.setRedirectUrl(redirectUrl);
+        String redirectConRef = redirectUrl
+            + (redirectUrl.contains("?") ? "&" : "?")
+            + "reference=" + referencia;
+        pago.setRedirectUrl(redirectConRef);
         pago.setFechaCreacion(LocalDateTime.now());
         pago.setFechaActualizacion(LocalDateTime.now());
         pagoRepository.save(pago);
@@ -92,8 +111,58 @@ public class WompiService {
                 + "&amount-in-cents=" + montoCentavos
                 + "&reference=" + referencia
                 + "&signature:integrity=" + firma
-                + "&redirect-url=" + redirectUrl
-                + "&customer-data:email=" + cedula + "@estudiante.ufps.edu.co";
+            + "&redirect-url=" + URLEncoder.encode(redirectConRef, StandardCharsets.UTF_8)
+                + "&customer-data:email=" + URLEncoder.encode(cedula + "@estudiante.ufps.edu.co", StandardCharsets.UTF_8);
+
+        return Map.of(
+                "referencia", referencia,
+                "checkoutUrl", url,
+                "monto", montoCOP,
+                "montoCentavos", montoCentavos
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // CREAR PAGO CERTIFICADO
+    // ─────────────────────────────────────────────────────────────────────
+    public Map<String, Object> crearPagoCertificado(Long certId, String cedula) {
+        SolicitudCertificado cert = certificadoRepository.findById(certId)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud de certificado no encontrada"));
+
+        if (!"PENDIENTE_PAGO".equals(cert.getEstado()))
+            throw new IllegalStateException("El certificado no está pendiente de pago. Estado: " + cert.getEstado());
+
+        long montoCOP = cert.getCosto() != null ? cert.getCosto().longValue() : 0L;
+        long montoCentavos = montoCOP * 100L;
+
+        String referencia = "UFPS-CER-" + certId
+                + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+
+        Pago pago = new Pago();
+        pago.setReferencia(referencia);
+        pago.setSolicitudId(certId);
+        pago.setCedulaEstudiante(cedula);
+        pago.setTipoPago("CERTIFICADO");
+        pago.setMontoCentavos(montoCentavos);
+        pago.setEstado("PENDIENTE");
+        String redirectConRef = redirectUrl
+                + (redirectUrl.contains("?") ? "&" : "?")
+                + "reference=" + referencia;
+        pago.setRedirectUrl(redirectConRef);
+        pago.setFechaCreacion(LocalDateTime.now());
+        pago.setFechaActualizacion(LocalDateTime.now());
+        pagoRepository.save(pago);
+
+        String firma = generarFirmaIntegridad(referencia, montoCentavos, "COP");
+
+        String url = checkoutUrl
+                + "?public-key=" + publicKey
+                + "&currency=COP"
+                + "&amount-in-cents=" + montoCentavos
+                + "&reference=" + referencia
+                + "&signature:integrity=" + firma
+                + "&redirect-url=" + URLEncoder.encode(redirectConRef, StandardCharsets.UTF_8)
+                + "&customer-data:email=" + URLEncoder.encode(cedula + "@estudiante.ufps.edu.co", StandardCharsets.UTF_8);
 
         return Map.of(
                 "referencia", referencia,
@@ -146,8 +215,14 @@ public class WompiService {
             String referencia = (String) transaction.get("reference");
             String checksum = (String) signature.get("checksum");
 
+            // Wompi incluye el timestamp del evento en el hash de la firma
+            Object tsObj = evento.get("timestamp");
+            long timestamp = tsObj instanceof Integer
+                    ? ((Integer) tsObj).longValue()
+                    : tsObj instanceof Long ? (Long) tsObj : 0L;
+
             // Verificar firma del webhook
-            if (!verificarFirmaWebhook(transactionId, status, amountInCents, checksum)) {
+            if (!verificarFirmaWebhook(transactionId, status, amountInCents, timestamp, checksum)) {
                 log.warn("[WOMPI] Firma inválida para transacción {}", transactionId);
                 return;
             }
@@ -210,19 +285,22 @@ public class WompiService {
     }
 
     /**
-     * SHA256(transactionId + status + amountInCents + eventsSecret)
+     * SHA256(transactionId + status + amountInCents + timestamp + eventsSecret)
      */
     private boolean verificarFirmaWebhook(String transactionId, String status,
-            long amountInCents, String checksum) {
+            long amountInCents, long timestamp, String checksum) {
         try {
-            String datos = transactionId + status + amountInCents + eventsSecret;
+            String datos = transactionId + status + amountInCents + timestamp + eventsSecret;
+            log.info("[WOMPI] Webhook firma input: '{}'", datos);
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(datos.getBytes(StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder();
             for (byte b : hash) {
                 sb.append(String.format("%02x", b));
             }
-            return sb.toString().equals(checksum);
+            String calculado = sb.toString();
+            log.info("[WOMPI] Webhook firma calculada: '{}' | recibida: '{}'", calculado, checksum);
+            return calculado.equals(checksum);
         } catch (Exception e) {
             log.error("[WOMPI] Error verificando firma webhook: {}", e.getMessage());
             return false;
@@ -247,12 +325,26 @@ public class WompiService {
     private void actualizarSolicitudTrasAprobacion(Pago pago) {
         try {
             switch (pago.getTipoPago()) {
-                case "TERMINACION" ->
+                case "TERMINACION" -> {
                     solicitudService.registrarPagoTerminacion(pago.getSolicitudId());
-                case "GRADO" ->
+                    solicitudRepository.findById(pago.getSolicitudId()).ifPresent(sol ->
+                        usuarioRepository.findByCedula(pago.getCedulaEstudiante()).ifPresent(est ->
+                            correoSolicitudService.notificarEstudiantePagoConfirmado(sol, est)
+                        )
+                    );
+                }
+                case "GRADO" -> {
                     solicitudService.registrarPagoGrado(pago.getSolicitudId());
+                    solicitudRepository.findById(pago.getSolicitudId()).ifPresent(sol ->
+                        usuarioRepository.findByCedula(pago.getCedulaEstudiante()).ifPresent(est ->
+                            correoSolicitudService.notificarEstudiantePagoConfirmado(sol, est)
+                        )
+                    );
+                }
                 case "MODALIDAD_CEREMONIA" ->
                     solicitudService.registrarPagoModalidad(pago.getSolicitudId());
+                case "CERTIFICADO" ->
+                    certificadoService.registrarPagoCertificado(pago.getSolicitudId());
             }
         } catch (Exception e) {
             log.error("[WOMPI] Error actualizando solicitud {} tras pago: {}",

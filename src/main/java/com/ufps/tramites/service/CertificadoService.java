@@ -107,7 +107,26 @@ public class CertificadoService {
         return resultado;
     }
 
-    // ── 3) PAGO + GENERACIÓN INMEDIATA (Regla PRD: 3-5 min) ──────────────────
+    // ── 3a) PAGO CONFIRMADO POR WEBHOOK DE WOMPI ─────────────────────────────
+
+    public void registrarPagoCertificado(Long id) {
+        SolicitudCertificado s = certificadoRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Solicitud de certificado no encontrada: " + id));
+
+        if (!"PENDIENTE_PAGO".equals(s.getEstado())) {
+            log.warn("[WOMPI] Certificado {} ya procesado, estado actual: {}", id, s.getEstado());
+            return;
+        }
+
+        s.setEstado("PAGADO");
+        s.setFechaPago(LocalDateTime.now());
+        s.setObservaciones("Pago confirmado vía Wompi.");
+        certificadoRepository.save(s);
+
+        generarYNotificar(id);
+    }
+
+    // ── 3b) PAGO + GENERACIÓN INMEDIATA (Regla PRD: 3-5 min) ─────────────────
 
     public Map<String, Object> simularPago(Long id, String cedula) {
         SolicitudCertificado s = certificadoRepository.findById(id)
