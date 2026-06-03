@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.*;
 
 import com.ufps.tramites.model.TipoCertificado;
 import com.ufps.tramites.repository.TipoCertificadoRepository;
-import com.ufps.tramites.service.DependenciaService;
 import com.ufps.tramites.service.PlantillaCertificadoService;
 
 /**
@@ -33,7 +32,6 @@ import com.ufps.tramites.service.PlantillaCertificadoService;
 public class AdminTipoCertificadoController {
 
     @Autowired private TipoCertificadoRepository repository;
-    @Autowired private DependenciaService dependenciaService;
     @Autowired private PlantillaCertificadoService plantillaService;
 
     @Operation(summary = "Listar todos los tipos de certificado",
@@ -158,10 +156,6 @@ public class AdminTipoCertificadoController {
         if (body.containsKey("descripcion"))          t.setDescripcion(strOrNull(body.get("descripcion")));
         if (body.containsKey("precioDigital"))        t.setPrecioDigital(numOrNull(body.get("precioDigital")));
         if (body.containsKey("costoLogisticaFisica")) t.setCostoLogisticaFisica(numOrNull(body.get("costoLogisticaFisica")));
-        if (body.containsKey("dependenciaId")) {
-            Long depId = longOrNull(body.get("dependenciaId"));
-            t.setDependencia(depId != null ? dependenciaService.obtenerPorId(depId) : null);
-        }
         if (body.containsKey("direccionOficina"))     t.setDireccionOficina(strOrNull(body.get("direccionOficina")));
         if (body.containsKey("tiempoEntregaDias"))    t.setTiempoEntregaDias(intOrNull(body.get("tiempoEntregaDias")));
         if (body.containsKey("activo"))               t.setActivo(boolOrNull(body.get("activo")));
@@ -175,8 +169,6 @@ public class AdminTipoCertificadoController {
         m.put("descripcion", t.getDescripcion());
         m.put("precioDigital", t.getPrecioDigital());
         m.put("costoLogisticaFisica", t.getCostoLogisticaFisica());
-        m.put("dependenciaId",     t.getDependenciaId());
-        m.put("dependenciaNombre", t.getDependenciaNombre());
         m.put("direccionOficina", t.getDireccionOficina());
         m.put("tiempoEntregaDias", t.getTiempoEntregaDias());
         m.put("activo", t.getActivo());
