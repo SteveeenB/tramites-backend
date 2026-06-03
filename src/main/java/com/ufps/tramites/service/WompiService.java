@@ -19,6 +19,7 @@ import com.ufps.tramites.model.SolicitudCertificado;
 import com.ufps.tramites.repository.PagoRepository;
 import com.ufps.tramites.repository.SolicitudCertificadoRepository;
 import com.ufps.tramites.repository.SolicitudRepository;
+import com.ufps.tramites.repository.UsuarioRepository;
 
 @Service
 public class WompiService {
@@ -54,6 +55,12 @@ public class WompiService {
 
     @Autowired
     private CertificadoService certificadoService;
+
+    @Autowired
+    private CorreoSolicitudService correoSolicitudService;
+
+    @Autowired
+    private com.ufps.tramites.repository.UsuarioRepository usuarioRepository;
 
     // ─────────────────────────────────────────────────────────────────────
     // CREAR PAGO
@@ -318,10 +325,22 @@ public class WompiService {
     private void actualizarSolicitudTrasAprobacion(Pago pago) {
         try {
             switch (pago.getTipoPago()) {
-                case "TERMINACION" ->
+                case "TERMINACION" -> {
                     solicitudService.registrarPagoTerminacion(pago.getSolicitudId());
-                case "GRADO" ->
+                    solicitudRepository.findById(pago.getSolicitudId()).ifPresent(sol ->
+                        usuarioRepository.findByCedula(pago.getCedulaEstudiante()).ifPresent(est ->
+                            correoSolicitudService.notificarEstudiantePagoConfirmado(sol, est)
+                        )
+                    );
+                }
+                case "GRADO" -> {
                     solicitudService.registrarPagoGrado(pago.getSolicitudId());
+                    solicitudRepository.findById(pago.getSolicitudId()).ifPresent(sol ->
+                        usuarioRepository.findByCedula(pago.getCedulaEstudiante()).ifPresent(est ->
+                            correoSolicitudService.notificarEstudiantePagoConfirmado(sol, est)
+                        )
+                    );
+                }
                 case "MODALIDAD_CEREMONIA" ->
                     solicitudService.registrarPagoModalidad(pago.getSolicitudId());
                 case "CERTIFICADO" ->
