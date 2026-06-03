@@ -137,7 +137,6 @@ ON CONFLICT DO NOTHING;
 -- ── Tipos de certificado ──────────────────────────────────────────────
 -- precio_digital      = precio base del documento
 -- costo_logistica_fisica = delta adicional cuando se elige modalidad física (impresión + sello + manejo)
--- dependencia_cedula  = FK lógica a usuario.cedula con rol = 'DEPENDENCIA'
 
 -- Tipo especial para el certificado de terminación de materias (tramite de grado)
 -- No se vende directamente: lo genera el sistema al aprobar el trámite.
@@ -150,22 +149,21 @@ VALUES ('TERMINACION_MATERIAS', 'CERTIFICADO DE TERMINACIÓN DE MATERIAS',
 ON CONFLICT (codigo) DO NOTHING;
 
 INSERT INTO tipo_certificado (codigo, label, descripcion, precio_digital, costo_logistica_fisica,
-                              dependencia_cedula, direccion_oficina, tiempo_entrega_dias, activo) VALUES
+                              direccion_oficina, tiempo_entrega_dias, activo) VALUES
 ('CONSTANCIA_REGISTRO_CALIFICADO', 'CONSTANCIA REGISTRO CALIFICADO DE UN PROGRAMA ACADEMICO',
     'Constancia oficial del registro calificado vigente del programa académico de posgrado.',
-    8800, 3700, '3000000003', 'Bloque A - Oficina Admisiones y Registro', 2, true),
+    8800, 3700, 'Bloque A - Oficina Admisiones y Registro', 2, true),
 ('CONSTANCIA_MATRICULA', 'CONSTANCIA MATRICULA ACADEMICA POSGRADO',
     'Constancia de matrícula académica vigente para el periodo actual.',
-    6500, 3300, '3000000003', 'Bloque A - Oficina Admisiones y Registro', 2, true),
+    6500, 3300, 'Bloque A - Oficina Admisiones y Registro', 2, true),
 ('CONSTANCIA_BUENA_CONDUCTA', 'CONSTANCIA BUENA CONDUCTA POSGRADO',
     'Constancia de comportamiento disciplinario y académico del estudiante.',
-    7200, 3800, '3000000003', 'Bloque A - Oficina Admisiones y Registro', 3, true)
+    7200, 3800, 'Bloque A - Oficina Admisiones y Registro', 3, true)
 ON CONFLICT (codigo) DO UPDATE SET
     label                  = EXCLUDED.label,
     descripcion            = EXCLUDED.descripcion,
     precio_digital         = EXCLUDED.precio_digital,
     costo_logistica_fisica = EXCLUDED.costo_logistica_fisica,
-    dependencia_cedula     = EXCLUDED.dependencia_cedula,
     direccion_oficina      = EXCLUDED.direccion_oficina,
     tiempo_entrega_dias    = EXCLUDED.tiempo_entrega_dias;
 
@@ -177,7 +175,7 @@ ON CONFLICT (codigo) DO UPDATE SET
 INSERT INTO estudiante (nombre, apellido, cedula, codigo, email, es_posgrado, migrado,
     creditos_aprobados, programa_id, usuario_id)
 VALUES
-    ('Juan',   'Perez',    '1098765432', '20261001', 'juan@example.com',      true, false, 40,
+    ('Juan',   'Perez',    '1098765432', '20261001', 'raulbaezjxd123@gmail.com',      true, false, 40,
      (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas'),
      (SELECT id FROM usuario WHERE cedula = '1098765432')),
     ('Laura',  'Gomez',    '1098765435', '20261005', 'laura@example.com',     true, false, 56,
