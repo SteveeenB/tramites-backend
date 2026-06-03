@@ -171,7 +171,7 @@ public class ActaPdfGeneratorService {
                         .setFontSize(9).setItalic().setTextAlignment(TextAlignment.CENTER))
                 .add(new Paragraph("Universidad Francisco de Paula Santander")
                         .setFontSize(8).setTextAlignment(TextAlignment.CENTER)
-                        .setFontColor(ColorConstants.GRAY))
+                        .setFontColor(COLOR_GRIS))
                 .setBorder(Border.NO_BORDER)
                 .setPaddingTop(6);
     }
