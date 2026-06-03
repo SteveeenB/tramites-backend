@@ -26,6 +26,7 @@ import com.ufps.tramites.repository.DocumentoSolicitudRepository;
 import com.ufps.tramites.repository.EstadoEstudianteRepository;
 import com.ufps.tramites.repository.EstudianteRepository;
 import com.ufps.tramites.repository.SolicitudRepository;
+import com.ufps.tramites.repository.TipoCertificadoRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
 
 @Service
@@ -73,6 +74,12 @@ public class SolicitudService {
 
     @Autowired
     CertificadoPdfService certificadoPdfService;
+
+    @Autowired
+    private TipoCertificadoRepository tipoCertificadoRepository;
+
+    @Autowired
+    private PlantillaCertificadoService plantillaCertificadoService;
 
     @Autowired
     private CorreoCertificadoService correoService;
@@ -701,13 +708,38 @@ public class SolicitudService {
         String fechaAprobacion = s.getFechaSolicitud() != null ? s.getFechaSolicitud().format(fmt) : LocalDate.now().format(fmt);
         String fechaExpedicion = LocalDate.now().format(fmt);
         try {
-            byte[] pdf = certificadoPdfService.generar(nombre, s.getCedula(), codigo, programa, fechaAprobacion, fechaExpedicion, id);
+            byte[] pdf = generarPdfTerminacion(nombre, s.getCedula(), codigo, programa,
+                    fechaAprobacion, fechaExpedicion, id);
             s.setActaGenerada(true);
             solicitudRepository.save(s);
             return pdf;
         } catch (IOException e) {
             throw new RuntimeException("Error generando el PDF del certificado", e);
         }
+    }
+
+    private byte[] generarPdfTerminacion(String nombre, String cedula, String codigo,
+                                         String programa, String fechaAprobacion,
+                                         String fechaExpedicion, Long solicitudId) throws IOException {
+        com.ufps.tramites.model.TipoCertificado tipo =
+                tipoCertificadoRepository.findByCodigo("TERMINACION_MATERIAS").orElse(null);
+        if (tipo != null && tipo.getPlantillaHtml() != null && !tipo.getPlantillaHtml().isBlank()) {
+            String codigoVerif = "UFPS-TM-" + solicitudId + "-" + cedula.substring(Math.max(0, cedula.length() - 4));
+            java.util.Map<String, String> vars = new java.util.LinkedHashMap<>();
+            vars.put("nombre_completo", nombre);
+            vars.put("cedula", cedula);
+            vars.put("codigo_estudiantil", codigo);
+            vars.put("programa", programa);
+            vars.put("tipo_certificado", "Certificado de Terminación de Materias");
+            vars.put("fecha_expedicion", fechaExpedicion);
+            vars.put("fecha_aprobacion", fechaAprobacion);
+            vars.put("numero_solicitud", String.valueOf(solicitudId));
+            vars.put("codigo_verificacion", codigoVerif);
+            vars.put("dependencia", "Sección de Posgrados");
+            String htmlProcesado = plantillaCertificadoService.aplicarVariables(tipo.getPlantillaHtml(), vars);
+            return plantillaCertificadoService.renderizarPdf(htmlProcesado);
+        }
+        return certificadoPdfService.generar(nombre, cedula, codigo, programa, fechaAprobacion, fechaExpedicion, solicitudId);
     }
 
     public byte[] aprobarPosgrados(Long id, Admin posgradosAdmin) {

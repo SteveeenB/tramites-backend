@@ -1,5 +1,6 @@
 package com.ufps.tramites.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -31,6 +32,9 @@ public class TipoCertificado {
     private Integer tiempoEntregaDias;
 
     private Boolean activo;
+
+    @Column(columnDefinition = "TEXT")
+    private String plantillaHtml;
 
     public TipoCertificado() {}
 
@@ -71,6 +75,9 @@ public class TipoCertificado {
 
     public Boolean getActivo() { return activo; }
     public void setActivo(Boolean activo) { this.activo = activo; }
+
+    public String getPlantillaHtml() { return plantillaHtml; }
+    public void setPlantillaHtml(String plantillaHtml) { this.plantillaHtml = plantillaHtml; }
 
     public double precioTotal(String modalidad) {
         double base = precioDigital != null ? precioDigital : 0.0;

@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import com.ufps.tramites.model.TipoCertificado;
 import com.ufps.tramites.repository.TipoCertificadoRepository;
 import com.ufps.tramites.service.DependenciaService;
+import com.ufps.tramites.service.PlantillaCertificadoService;
 
 /**
  * CRUD de tipos de certificado. Lo consume el panel de administrador
@@ -33,6 +34,7 @@ public class AdminTipoCertificadoController {
 
     @Autowired private TipoCertificadoRepository repository;
     @Autowired private DependenciaService dependenciaService;
+    @Autowired private PlantillaCertificadoService plantillaService;
 
     @Operation(summary = "Listar todos los tipos de certificado",
                description = "Devuelve el catálogo completo (activos e inactivos) con el nombre de la dependencia responsable.")
@@ -119,6 +121,34 @@ public class AdminTipoCertificadoController {
             t.setActivo(valor);
             repository.save(t);
             return ResponseEntity.ok(toMap(t));
+        }).orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", "Tipo no encontrado")));
+    }
+
+    @Operation(summary = "Obtener la plantilla HTML de un tipo de certificado")
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/{id}/plantilla")
+    public ResponseEntity<?> obtenerPlantilla(@PathVariable Long id) {
+        return repository.findById(id).<ResponseEntity<?>>map(t -> {
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("id", t.getId());
+            resp.put("codigo", t.getCodigo());
+            resp.put("label", t.getLabel());
+            resp.put("plantillaHtml", t.getPlantillaHtml());
+            resp.put("variables", PlantillaCertificadoService.VARIABLES_DISPONIBLES);
+            return ResponseEntity.ok(resp);
+        }).orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", "Tipo no encontrado")));
+    }
+
+    @Operation(summary = "Guardar la plantilla HTML de un tipo de certificado")
+    @PreAuthorize("hasRole('ADMIN')")
+    @PutMapping("/{id}/plantilla")
+    public ResponseEntity<?> guardarPlantilla(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        return repository.findById(id).<ResponseEntity<?>>map(t -> {
+            t.setPlantillaHtml(strOrNull(body.get("plantillaHtml")));
+            repository.save(t);
+            return ResponseEntity.ok(Map.of("ok", true, "id", t.getId()));
         }).orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(Map.of("error", "Tipo no encontrado")));
     }
