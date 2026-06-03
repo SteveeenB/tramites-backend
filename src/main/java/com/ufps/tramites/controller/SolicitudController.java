@@ -271,11 +271,14 @@ public class SolicitudController {
     }
 
     /** GET /api/solicitudes/{id}/certificado-pdf */
-    @PreAuthorize("hasRole('POSGRADOS')")
+    @PreAuthorize("hasAnyRole('POSGRADOS', 'ESTUDIANTE')")
     @GetMapping("/{id}/certificado-pdf")
     public ResponseEntity<byte[]> descargarCertificadoPdf(@PathVariable Long id, Authentication auth) {
         ResolvedPrincipal p = principalResolver.resolve(auth);
         if (p == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if ("ESTUDIANTE".equals(p.rol()) && !solicitudService.perteneceAEstudiante(id, p.cedula())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         try {
             byte[] pdf = solicitudService.generarCertificadoPdf(id);
             return ResponseEntity.ok()
