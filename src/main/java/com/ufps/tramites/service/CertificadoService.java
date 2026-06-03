@@ -41,6 +41,7 @@ public class CertificadoService {
     @Autowired private PlantillaCertificadoService plantillaService;
     @Autowired private CorreoConstanciaService correoService;
     @Autowired private SupabaseStorageService storage;
+    @Autowired private NotificacionService notificacionService;
 
     // ── 1) SOLICITUD ──────────────────────────────────────────────────────────
 
@@ -199,8 +200,23 @@ public class CertificadoService {
         s.setHashPdf(hash);
         s.setEstado("GENERADO");
         s.setFechaGeneracion(LocalDateTime.now());
-        s.setObservaciones("Certificado generado y notificado por correo.");
+        s.setObservaciones("Certificado generado.");
         certificadoRepository.save(s);
+
+        // Notificar a Posgrados si es física para que lo imprima
+        if ("FISICA".equals(s.getModalidadEnvio())) {
+            notificacionService.crear("POS001", "NUEVO_TRAMITE",
+                "Nuevo certificado por imprimir",
+                "Se ha generado un certificado físico para " + (estudiante != null ? estudiante.getNombre() : s.getCedula()),
+                "/tramites"
+            );
+        } else {
+            notificacionService.crear(s.getCedula(), "ESTADO_CAMBIADO", 
+                "Certificado generado", 
+                "Tu certificado " + tipo.getLabel() + " ya está disponible para descargar.", 
+                "/certificados"
+            );
+        }
 
         try {
             correoService.enviarConstancia(estudiante, tipo, s, pdfBytes);
@@ -227,7 +243,7 @@ public class CertificadoService {
             vars.put("fecha_aprobacion", fechaExpedicion);
             vars.put("numero_solicitud", String.valueOf(s.getId()));
             vars.put("codigo_verificacion", codigoVerif);
-            vars.put("dependencia", tipo.getDependenciaNombre() != null ? tipo.getDependenciaNombre() : "—");
+            vars.put("dependencia", "Oficina de Posgrados");
             String html = plantillaService.aplicarVariables(tipo.getPlantillaHtml(), vars);
             return plantillaService.renderizarPdf(html);
         }
@@ -241,19 +257,14 @@ public class CertificadoService {
      * como a la dependencia encargada (por id de Dependencia). Un caller solo
      * llenará uno de los dos parámetros según su rol; el otro será null.
      */
-    public byte[] descargarPdf(Long solicitudId, String cedulaEstudianteActor, Long dependenciaIdActor) {
+    public byte[] descargarPdf(Long solicitudId, String cedulaEstudianteActor, boolean esPosgrados) {
         SolicitudCertificado s = certificadoRepository.findById(solicitudId)
             .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
 
         boolean esDueno = cedulaEstudianteActor != null && cedulaEstudianteActor.equals(s.getCedula());
-        boolean esDependenciaEncargada = false;
         TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(s.getTipoCertificado()).orElse(null);
-        if (tipo != null && tipo.getDependencia() != null
-                && dependenciaIdActor != null
-                && tipo.getDependencia().getId().equals(dependenciaIdActor)) {
-            esDependenciaEncargada = true;
-        }
-        if (!esDueno && !esDependenciaEncargada) {
+        
+        if (!esDueno && !esPosgrados) {
             throw new IllegalStateException("No autorizado para descargar este certificado.");
         }
 
@@ -279,11 +290,11 @@ public class CertificadoService {
         return "GENERADO".equals(estado) || "LISTO_RETIRO".equals(estado) || "ENTREGADO".equals(estado);
     }
 
-    // ── 5) FLUJO DE LA DEPENDENCIA (FÍSICOS) ─────────────────────────────────
+    // ── 5) FLUJO DE POSGRADOS (FÍSICOS) ─────────────────────────────────
 
-    public List<Map<String, Object>> obtenerPorDependencia(Long dependenciaId, String estadoFiltro) {
+    public List<Map<String, Object>> obtenerBandejaPosgrados(String estadoFiltro) {
         List<SolicitudCertificado> solicitudes =
-            certificadoRepository.findByDependencia(dependenciaId, estadoFiltro);
+            certificadoRepository.findBandejaPosgradosFisico(estadoFiltro);
         List<Map<String, Object>> resultado = new ArrayList<>();
         for (SolicitudCertificado s : solicitudes) {
             Usuario estudiante = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
@@ -293,11 +304,10 @@ public class CertificadoService {
         return resultado;
     }
 
-    public Map<String, Object> marcarListoRetiro(Long solicitudId, Long dependenciaId) {
+    public Map<String, Object> marcarListoRetiro(Long solicitudId) {
         SolicitudCertificado s = certificadoRepository.findById(solicitudId)
             .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
         TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(s.getTipoCertificado()).orElse(null);
-        validarDependenciaEncargada(tipo, dependenciaId);
 
         if (!"FISICA".equals(s.getModalidadEnvio())) {
             throw new IllegalStateException("Esta solicitud no es de modalidad física.");
@@ -311,6 +321,12 @@ public class CertificadoService {
         certificadoRepository.save(s);
 
         Usuario estudiante = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
+        notificacionService.crear(s.getCedula(), "ESTADO_CAMBIADO", 
+            "Certificado listo para retiro", 
+            "Tu certificado " + (tipo != null ? tipo.getLabel() : "físico") + " está listo para que lo retires en la Oficina de Posgrados.", 
+            "/certificados"
+        );
+
         try {
             correoService.enviarAvisoListoRetiro(estudiante, tipo, s);
         } catch (Exception e) {
@@ -319,11 +335,10 @@ public class CertificadoService {
         return construirRespuesta(s, estudiante, tipo);
     }
 
-    public Map<String, Object> marcarEntregado(Long solicitudId, Long dependenciaId) {
+    public Map<String, Object> marcarEntregado(Long solicitudId) {
         SolicitudCertificado s = certificadoRepository.findById(solicitudId)
             .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
         TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(s.getTipoCertificado()).orElse(null);
-        validarDependenciaEncargada(tipo, dependenciaId);
 
         if (!"LISTO_RETIRO".equals(s.getEstado())) {
             throw new IllegalStateException(
@@ -333,18 +348,15 @@ public class CertificadoService {
         s.setFechaEntrega(LocalDateTime.now());
         s.setObservaciones("Documento físico entregado al estudiante.");
         certificadoRepository.save(s);
+        
+        notificacionService.crear(s.getCedula(), "ESTADO_CAMBIADO", 
+            "Certificado entregado", 
+            "Se ha registrado la entrega física de tu certificado " + (tipo != null ? tipo.getLabel() : "") + ".", 
+            "/certificados"
+        );
 
         Usuario estudiante = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
         return construirRespuesta(s, estudiante, tipo);
-    }
-
-    private void validarDependenciaEncargada(TipoCertificado tipo, Long dependenciaId) {
-        if (tipo == null || tipo.getDependencia() == null) {
-            throw new IllegalStateException("El tipo de certificado no tiene dependencia asignada.");
-        }
-        if (!tipo.getDependencia().getId().equals(dependenciaId)) {
-            throw new IllegalStateException("Esta dependencia no es responsable de este tipo de certificado.");
-        }
     }
 
     // ── 6) SERIALIZACIÓN ──────────────────────────────────────────────────────
@@ -375,8 +387,6 @@ public class CertificadoService {
             t.put("descripcion", tipo.getDescripcion());
             t.put("precioDigital", tipo.getPrecioDigital());
             t.put("costoLogisticaFisica", tipo.getCostoLogisticaFisica());
-            t.put("dependenciaId",     tipo.getDependenciaId());
-            t.put("dependenciaNombre", tipo.getDependenciaNombre());
             t.put("direccionOficina", tipo.getDireccionOficina());
             t.put("tiempoEntregaDias", tipo.getTiempoEntregaDias());
             map.put("tipo", t);

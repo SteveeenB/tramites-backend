@@ -60,7 +60,7 @@ public class CorreoConstanciaService {
             cuerpo.append("Recibirás un correo adicional cuando el documento físico esté listo para retiro.\n\n");
         }
         cuerpo.append("Atentamente,\n")
-              .append("Sección de Posgrados\n")
+              .append("Oficina de Posgrados\n")
               .append("Universidad Francisco de Paula Santander");
 
         if (mailSender != null) {
@@ -101,7 +101,7 @@ public class CorreoConstanciaService {
                 + "Tu certificado " + labelTipo + " (solicitud " + solicitud.getId() + ") "
                 + "está listo para que pases a recogerlo en:\n  • " + oficina + "\n\n"
                 + "Recuerda llevar tu documento de identidad.\n\n"
-                + "Atentamente,\nSección de Posgrados — UFPS";
+                + "Atentamente,\nOficina de Posgrados — UFPS";
 
         if (mailSender != null) {
             try {
