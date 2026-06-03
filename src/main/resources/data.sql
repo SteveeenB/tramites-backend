@@ -138,6 +138,17 @@ ON CONFLICT DO NOTHING;
 -- precio_digital      = precio base del documento
 -- costo_logistica_fisica = delta adicional cuando se elige modalidad física (impresión + sello + manejo)
 -- dependencia_cedula  = FK lógica a usuario.cedula con rol = 'DEPENDENCIA'
+
+-- Tipo especial para el certificado de terminación de materias (tramite de grado)
+-- No se vende directamente: lo genera el sistema al aprobar el trámite.
+-- Se registra aquí para que el admin pueda configurar su plantilla HTML.
+INSERT INTO tipo_certificado (codigo, label, descripcion, precio_digital, costo_logistica_fisica,
+                              tiempo_entrega_dias, activo)
+VALUES ('TERMINACION_MATERIAS', 'CERTIFICADO DE TERMINACIÓN DE MATERIAS',
+        'Certificado oficial que acredita la culminación satisfactoria de todos los requisitos académicos del programa de posgrado.',
+        150000, 0, 1, true)
+ON CONFLICT (codigo) DO NOTHING;
+
 INSERT INTO tipo_certificado (codigo, label, descripcion, precio_digital, costo_logistica_fisica,
                               dependencia_cedula, direccion_oficina, tiempo_entrega_dias, activo) VALUES
 ('CONSTANCIA_REGISTRO_CALIFICADO', 'CONSTANCIA REGISTRO CALIFICADO DE UN PROGRAMA ACADEMICO',

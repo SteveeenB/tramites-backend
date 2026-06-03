@@ -123,6 +123,13 @@
 		<artifactId>javase</artifactId>
 		<version>3.5.2</version>
 	</dependency>
+
+	<!-- openhtmltopdf — renderiza plantillas HTML de certificados a PDF -->
+	<dependency>
+		<groupId>com.openhtmltopdf</groupId>
+		<artifactId>openhtmltopdf-pdfbox</artifactId>
+		<version>1.0.10</version>
+	</dependency>
 	</dependencies>
 
 
