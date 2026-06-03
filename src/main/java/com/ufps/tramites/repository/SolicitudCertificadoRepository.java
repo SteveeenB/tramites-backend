@@ -26,13 +26,10 @@ public interface SolicitudCertificadoRepository extends JpaRepository<SolicitudC
      * Filtra por id de la entidad Dependencia (refactor del Bloque 1).
      */
     @Query("""
-           SELECT s FROM SolicitudCertificado s, TipoCertificado t
-           WHERE s.tipoCertificado = t.codigo
-             AND t.dependencia.id = :dependenciaId
-             AND s.modalidadEnvio = 'FISICA'
+           SELECT s FROM SolicitudCertificado s
+           WHERE s.modalidadEnvio = 'FISICA'
              AND (:estado IS NULL OR s.estado = :estado)
            ORDER BY s.fechaSolicitud DESC, s.id DESC
            """)
-    List<SolicitudCertificado> findByDependencia(@Param("dependenciaId") Long dependenciaId,
-                                                 @Param("estado") String estado);
+    List<SolicitudCertificado> findBandejaPosgradosFisico(@Param("estado") String estado);
 }
