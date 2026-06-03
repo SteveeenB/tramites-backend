@@ -1,10 +1,5 @@
 package com.ufps.tramites.service;
 
-import com.ufps.tramites.model.Solicitud;
-import com.ufps.tramites.model.Usuario;
-import com.ufps.tramites.repository.DocumentoSolicitudRepository;
-import com.ufps.tramites.repository.SolicitudRepository;
-import com.ufps.tramites.repository.UsuarioRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -18,10 +13,21 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.context.annotation.Lazy;
-import com.ufps.tramites.service.PazYSalvoService;
+
+import com.ufps.tramites.model.Admin;
+import com.ufps.tramites.model.EstadoEstudiante;
+import com.ufps.tramites.model.Estudiante;
+import com.ufps.tramites.model.Solicitud;
+import com.ufps.tramites.model.Usuario;
+import com.ufps.tramites.repository.DocumentoSolicitudRepository;
+import com.ufps.tramites.repository.EstadoEstudianteRepository;
+import com.ufps.tramites.repository.EstudianteRepository;
+import com.ufps.tramites.repository.SolicitudRepository;
+import com.ufps.tramites.repository.TipoCertificadoRepository;
+import com.ufps.tramites.repository.UsuarioRepository;
 
 @Service
 public class SolicitudService {
@@ -40,6 +46,12 @@ public class SolicitudService {
 
     @Autowired
     private UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private EstudianteRepository estudianteRepository;
+
+    @Autowired
+    private EstadoEstudianteRepository estadoEstudianteRepository;
 
     @Autowired
     private NotificacionSseService notificacionSseService;
@@ -64,6 +76,12 @@ public class SolicitudService {
     CertificadoPdfService certificadoPdfService;
 
     @Autowired
+    private TipoCertificadoRepository tipoCertificadoRepository;
+
+    @Autowired
+    private PlantillaCertificadoService plantillaCertificadoService;
+
+    @Autowired
     private CorreoCertificadoService correoService;
 
     /**
@@ -72,7 +90,9 @@ public class SolicitudService {
      */
     public Map<String, Object> crearSolicitudTerminacion(Usuario estudiante) {
         // 1. Validar créditos (requisito reglamentario)
-        int creditosAprobados = estudiante.getCreditosAprobados() != null ? estudiante.getCreditosAprobados() : 0;
+        Estudiante perfilEstudiante = estudianteRepository.findByUsuario(estudiante).orElse(null);
+        int creditosAprobados = perfilEstudiante != null && perfilEstudiante.getCreditosAprobados() != null
+                ? perfilEstudiante.getCreditosAprobados() : 0;
         int creditosRequeridos = estudiante.getProgramaAcademico() != null
                 ? estudiante.getProgramaAcademico().getTotalCreditos()
                 : Integer.MAX_VALUE;
@@ -86,18 +106,19 @@ public class SolicitudService {
         LocalDate hoy = LocalDate.now();
 
         // 3. Verificar que no exista una solicitud activa del mismo tipo
-        Optional<Solicitud> existente = solicitudRepository.findFirstByCedulaAndTipo(
+        Optional<Solicitud> existente = solicitudRepository.findFirstByCedulaAndTipoOrderByIdDesc(
                 estudiante.getCedula(), "TERMINACION_MATERIAS"
         );
-        if (existente.isPresent()) {
+        if (existente.isPresent() && !"RECHAZADA".equals(existente.get().getEstado())) {
             throw new IllegalStateException(
                     "Ya existe una solicitud de terminación de materias con estado: " + existente.get().getEstado()
             );
         }
 
-        // 4. Crear y guardar la solicitud
+        // 4. Crear y guardar la solicitud (doble-write: cedula + FK Estudiante)
         Solicitud solicitud = new Solicitud();
         solicitud.setCedula(estudiante.getCedula());
+        solicitud.setEstudiante(perfilEstudiante);
         solicitud.setTipo("TERMINACION_MATERIAS");
         solicitud.setEstado("PENDIENTE_PAGO");
         solicitud.setFechaSolicitud(hoy);
@@ -126,7 +147,7 @@ public class SolicitudService {
             MultipartFile certificadoIngles) throws IOException {
 
         // 1. Verificar que la terminación de materias esté aprobada (requisito previo)
-        Optional<Solicitud> terminacion = solicitudRepository.findFirstByCedulaAndTipo(
+        Optional<Solicitud> terminacion = solicitudRepository.findFirstByCedulaAndTipoOrderByIdDesc(
                 estudiante.getCedula(), "TERMINACION_MATERIAS"
         );
         if (terminacion.isEmpty() || !"APROBADA".equals(terminacion.get().getEstado())) {
@@ -136,7 +157,7 @@ public class SolicitudService {
         }
 
         // 2. Verificar que no exista ya una solicitud de grado activa
-        Optional<Solicitud> existente = solicitudRepository.findFirstByCedulaAndTipo(
+        Optional<Solicitud> existente = solicitudRepository.findFirstByCedulaAndTipoOrderByIdDesc(
                 estudiante.getCedula(), "GRADO"
         );
         if (existente.isPresent() && !"RECHAZADA".equals(existente.get().getEstado())) {
@@ -146,8 +167,11 @@ public class SolicitudService {
         }
 
         // 3. Crear y guardar la solicitud con los datos del proyecto
+        //    (doble-write: cedula + FK Estudiante)
+        Estudiante perfilEstudiante = estudianteRepository.findByUsuario(estudiante).orElse(null);
         Solicitud solicitud = new Solicitud();
         solicitud.setCedula(estudiante.getCedula());
+        solicitud.setEstudiante(perfilEstudiante);
         solicitud.setTipo("GRADO");
         solicitud.setEstado("EN_REVISION");
         solicitud.setFechaSolicitud(LocalDate.now());
@@ -185,7 +209,7 @@ public class SolicitudService {
             return Map.of("pendientes", List.of(), "aprobadas", List.of(), "rechazadas", List.of());
         }
 
-        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRol(programaId, "ESTUDIANTE");
+        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRol_Nombre(programaId, "ESTUDIANTE");
         List<String> cedulas = estudiantes.stream().map(Usuario::getCedula).collect(Collectors.toList());
         Map<String, Usuario> porCedula = estudiantes.stream()
                 .collect(Collectors.toMap(Usuario::getCedula, u -> u));
@@ -221,7 +245,7 @@ public class SolicitudService {
             return Map.of("pendientes", List.of(), "aprobadas", List.of(), "rechazadas", List.of());
         }
 
-        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRol(programaId, "ESTUDIANTE");
+        List<Usuario> estudiantes = usuarioRepository.findByProgramaAcademicoIdAndRol_Nombre(programaId, "ESTUDIANTE");
         List<String> cedulas = estudiantes.stream().map(Usuario::getCedula).collect(Collectors.toList());
         Map<String, Usuario> porCedula = estudiantes.stream()
                 .collect(Collectors.toMap(Usuario::getCedula, u -> u));
@@ -263,12 +287,13 @@ public class SolicitudService {
 
             Usuario est = porCedula.get(s.getCedula());
             if (est != null) {
+                Estudiante perfil = estudianteRepository.findByUsuario(est).orElse(null);
                 Map<String, Object> estMap = new LinkedHashMap<>();
                 estMap.put("cedula", est.getCedula());
                 estMap.put("nombre", est.getNombre());
                 estMap.put("programa", est.getProgramaAcademico() != null
                         ? est.getProgramaAcademico().getNombre() : null);
-                estMap.put("creditosAprobados", est.getCreditosAprobados());
+                estMap.put("creditosAprobados", perfil != null ? perfil.getCreditosAprobados() : null);
                 estMap.put("creditosRequeridos", est.getProgramaAcademico() != null
                         ? est.getProgramaAcademico().getTotalCreditos() : null);
                 map.put("estudiante", estMap);
@@ -326,16 +351,19 @@ public class SolicitudService {
 
         notificarEstudiante(s, estadoAnterior);
 
-        // Si es solicitud de GRADO: marcar estadoGrado del estudiante e iniciar paz y salvo
+        // Si es solicitud de GRADO: marcar estado del estudiante e iniciar paz y salvo
         if ("GRADO".equals(s.getTipo())) {
-            // Marcar al estudiante con pago de grado pendiente
-            usuarioRepository.findById(s.getCedula()).ifPresent(est -> {
-                est.setEstadoGrado("PAGO_GRADO_PENDIENTE");
-                usuarioRepository.save(est);
-            });
+            // Marcar al estudiante con pago de grado pendiente (vía catálogo)
+            EstadoEstudiante pagoPendiente = resolverEstadoEstudiante("PAGO_GRADO_PENDIENTE");
+            usuarioRepository.findByCedula(s.getCedula()).ifPresent(est ->
+                estudianteRepository.findByUsuario(est).ifPresent(perfil -> {
+                    perfil.setEstadoEstudiante(pagoPendiente);
+                    estudianteRepository.save(perfil);
+                })
+            );
             // Iniciar proceso de paz y salvo
             if (cedulaDirector != null) {
-                usuarioRepository.findById(cedulaDirector).ifPresent(director
+                usuarioRepository.findByCedula(cedulaDirector).ifPresent(director
                         -> pazYSalvoService.iniciarProcesoPazYSalvo(s, director)
                 );
             }
@@ -368,8 +396,20 @@ public class SolicitudService {
 
     private void notificarEstudiante(Solicitud s, String estadoAnterior) {
         notificacionSseService.notificarCambioEstado(s, estadoAnterior);
-        usuarioRepository.findById(s.getCedula())
+        usuarioRepository.findByCedula(s.getCedula())
                 .ifPresent(est -> notificacionService.notificarEstudianteCambioEstado(s, est));
+    }
+
+    /**
+     * Resuelve un {@link EstadoEstudiante} del catálogo `estados_estudiantes`
+     * por nombre. Si no existe, lanza IllegalStateException — el seed inicial
+     * del catálogo es responsabilidad de la migración SQL del Bloque 5e.
+     */
+    private EstadoEstudiante resolverEstadoEstudiante(String nombre) {
+        return estadoEstudianteRepository.findByNombre(nombre)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Estado de estudiante no encontrado en catálogo: " + nombre
+                        + ". ¿Se ejecutó migracion_bloque5e_estados_estudiantes.sql?"));
     }
 
     /**
@@ -416,6 +456,8 @@ public class SolicitudService {
             // Campos de progreso del proceso de grado
             map.put("estadoPagoGrado", s.getEstadoPagoGrado());
             map.put("fechaGrado", s.getFechaGrado() != null ? s.getFechaGrado().toString() : null);
+            map.put("modalidadGrado", s.getModalidadGrado());
+            map.put("pagoModalidadRealizado", s.getPagoModalidadRealizado() != null && s.getPagoModalidadRealizado());
         }
 
         return map;
@@ -448,6 +490,18 @@ public class SolicitudService {
         return construirRespuestaSolicitud(s);
     }
 
+    public Map<String, Object> registrarPagoTerminacion(Long id) {
+    Solicitud s = solicitudRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+    if (!"PENDIENTE_PAGO".equals(s.getEstado()) || !"TERMINACION_MATERIAS".equals(s.getTipo())) {
+        throw new IllegalStateException("La solicitud no está pendiente de pago");
+    }
+    s.setEstado("EN_REVISION");
+    solicitudRepository.save(s);
+    notificarEstudiante(s, "PENDIENTE_PAGO");
+    return construirRespuestaSolicitud(s);
+}
+
     /**
      * Registra la fecha de graduación elegida por el estudiante. Requiere que
      * el pago ya esté registrado.
@@ -464,6 +518,72 @@ public class SolicitudService {
         s.setFechaGrado(fechaGrado);
         solicitudRepository.save(s);
         return construirRespuestaSolicitud(s);
+    }
+
+    public Map<String, Object> registrarModalidadGrado(Long id, String modalidad) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"APROBADO".equals(s.getEstadoPagoGrado())) {
+            throw new IllegalStateException("El pago de grado no ha sido completado");
+        }
+        if (!"CEREMONIA".equals(modalidad) && !"SECRETARIA".equals(modalidad)) {
+            throw new IllegalArgumentException("Modalidad inválida. Use CEREMONIA o SECRETARIA");
+        }
+        s.setModalidadGrado(modalidad);
+        if ("SECRETARIA".equals(modalidad)) {
+            s.setPagoModalidadRealizado(true);
+        }
+        solicitudRepository.save(s);
+        return construirRespuestaSolicitud(s);
+    }
+
+    public Map<String, Object> registrarPagoModalidad(Long id) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"CEREMONIA".equals(s.getModalidadGrado())) {
+            throw new IllegalStateException("Solo aplica para modalidad CEREMONIA");
+        }
+        s.setPagoModalidadRealizado(true);
+        solicitudRepository.save(s);
+        return construirRespuestaSolicitud(s);
+    }
+
+    public Map<String, Object> verificarCertificado(String codigo) {
+        // Formato: UFPS-TM-{id}-{last4cedula}
+        try {
+            String[] partes = codigo.split("-");
+            Long solicitudId = Long.parseLong(partes[2]);
+            String last4 = partes[3];
+            Solicitud s = solicitudRepository.findById(solicitudId).orElse(null);
+            if (s == null || !"APROBADA".equals(s.getEstado()) || !"TERMINACION_MATERIAS".equals(s.getTipo())) {
+                Map<String, Object> r = new java.util.LinkedHashMap<>();
+                r.put("valido", false);
+                r.put("mensaje", "Certificado no encontrado o no válido.");
+                return r;
+            }
+            String cedulaReal = s.getCedula();
+            if (!cedulaReal.endsWith(last4)) {
+                Map<String, Object> r = new java.util.LinkedHashMap<>();
+                r.put("valido", false);
+                r.put("mensaje", "El código de verificación no coincide.");
+                return r;
+            }
+            Usuario est = usuarioRepository.findByCedula(cedulaReal).orElse(null);
+            Map<String, Object> r = new java.util.LinkedHashMap<>();
+            r.put("valido", true);
+            r.put("codigo", codigo);
+            r.put("nombre", est != null ? est.getNombre() : "—");
+            r.put("cedula", cedulaReal);
+            r.put("programa", est != null && est.getProgramaAcademico() != null ? est.getProgramaAcademico().getNombre() : "—");
+            r.put("fechaAprobacion", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : "—");
+            r.put("mensaje", "Certificado válido y auténtico.");
+            return r;
+        } catch (Exception e) {
+            Map<String, Object> r = new java.util.LinkedHashMap<>();
+            r.put("valido", false);
+            r.put("mensaje", "Código de verificación inválido.");
+            return r;
+        }
     }
 
     /**
@@ -490,7 +610,7 @@ public class SolicitudService {
         }
 
         // Primera generación: construir PDF
-        Usuario est = usuarioRepository.findById(s.getCedula()).orElse(null);
+        Usuario est = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
         String nombre = est != null ? est.getNombre() : "Estudiante";
         String cedula = s.getCedula();
         String codigo = est != null ? est.getCodigo() : "-";
@@ -516,10 +636,17 @@ public class SolicitudService {
                     nombre, cedula, codigo, programa,
                     fechaAprobacion, fechaExpedicion, fechaGradoStr, s.getRadicado());
 
-            // Actualizar estado del estudiante a GRADUADO
-            if (est != null && !"GRADUADO".equals(est.getEstadoGrado())) {
-                est.setEstadoGrado("GRADUADO");
-                usuarioRepository.save(est);
+            // Actualizar estado del estudiante a GRADUADO (vía catálogo)
+            if (est != null) {
+                EstadoEstudiante graduado = resolverEstadoEstudiante("GRADUADO");
+                estudianteRepository.findByUsuario(est).ifPresent(perfil -> {
+                    boolean yaGraduado = perfil.getEstadoEstudiante() != null
+                            && "GRADUADO".equals(perfil.getEstadoEstudiante().getNombre());
+                    if (!yaGraduado) {
+                        perfil.setEstadoEstudiante(graduado);
+                        estudianteRepository.save(perfil);
+                    }
+                });
             }
 
             // Vincular PDF al expediente digital
@@ -545,7 +672,7 @@ public class SolicitudService {
 
     private Map<String, Object> enriquecerConEstudiante(Solicitud s) {
         Map<String, Object> m = construirRespuestaSolicitud(s);
-        usuarioRepository.findById(s.getCedula()).ifPresent(est -> {
+        usuarioRepository.findByCedula(s.getCedula()).ifPresent(est -> {
             m.put("nombreEstudiante", est.getNombre());
             m.put("cedulaEstudiante", est.getCedula());
             m.put("codigoEstudiante", est.getCodigo());
@@ -572,7 +699,7 @@ public class SolicitudService {
         if (!"TERMINACION_MATERIAS".equals(s.getTipo())) {
             throw new IllegalStateException("Este tipo de solicitud no genera certificado");
         }
-        Usuario est = usuarioRepository.findById(s.getCedula()).orElse(null);
+        Usuario est = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
         String nombre = est != null ? est.getNombre() : "Estudiante";
         String codigo = est != null ? est.getCodigo() : "-";
         String programa = est != null && est.getProgramaAcademico() != null ? est.getProgramaAcademico().getNombre() : "-";
@@ -581,7 +708,8 @@ public class SolicitudService {
         String fechaAprobacion = s.getFechaSolicitud() != null ? s.getFechaSolicitud().format(fmt) : LocalDate.now().format(fmt);
         String fechaExpedicion = LocalDate.now().format(fmt);
         try {
-            byte[] pdf = certificadoPdfService.generar(nombre, s.getCedula(), codigo, programa, fechaAprobacion, fechaExpedicion, id);
+            byte[] pdf = generarPdfTerminacion(nombre, s.getCedula(), codigo, programa,
+                    fechaAprobacion, fechaExpedicion, id);
             s.setActaGenerada(true);
             solicitudRepository.save(s);
             return pdf;
@@ -590,7 +718,31 @@ public class SolicitudService {
         }
     }
 
-    public byte[] aprobarPosgrados(Long id) {
+    private byte[] generarPdfTerminacion(String nombre, String cedula, String codigo,
+                                         String programa, String fechaAprobacion,
+                                         String fechaExpedicion, Long solicitudId) throws IOException {
+        com.ufps.tramites.model.TipoCertificado tipo =
+                tipoCertificadoRepository.findByCodigo("TERMINACION_MATERIAS").orElse(null);
+        if (tipo != null && tipo.getPlantillaHtml() != null && !tipo.getPlantillaHtml().isBlank()) {
+            String codigoVerif = "UFPS-TM-" + solicitudId + "-" + cedula.substring(Math.max(0, cedula.length() - 4));
+            java.util.Map<String, String> vars = new java.util.LinkedHashMap<>();
+            vars.put("nombre_completo", nombre);
+            vars.put("cedula", cedula);
+            vars.put("codigo_estudiantil", codigo);
+            vars.put("programa", programa);
+            vars.put("tipo_certificado", "Certificado de Terminación de Materias");
+            vars.put("fecha_expedicion", fechaExpedicion);
+            vars.put("fecha_aprobacion", fechaAprobacion);
+            vars.put("numero_solicitud", String.valueOf(solicitudId));
+            vars.put("codigo_verificacion", codigoVerif);
+            vars.put("dependencia", "Sección de Posgrados");
+            String htmlProcesado = plantillaCertificadoService.aplicarVariables(tipo.getPlantillaHtml(), vars);
+            return plantillaCertificadoService.renderizarPdf(htmlProcesado);
+        }
+        return certificadoPdfService.generar(nombre, cedula, codigo, programa, fechaAprobacion, fechaExpedicion, solicitudId);
+    }
+
+    public byte[] aprobarPosgrados(Long id, Admin posgradosAdmin) {
         Solicitud s = solicitudRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
         if (!"APROBADA_DIRECTOR".equals(s.getEstado())) {
@@ -602,11 +754,12 @@ public class SolicitudService {
             throw new IllegalStateException("Este endpoint solo aplica para solicitudes de terminación de materias.");
         }
         s.setEstado("APROBADA");
+        if (posgradosAdmin != null) s.setPosgradosAdmin(posgradosAdmin);
         solicitudRepository.save(s);
         notificarEstudiante(s, "APROBADA_DIRECTOR");
         byte[] pdfBytes = generarCertificadoPdf(id); // sets actaGenerada=true
         try {
-            usuarioRepository.findById(s.getCedula()).ifPresent(est -> {
+            usuarioRepository.findByCedula(s.getCedula()).ifPresent(est -> {
                 if (est.getCorreo() != null && !est.getCorreo().isBlank()) {
                     correoService.enviarCertificadoPorCorreo(est, pdfBytes, id);
                 }
@@ -632,7 +785,7 @@ public class SolicitudService {
             throw new IllegalStateException("Este tipo de solicitud no genera certificado");
         }
 
-        Usuario est = usuarioRepository.findById(s.getCedula()).orElse(null);
+        Usuario est = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
         String nombre = est != null ? est.getNombre() : "Estudiante";
         String cedula = s.getCedula();
         String codigo = est != null ? est.getCodigo() : "-";

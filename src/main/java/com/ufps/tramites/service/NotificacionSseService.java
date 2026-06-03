@@ -1,5 +1,6 @@
 package com.ufps.tramites.service;
 
+import com.ufps.tramites.dto.NotificacionDTO;
 import com.ufps.tramites.model.Solicitud;
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -64,6 +65,21 @@ public class NotificacionSseService {
             }
         }
         log.info("SSE enviado a {} suscriptores de cedula {}", lista.size(), cedula);
+    }
+
+    /** Emite un evento 'notificacion-nueva' al usuario si tiene conexión SSE activa. */
+    public void emitirNotificacion(String cedula, NotificacionDTO dto) {
+        List<SseEmitter> lista = emitters.getOrDefault(cedula, List.of());
+        if (lista.isEmpty()) return;
+        for (SseEmitter emitter : new java.util.ArrayList<>(lista)) {
+            try {
+                emitter.send(SseEmitter.event()
+                        .name("notificacion-nueva")
+                        .data(dto, MediaType.APPLICATION_JSON));
+            } catch (IOException e) {
+                eliminarEmitter(cedula, emitter);
+            }
+        }
     }
 
     private void eliminarEmitter(String cedula, SseEmitter emitter) {

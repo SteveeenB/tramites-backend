@@ -1,9 +1,12 @@
 package com.ufps.tramites.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
@@ -21,11 +24,17 @@ public class TipoCertificado {
     private Double precioDigital;
     private Double costoLogisticaFisica;
 
-    private String dependenciaCedula;
+    @ManyToOne
+    @JoinColumn(name = "dependencia_id")
+    private Dependencia dependencia;
+
     private String direccionOficina;
     private Integer tiempoEntregaDias;
 
     private Boolean activo;
+
+    @Column(columnDefinition = "TEXT")
+    private String plantillaHtml;
 
     public TipoCertificado() {}
 
@@ -47,8 +56,16 @@ public class TipoCertificado {
     public Double getCostoLogisticaFisica() { return costoLogisticaFisica; }
     public void setCostoLogisticaFisica(Double costoLogisticaFisica) { this.costoLogisticaFisica = costoLogisticaFisica; }
 
-    public String getDependenciaCedula() { return dependenciaCedula; }
-    public void setDependenciaCedula(String dependenciaCedula) { this.dependenciaCedula = dependenciaCedula; }
+    public Dependencia getDependencia() { return dependencia; }
+    public void setDependencia(Dependencia dependencia) { this.dependencia = dependencia; }
+
+    public Long getDependenciaId() {
+        return dependencia != null ? dependencia.getId() : null;
+    }
+
+    public String getDependenciaNombre() {
+        return dependencia != null ? dependencia.getNombre() : null;
+    }
 
     public String getDireccionOficina() { return direccionOficina; }
     public void setDireccionOficina(String direccionOficina) { this.direccionOficina = direccionOficina; }
@@ -58,6 +75,9 @@ public class TipoCertificado {
 
     public Boolean getActivo() { return activo; }
     public void setActivo(Boolean activo) { this.activo = activo; }
+
+    public String getPlantillaHtml() { return plantillaHtml; }
+    public void setPlantillaHtml(String plantillaHtml) { this.plantillaHtml = plantillaHtml; }
 
     public double precioTotal(String modalidad) {
         double base = precioDigital != null ? precioDigital : 0.0;
