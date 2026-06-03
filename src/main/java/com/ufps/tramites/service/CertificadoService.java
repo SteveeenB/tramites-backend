@@ -13,6 +13,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
+
 import com.ufps.tramites.model.Estudiante;
 import com.ufps.tramites.model.SolicitudCertificado;
 import com.ufps.tramites.model.TipoCertificado;
@@ -35,6 +38,7 @@ public class CertificadoService {
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private EstudianteRepository estudianteRepository;
     @Autowired private CertificadoConstanciaPdfService pdfService;
+    @Autowired private PlantillaCertificadoService plantillaService;
     @Autowired private CorreoConstanciaService correoService;
     @Autowired private SupabaseStorageService storage;
 
@@ -157,7 +161,7 @@ public class CertificadoService {
 
         byte[] pdfBytes;
         try {
-            pdfBytes = pdfService.generar(tipo, s, estudiante);
+            pdfBytes = generarPdfConstancia(tipo, s, estudiante);
         } catch (Exception e) {
             log.error("[CONSTANCIA] Error generando PDF para solicitud {}: {}", solicitudId, e.getMessage());
             throw new IllegalStateException("No se pudo generar el certificado PDF. Intenta de nuevo en unos minutos.");
@@ -185,6 +189,30 @@ public class CertificadoService {
             log.error("[CONSTANCIA] PDF generado pero correo falló para solicitud {}: {}", solicitudId, e.getMessage());
             // No revertimos el estado: el PDF existe y es descargable.
         }
+    }
+
+    private byte[] generarPdfConstancia(TipoCertificado tipo, SolicitudCertificado s, Usuario estudiante) throws Exception {
+        if (tipo.getPlantillaHtml() != null && !tipo.getPlantillaHtml().isBlank()) {
+            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", new Locale("es", "CO"));
+            String fechaExpedicion = LocalDate.now().format(fmt);
+            String codigoVerif = "UFPS-CERT-" + s.getId() + "-"
+                    + s.getCedula().substring(Math.max(0, s.getCedula().length() - 4));
+            Map<String, String> vars = new LinkedHashMap<>();
+            vars.put("nombre_completo", estudiante != null ? estudiante.getNombre() : "—");
+            vars.put("cedula", s.getCedula());
+            vars.put("codigo_estudiantil", estudiante != null ? estudiante.getCodigo() : "—");
+            vars.put("programa", estudiante != null && estudiante.getProgramaAcademico() != null
+                    ? estudiante.getProgramaAcademico().getNombre() : "—");
+            vars.put("tipo_certificado", tipo.getLabel());
+            vars.put("fecha_expedicion", fechaExpedicion);
+            vars.put("fecha_aprobacion", fechaExpedicion);
+            vars.put("numero_solicitud", String.valueOf(s.getId()));
+            vars.put("codigo_verificacion", codigoVerif);
+            vars.put("dependencia", tipo.getDependenciaNombre() != null ? tipo.getDependenciaNombre() : "—");
+            String html = plantillaService.aplicarVariables(tipo.getPlantillaHtml(), vars);
+            return plantillaService.renderizarPdf(html);
+        }
+        return pdfService.generar(tipo, s, estudiante);
     }
 
     // ── 4) DESCARGA DEL PDF ───────────────────────────────────────────────────
