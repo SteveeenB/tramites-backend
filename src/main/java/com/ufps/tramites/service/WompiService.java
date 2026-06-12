@@ -19,6 +19,7 @@ import com.ufps.tramites.model.SolicitudCertificado;
 import com.ufps.tramites.repository.PagoRepository;
 import com.ufps.tramites.repository.SolicitudCertificadoRepository;
 import com.ufps.tramites.repository.SolicitudRepository;
+import com.ufps.tramites.repository.TipoSolicitudRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
 
 @Service
@@ -61,6 +62,9 @@ public class WompiService {
 
     @Autowired
     private com.ufps.tramites.repository.UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private TipoSolicitudRepository tipoSolicitudRepository;
 
     // ─────────────────────────────────────────────────────────────────────
     // CREAR PAGO
@@ -257,7 +261,9 @@ public class WompiService {
             case "GRADO" ->
                 solicitud.getCosto() != null ? solicitud.getCosto().longValue() : 250_000L;
             case "MODALIDAD_CEREMONIA" ->
-                40_000L;
+                tipoSolicitudRepository.findByCodigo("MODALIDAD_CEREMONIA")
+                    .map(t -> t.getCosto() != null ? t.getCosto().longValue() : 40_000L)
+                    .orElse(40_000L);
             default ->
                 throw new IllegalArgumentException("Tipo de pago inválido: " + tipoPago);
         };

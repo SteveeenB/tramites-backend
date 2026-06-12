@@ -24,6 +24,7 @@ import com.itextpdf.layout.properties.UnitValue;
 import com.ufps.tramites.model.SolicitudCertificado;
 import com.ufps.tramites.model.TipoCertificado;
 import com.ufps.tramites.model.Usuario;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
@@ -50,6 +51,9 @@ import java.util.Map;
  */
 @Service
 public class CertificadoConstanciaPdfService {
+
+    @Value("${app.frontend-url:http://localhost:3000}")
+    private String frontendUrl;
 
     private static final DeviceRgb COLOR_ROJO  = new DeviceRgb(188, 0, 23);    // #BC0017
     private static final DeviceRgb COLOR_NEGRO = new DeviceRgb(0, 0, 0);       // #000000
@@ -164,7 +168,7 @@ public class CertificadoConstanciaPdfService {
         String cedula = estudiante != null ? estudiante.getCedula() : "0000";
         String codigoVerif = "UFPS-CERT-" + s.getId() + "-"
                 + cedula.substring(Math.max(0, cedula.length() - 4));
-        String urlVerif = "https://tramites.ufps.edu.co/verificar?codigo=" + codigoVerif;
+        String urlVerif = frontendUrl + "/verificar?codigo=" + codigoVerif;
 
         float[] widths = {28f, 72f};
         Table verif = new Table(UnitValue.createPercentArray(widths))
