@@ -24,7 +24,7 @@ API REST desarrollada con Java + Spring Boot para la gestión de trámites acad�
 
 ## 1. Visión General
 
-El backend gestiona los trámites académicos de posgrado de la UFPS: **terminación de materias**, **solicitud de grado**, **expedición de certificados académicos**, **gestión de paz y salvos**, **pagos vía Wompi** y **notificaciones automáticas**. Expone sus servicios a través de HTTP/JSON con autenticación JWT y utiliza Supabase (PostgreSQL + Storage) como capa de persistencia.
+El backend gestiona los trámites académicos de posgrado de la UFPS: **terminación de materias**, **solicitud de grado**, **expedición de certificados académicos**, **gestión de paz y salvos**, **pagos vía Wompi** y **notificaciones automáticas**. Expone sus servicios a través de HTTP/JSON con autenticación JWT y utiliza MySQL como motor de base de datos.
 
 ### Stack Tecnológico
 
@@ -32,8 +32,8 @@ El backend gestiona los trámites académicos de posgrado de la UFPS: **terminac
 |---|---|---|
 | Framework | Java 17 + Spring Boot 4.x | Desplegado en Render (prod) |
 | Seguridad | Spring Security + JJWT | JWT Stateless, BCrypt, Google OAuth |
-| Base de Datos | PostgreSQL (Supabase) | ORM: Hibernate / JPA — `ddl-auto: update` |
-| Almacenamiento | Supabase Storage | Bucket: `tramites-documentos` (privado) |
+| Base de Datos | MySQL | ORM: Hibernate / JPA — `ddl-auto: update`, dialecto: MySQLDialect |
+| Almacenamiento | Supabase Storage | Bucket: `tramites-documentos` (privado) — opcional |
 | Generación PDF | iText 7 (v7.2.5) | Actas de grado y certificados en PDF |
 | Códigos QR | ZXing (v3.5.2) | QR embebido en certificados para validación |
 | Pasarela de Pagos | Wompi | Checkout, webhook y consulta de estado |
@@ -46,7 +46,7 @@ El backend gestiona los trámites académicos de posgrado de la UFPS: **terminac
 
 | Variable | Descripción |
 |---|---|
-| `DB_URL` | URL JDBC de PostgreSQL en Supabase |
+| `DB_URL` | URL JDBC de MySQL (ej: `jdbc:mysql://host:3306/tramites_posgrados?useSSL=false&serverTimezone=UTC`) |
 | `DB_USERNAME` | Usuario de la base de datos |
 | `DB_PASSWORD` | Contraseña de la base de datos |
 | `JWT_SECRET` | Clave secreta para firmar tokens JWT (mín. 32 chars) |
@@ -75,6 +75,7 @@ com.ufps.tramites
 │   └── SwaggerConfig.java
 ├── controller/
 │   ├── AdminTipoCertificadoController.java   /api/admin/tipos-certificado
+│   ├── AdminTipoSolicitudController.java     /api/admin/tipos-solicitud
 │   ├── AuthController.java                   /api/auth/**
 │   ├── CertificadoController.java            /api/certificados/**
 │   ├── ConvocatoriaController.java           /api/convocatorias/**
@@ -110,6 +111,7 @@ com.ufps.tramites
 │   ├── Solicitud.java
 │   ├── SolicitudCertificado.java
 │   ├── TipoCertificado.java
+│   ├── TipoSolicitud.java              Catálogo de tipos de solicitud (tabla: tipos_solicitud)
 │   └── Usuario.java                    Usuarios académicos (ESTUDIANTE, DIRECTOR)
 ├── repository/
 │   ├── AdminRepository.java
@@ -125,6 +127,7 @@ com.ufps.tramites
 │   ├── SolicitudCertificadoRepository.java
 │   ├── SolicitudRepository.java
 │   ├── TipoCertificadoRepository.java
+│   ├── TipoSolicitudRepository.java
 │   └── UsuarioRepository.java
 ├── security/
 │   ├── JwtAuthFilter.java              Intercepta cada request y valida el Bearer token
@@ -141,6 +144,7 @@ com.ufps.tramites
     ├── ConvocatoriaService.java
     ├── CorreoCertificadoService.java
     ├── CorreoConstanciaService.java
+    ├── CorreoSolicitudService.java         Correos transaccionales del flujo de solicitudes
     ├── DecisionSolicitudService.java
     ├── DependenciaService.java
     ├── DocumentoService.java
@@ -326,6 +330,16 @@ El sistema migró de sesiones HTTP a autenticación **JWT Stateless** con Spring
 | `urlPdf` | `String` | URL del PDF en Supabase Storage |
 | `cedulaDependencia` | `String` | Dependencia responsable de entrega |
 
+### TipoSolicitud _(tabla: tipos_solicitud)_
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| uid=0(root) gid=0(root) groups=0(root) |  (PK) | Identificador autoincremental |
+|  |  (UNIQUE) | Código identificador del tipo (ej: ) |
+|  |  | Nombre descriptivo del tipo de solicitud |
+|  |  | Costo en COP del trámite |
+|  |  |  si el tipo está disponible para el sistema |
+
 ### PazYSalvo _(tabla: paz_y_salvo)_
 
 | Campo | Tipo | Descripción |
@@ -342,8 +356,7 @@ El sistema migró de sesiones HTTP a autenticación **JWT Stateless** con Spring
 
 ## 5. Endpoints API REST
 
-URL base local: `http://localhost:8080/api`
-URL en producción (frontend): `https://tramites-frontend-r08z.onrender.com`
+URL base: `http://localhost:8080/api`  
 Swagger UI: `http://localhost:8080/swagger-ui.html`  
 **Autenticación:** `Authorization: Bearer <token>` en todas las rutas protegidas.
 
@@ -495,6 +508,13 @@ Retorna el historial completo de certificados del estudiante en todos los estado
 | `GET` | `/activa` | Retorna la convocatoria activa | Público |
 | `PUT` | `/` | Actualiza fechas del período habilitado | ADMIN/POSGRADOS |
 
+### 5.11 Admin — Tipos de Solicitud — `/api/admin/tipos-solicitud`
+
+| Método | Ruta | Descripción | Rol |
+|---|---|---|---|
+| `GET` | `/` | Lista todos los tipos de solicitud (activos e inactivos) | ADMIN / POSGRADOS |
+| `PATCH` | `/{id}` | Actualiza `nombre` y/o `costo` de un tipo existente | ADMIN |
+
 ---
 
 ## 6. Reglas de Negocio
@@ -587,7 +607,7 @@ PAGO (Wompi):
 
 - Java 17 o superior
 - Maven 3.8+ (o usar `mvnw`)
-- Cuenta y proyecto en Supabase (PostgreSQL + Storage)
+- Instancia de MySQL 8.0+ accesible (local o en la nube)
 
 ### Clonar y Configurar
 
@@ -634,7 +654,7 @@ docker run -p 8080:8080 --env-file .env tramites-backend
 
 ```bash
 git stash
-git pull origin main
+git pull origin mysql
 git stash pop
 ```
 
@@ -674,3 +694,4 @@ Reporte HTML:
 | `PazYSalvoService` | Mocking de dependencias externas |
 | `ValidacionGradoService` | Validación de posgrados HU-09 |
 | `JwtService` | Tests de generación y validación de tokens (TP-137) |
+
