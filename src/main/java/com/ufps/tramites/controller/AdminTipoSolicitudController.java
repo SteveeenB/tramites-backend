@@ -28,7 +28,7 @@ public class AdminTipoSolicitudController {
         return ResponseEntity.ok(data);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'POSGRADOS')")
     @PatchMapping("/{id}")
     public ResponseEntity<?> actualizar(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         return repository.findById(id)
