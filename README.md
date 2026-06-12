@@ -342,7 +342,8 @@ El sistema migró de sesiones HTTP a autenticación **JWT Stateless** con Spring
 
 ## 5. Endpoints API REST
 
-URL base: `http://localhost:8080/api`  
+URL base local: `http://localhost:8080/api`
+URL en producción (frontend): `https://tramites-frontend-r08z.onrender.com`
 Swagger UI: `http://localhost:8080/swagger-ui.html`  
 **Autenticación:** `Authorization: Bearer <token>` en todas las rutas protegidas.
 
