@@ -33,7 +33,7 @@ El backend gestiona los trámites académicos de posgrado de la UFPS: **terminac
 | Framework | Java 17 + Spring Boot 4.x | Desplegado en Render (prod) |
 | Seguridad | Spring Security + JJWT | JWT Stateless, BCrypt, Google OAuth |
 | Base de Datos | MySQL | ORM: Hibernate / JPA — `ddl-auto: update`, dialecto: MySQLDialect |
-| Almacenamiento | Supabase Storage | Bucket: `tramites-documentos` (privado) — opcional |
+| Almacenamiento | Supabase Storage | Bucket: `tramites-documentos` — almacenamiento de PDFs y archivos adjuntos |
 | Generación PDF | iText 7 (v7.2.5) | Actas de grado y certificados en PDF |
 | Códigos QR | ZXing (v3.5.2) | QR embebido en certificados para validación |
 | Pasarela de Pagos | Wompi | Checkout, webhook y consulta de estado |
@@ -51,8 +51,8 @@ El backend gestiona los trámites académicos de posgrado de la UFPS: **terminac
 | `DB_PASSWORD` | Contraseña de la base de datos |
 | `JWT_SECRET` | Clave secreta para firmar tokens JWT (mín. 32 chars) |
 | `JWT_EXPIRATION_MS` | Duración del token en ms (ej. `86400000` = 24h) |
-| `SUPABASE_URL` | URL base del proyecto Supabase |
-| `SUPABASE_SERVICE_ROLE_KEY` | Clave para acceso a Storage privado |
+| `SUPABASE_URL` | URL base del proyecto Supabase (para almacenamiento de archivos) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Clave para acceso al bucket de Supabase Storage |
 | `SUPABASE_BUCKET` | Nombre del bucket (`tramites-documentos`) |
 | `CORS_ORIGIN` | Origen permitido en CORS (`http://localhost:3000`) |
 | `PORT` | Puerto del servidor HTTP (`8080`) |
