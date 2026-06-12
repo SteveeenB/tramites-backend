@@ -21,6 +21,7 @@ import com.itextpdf.layout.properties.HorizontalAlignment;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import com.itextpdf.io.image.ImageDataFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
@@ -32,6 +33,9 @@ import java.util.Map;
 
 @Service
 public class CertificadoPdfService {
+
+    @Value("${app.frontend-url:http://localhost:3000}")
+    private String frontendUrl;
 
     private static final DeviceRgb COLOR_ROJO  = new DeviceRgb(188, 0, 23);    // #BC0017
     private static final DeviceRgb COLOR_NEGRO = new DeviceRgb(0, 0, 0);       // #000000
@@ -146,7 +150,7 @@ public class CertificadoPdfService {
                                              String cedula, String fechaExpedicion) {
         // Código de verificación legible
         String codigoVerif = "UFPS-TM-" + solicitudId + "-" + cedula.substring(Math.max(0, cedula.length() - 4));
-        String urlVerif    = "https://tramites.ufps.edu.co/verificar?codigo=" + codigoVerif;
+        String urlVerif    = frontendUrl + "/verificar?codigo=" + codigoVerif;
 
         // ── Tabla con QR a la izquierda y texto a la derecha ──────────────
         float[] widths = {28f, 72f};
