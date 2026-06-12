@@ -321,6 +321,12 @@ public class SolicitudController {
         catch (IllegalStateException e)      { return ResponseEntity.status(422).body(error(e.getMessage())); }
     }
 
+    /** GET /api/solicitudes/verificar — público, sin JWT (QR de certificados) */
+    @GetMapping("/verificar")
+    public ResponseEntity<Map<String, Object>> verificarCertificado(@RequestParam String codigo) {
+        return ResponseEntity.ok(solicitudService.verificarCertificado(codigo));
+    }
+
     private Map<String, Object> error(String mensaje) {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("error", mensaje);
