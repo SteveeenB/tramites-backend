@@ -19,7 +19,7 @@ public class PazYSalvoController {
     @Autowired private PrincipalResolver principalResolver;
 
     /** GET /api/paz-y-salvo/mis-solicitudes */
-    @PreAuthorize("hasAnyRole('DEPENDENCIA', 'DIRECTOR')")
+    @PreAuthorize("hasAnyRole('DEPENDENCIA', 'DIRECTOR', 'POSGRADOS')")
     @GetMapping("/mis-solicitudes")
     public ResponseEntity<?> misSolicitudes(Authentication auth) {
         ResolvedPrincipal p = principalResolver.resolve(auth);
@@ -28,7 +28,7 @@ public class PazYSalvoController {
     }
 
     /** GET /api/paz-y-salvo/pendientes */
-    @PreAuthorize("hasAnyRole('DEPENDENCIA', 'DIRECTOR')")
+    @PreAuthorize("hasAnyRole('DEPENDENCIA', 'DIRECTOR', 'POSGRADOS')")
     @GetMapping("/pendientes")
     public ResponseEntity<?> pendientes(Authentication auth) {
         ResolvedPrincipal p = principalResolver.resolve(auth);
@@ -37,7 +37,7 @@ public class PazYSalvoController {
     }
 
     /** POST /api/paz-y-salvo/{id}/responder */
-    @PreAuthorize("hasAnyRole('DEPENDENCIA', 'DIRECTOR')")
+    @PreAuthorize("hasAnyRole('DEPENDENCIA', 'DIRECTOR', 'POSGRADOS')")
     @PostMapping("/{id}/responder")
     public ResponseEntity<?> responder(
             @PathVariable Long id,
