@@ -55,6 +55,10 @@ public class CertificadoConstanciaPdfService {
     @Value("${app.frontend-url:http://localhost:3000}")
     private String frontendUrl;
 
+    private String getFrontendBase() {
+        return frontendUrl.endsWith("/") ? frontendUrl.substring(0, frontendUrl.length() - 1) : frontendUrl;
+    }
+
     private static final DeviceRgb COLOR_ROJO  = new DeviceRgb(188, 0, 23);    // #BC0017
     private static final DeviceRgb COLOR_NEGRO = new DeviceRgb(0, 0, 0);       // #000000
     private static final DeviceRgb COLOR_GRIS  = new DeviceRgb(129, 131, 134); // #818386
@@ -168,7 +172,7 @@ public class CertificadoConstanciaPdfService {
         String cedula = estudiante != null ? estudiante.getCedula() : "0000";
         String codigoVerif = "UFPS-CERT-" + s.getId() + "-"
                 + cedula.substring(Math.max(0, cedula.length() - 4));
-        String urlVerif = frontendUrl + "/verificar?codigo=" + codigoVerif;
+        String urlVerif = getFrontendBase() + "/verificar?codigo=" + codigoVerif;
 
         float[] widths = {28f, 72f};
         Table verif = new Table(UnitValue.createPercentArray(widths))
