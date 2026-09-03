@@ -246,6 +246,32 @@ public class SolicitudController {
         }
     }
 
+    /** POST /api/solicitudes/{id}/modalidad-grado?modalidad=CEREMONIA|SECRETARIA */
+    @PreAuthorize("hasRole('ESTUDIANTE')")
+    @PostMapping("/{id}/modalidad-grado")
+    public ResponseEntity<?> registrarModalidadGrado(@PathVariable Long id, @RequestParam String modalidad) {
+        try {
+            return ResponseEntity.ok(solicitudService.registrarModalidadGrado(id, modalidad));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(422).body(error(e.getMessage()));
+        }
+    }
+
+    /** POST /api/solicitudes/{id}/pagar-modalidad */
+    @PreAuthorize("hasRole('ESTUDIANTE')")
+    @PostMapping("/{id}/pagar-modalidad")
+    public ResponseEntity<?> pagarModalidad(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(solicitudService.registrarPagoModalidad(id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(422).body(error(e.getMessage()));
+        }
+    }
+
     /** POST /api/solicitudes/{id}/fecha-grado */
     @PreAuthorize("hasAnyRole('DIRECTOR', 'POSGRADOS')")
     @PostMapping("/{id}/fecha-grado")
