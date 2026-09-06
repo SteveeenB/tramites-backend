@@ -1,5 +1,4 @@
 package com.ufps.tramites.controller;
-
 import com.ufps.tramites.security.PrincipalResolver;
 import com.ufps.tramites.security.ResolvedPrincipal;
 import com.ufps.tramites.service.DocumentoService;
@@ -127,10 +126,13 @@ public class SolicitudController {
         try {
             var resultado = documentoService.obtenerArchivo(id, docId);
             if (resultado == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            // FIX (Diego Bermudez, dd/mm/aaaa): guard con instanceof — el chequeo anterior solo validaba null,
+            // no el tipo, y podía lanzar ClassCastException si "contentType" no era String
+            Object ct = resultado.get("contentType");
+            String contentType = (ct instanceof String) ? (String) ct : "application/octet-stream";
             return ResponseEntity.ok()
                     .header("Content-Disposition", "inline; filename=\"" + resultado.get("nombreOriginal") + "\"")
-                    .contentType(org.springframework.http.MediaType.parseMediaType(
-                            resultado.get("contentType") != null ? (String) resultado.get("contentType") : "application/octet-stream"))
+                    .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
                     .body((byte[]) resultado.get("bytes"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
