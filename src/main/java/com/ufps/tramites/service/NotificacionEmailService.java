@@ -41,6 +41,48 @@ public class NotificacionEmailService {
         enviarEmail(correo, construirAsunto(solicitud), construirCuerpo(solicitud, estudiante));
     }
 
+    /** Correo al director cuando un estudiante registra una nueva solicitud (evento 1). */
+    public void enviarCorreoNuevaSolicitud(Solicitud solicitud, Usuario director, String nombreEstudiante) {
+        if (director == null) return;
+        String correo = director.getCorreo();
+        if (correo == null || correo.isBlank()) {
+            log.warn("[NUEVA_SOLICITUD] Director {} sin email registrado, solicitud #{}",
+                    director.getCedula(), solicitud.getId());
+            return;
+        }
+        String tipo     = solicitud.getTipo().replace("_", " ");
+        String radicado = solicitud.getRadicado() != null ? solicitud.getRadicado() : "#" + solicitud.getId();
+        String nombreDir = director.getNombreCompleto() != null ? director.getNombreCompleto() : director.getCedula();
+        String asunto   = "[UFPS] Nueva solicitud para revisión - " + tipo;
+
+        String cuerpo = String.format(cargarPlantilla("nueva-solicitud-director.txt"),
+                nombreDir,
+                tipo,
+                radicado,
+                nombreEstudiante != null ? nombreEstudiante : solicitud.getCedula(),
+                solicitud.getFechaSolicitud());
+
+        enviarEmail(correo, asunto, cuerpo);
+    }
+
+    /** Correo al estudiante cuando se confirma el pago de su trámite (evento 4). */
+    public void enviarCorreoPagoConfirmado(Solicitud solicitud, Usuario estudiante) {
+        if (estudiante == null) return;
+        String correo = estudiante.getCorreo();
+        String tipo     = solicitud.getTipo().replace("_", " ");
+        String radicado = solicitud.getRadicado() != null ? solicitud.getRadicado() : "#" + solicitud.getId();
+        String nombre   = estudiante.getNombreCompleto() != null ? estudiante.getNombreCompleto() : estudiante.getCedula();
+        String asunto   = "[UFPS] Pago confirmado - " + tipo;
+
+        String cuerpo = String.format(cargarPlantilla("pago-confirmado.txt"),
+                nombre,
+                tipo,
+                radicado,
+                java.time.LocalDate.now());
+
+        enviarEmail(correo, asunto, cuerpo);
+    }
+
     /** Envía correo al director cuando una solicitud excede el plazo sin decisión. */
     public void enviarEmailPlazoVencido(Solicitud solicitud, Usuario director, int plazoHoras) {
         if (director == null) return;
