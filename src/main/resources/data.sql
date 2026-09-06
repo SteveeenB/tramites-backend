@@ -125,12 +125,7 @@ VALUES
       '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
       'DEPENDENCIA', false, (SELECT id FROM dependencias WHERE nombre = 'Admisiones' LIMIT 1));
 
--- Estudiante de prueba: Steven Bueno (credenciales: steven / 123456)
-INSERT IGNORE INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id, email, programa_id) VALUES
-('steven', 'steven', 'Steven Bueno', '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
-    (SELECT id FROM roles WHERE nombre = 'ESTUDIANTE' LIMIT 1),
-    'johanstevenbr@ufps.edu.co',
-    (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1));
+-- FIX RN-04 (Diego Bermudez, 06/09/2026): se retira usuario de prueba personal steven/steven del seed
 
 -- Estudiante con créditos completos y terminación aprobada
 INSERT IGNORE INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id, email, programa_id) VALUES
@@ -198,7 +193,6 @@ VALUES
      (SELECT id FROM usuario WHERE cedula = '1098765437' LIMIT 1)),
     ('Andrea', 'Prueba',   '2000000010', 'EST010',   'andrea.grado@test.com', true, false, 56,
      (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1),
-     (SELECT id FROM usuario WHERE cedula = '2000000010' LIMIT 1)),
-    ('Steven', 'Bueno',   'steven',     'steven',   'johanstevenbr@ufps.edu.co', true, false, 56,
-     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1),
-     (SELECT id FROM usuario WHERE cedula = 'steven' LIMIT 1));
+     (SELECT id FROM usuario WHERE cedula = '2000000010' LIMIT 1));
+     -- FIX RN-04 (Diego Bermudez, 06/09/2026): se retira usuario de prueba personal steven/steven del seed
+
