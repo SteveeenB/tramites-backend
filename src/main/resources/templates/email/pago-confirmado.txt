@@ -1,0 +1,13 @@
+Estimado/a %s,
+
+Hemos confirmado el pago de su trámite. Su solicitud continúa el proceso.
+
+Tipo de trámite: %s
+Radicado: %s
+Fecha: %s
+
+Le notificaremos por este medio cuando haya novedades sobre su solicitud.
+
+Atentamente,
+Universidad Francisco de Paula Santander (UFPS)
+Sistema de Trámites de Posgrado

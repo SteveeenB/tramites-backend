@@ -1,0 +1,14 @@
+Estimado/a %s,
+
+Se ha registrado una nueva solicitud que requiere su revisión.
+
+Tipo de trámite: %s
+Radicado: %s
+Estudiante: %s
+Fecha de solicitud: %s
+
+Ingrese al sistema para gestionarla desde su bandeja de director.
+
+Atentamente,
+Universidad Francisco de Paula Santander (UFPS)
+Sistema de Trámites de Posgrado

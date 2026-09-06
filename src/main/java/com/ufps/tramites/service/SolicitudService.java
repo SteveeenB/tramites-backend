@@ -13,10 +13,12 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.ufps.tramites.event.SolicitudEstadoCambiadoEvent;
 import com.ufps.tramites.model.Admin;
 import com.ufps.tramites.model.EstadoEstudiante;
 import com.ufps.tramites.model.Estudiante;
@@ -57,7 +59,10 @@ public class SolicitudService {
     private NotificacionSseService notificacionSseService;
 
     @Autowired
-    private NotificacionService notificacionService;
+    private NotificacionEmailService notificacionEmailService;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     @Autowired
     private ActaPdfGeneratorService actaPdfGeneratorService;
@@ -129,6 +134,8 @@ public class SolicitudService {
         solicitud.setRadicado(generarRadicado(solicitud));
         solicitudRepository.save(solicitud);
 
+        notificarDirectorNuevaSolicitud(solicitud, estudiante);
+
         return construirRespuestaSolicitud(solicitud);
     }
 
@@ -192,6 +199,8 @@ public class SolicitudService {
         if (certificadoIngles != null && !certificadoIngles.isEmpty()) {
             documentoService.guardarDocumento(solicitud.getId(), certificadoIngles, "CERTIFICADO_INGLES");
         }
+
+        notificarDirectorNuevaSolicitud(solicitud, estudiante);
 
         return construirRespuestaSolicitud(solicitud);
     }
@@ -396,8 +405,28 @@ public class SolicitudService {
 
     private void notificarEstudiante(Solicitud s, String estadoAnterior) {
         notificacionSseService.notificarCambioEstado(s, estadoAnterior);
+        // Publica el evento de dominio: NotificacionEmailService es el sink único
+        // (notificación in-app + correo de aprobación/rechazo). Ver @EventListener.
         usuarioRepository.findByCedula(s.getCedula())
-                .ifPresent(est -> notificacionService.notificarEstudianteCambioEstado(s, est));
+                .ifPresent(est -> eventPublisher.publishEvent(
+                        new SolicitudEstadoCambiadoEvent(this, s, est, estadoAnterior)));
+    }
+
+    /** Notifica por correo al director del programa del estudiante que hay una nueva solicitud. */
+    private void notificarDirectorNuevaSolicitud(Solicitud s, Usuario estudiante) {
+        Long programaId = estudiante.getProgramaAcademico() != null
+                ? estudiante.getProgramaAcademico().getId() : null;
+        if (programaId == null) return;
+        String nombreEstudiante = estudiante.getNombreCompleto() != null
+                ? estudiante.getNombreCompleto() : estudiante.getCedula();
+        usuarioRepository.findByProgramaAcademicoIdAndRol_Nombre(programaId, "DIRECTOR")
+                .forEach(dir -> notificacionEmailService.enviarCorreoNuevaSolicitud(s, dir, nombreEstudiante));
+    }
+
+    /** Notifica por correo al estudiante que su pago fue confirmado. */
+    private void notificarPagoConfirmado(Solicitud s) {
+        usuarioRepository.findByCedula(s.getCedula())
+                .ifPresent(est -> notificacionEmailService.enviarCorreoPagoConfirmado(s, est));
     }
 
     /**
@@ -487,6 +516,7 @@ public class SolicitudService {
         }
         s.setEstadoPagoGrado("APROBADO");
         solicitudRepository.save(s);
+        notificarPagoConfirmado(s);
         return construirRespuestaSolicitud(s);
     }
 
@@ -499,6 +529,7 @@ public class SolicitudService {
     s.setEstado("EN_REVISION");
     solicitudRepository.save(s);
     notificarEstudiante(s, "PENDIENTE_PAGO");
+    notificarPagoConfirmado(s);
     return construirRespuestaSolicitud(s);
 }
 
@@ -545,6 +576,7 @@ public class SolicitudService {
         }
         s.setPagoModalidadRealizado(true);
         solicitudRepository.save(s);
+        notificarPagoConfirmado(s);
         return construirRespuestaSolicitud(s);
     }
 
