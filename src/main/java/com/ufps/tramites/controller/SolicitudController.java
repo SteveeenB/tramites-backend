@@ -102,7 +102,11 @@ public class SolicitudController {
     /** POST /api/solicitudes/{id}/documentos */
     @PreAuthorize("hasRole('ESTUDIANTE')")
     @PostMapping(value = "/{id}/documentos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> subirDocumento(@PathVariable Long id, @RequestParam MultipartFile archivo) {
+    public ResponseEntity<?> subirDocumento(@PathVariable Long id, @RequestParam MultipartFile archivo, Authentication auth) {
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        if (!solicitudService.perteneceAEstudiante(id, p.cedula()))
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("No tiene acceso a esta solicitud"));
         try {
             return ResponseEntity.status(HttpStatus.CREATED).body(documentoService.guardarDocumento(id, archivo));
         } catch (IllegalArgumentException e) {
@@ -116,14 +120,22 @@ public class SolicitudController {
     /** GET /api/solicitudes/{id}/documentos */
     @PreAuthorize("hasAnyRole('ESTUDIANTE', 'DIRECTOR')")
     @GetMapping("/{id}/documentos")
-    public ResponseEntity<?> listarDocumentos(@PathVariable Long id) {
+    public ResponseEntity<?> listarDocumentos(@PathVariable Long id, Authentication auth) {
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        if ("ESTUDIANTE".equals(p.rol()) && !solicitudService.perteneceAEstudiante(id, p.cedula()))
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("No tiene acceso a esta solicitud"));
         return ResponseEntity.ok(documentoService.listarDocumentos(id));
     }
 
     /** GET /api/solicitudes/{id}/documentos/{docId}/file */
     @PreAuthorize("hasAnyRole('ESTUDIANTE', 'DIRECTOR')")
     @GetMapping("/{id}/documentos/{docId}/file")
-    public ResponseEntity<byte[]> descargarArchivo(@PathVariable Long id, @PathVariable Long docId) {
+    public ResponseEntity<byte[]> descargarArchivo(@PathVariable Long id, @PathVariable Long docId, Authentication auth) {
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if ("ESTUDIANTE".equals(p.rol()) && !solicitudService.perteneceAEstudiante(id, p.cedula()))
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             var resultado = documentoService.obtenerArchivo(id, docId);
             if (resultado == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
@@ -236,7 +248,11 @@ public class SolicitudController {
     /** POST /api/solicitudes/{id}/pagar-grado */
     @PreAuthorize("hasRole('ESTUDIANTE')")
     @PostMapping("/{id}/pagar-grado")
-    public ResponseEntity<?> pagarGrado(@PathVariable Long id) {
+    public ResponseEntity<?> pagarGrado(@PathVariable Long id, Authentication auth) {
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        if (!solicitudService.perteneceAEstudiante(id, p.cedula()))
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("No tiene acceso a esta solicitud"));
         try {
             return ResponseEntity.ok(solicitudService.registrarPagoGrado(id));
         } catch (IllegalArgumentException e) {
@@ -249,7 +265,11 @@ public class SolicitudController {
     /** POST /api/solicitudes/{id}/modalidad-grado?modalidad=CEREMONIA|SECRETARIA */
     @PreAuthorize("hasRole('ESTUDIANTE')")
     @PostMapping("/{id}/modalidad-grado")
-    public ResponseEntity<?> registrarModalidadGrado(@PathVariable Long id, @RequestParam String modalidad) {
+    public ResponseEntity<?> registrarModalidadGrado(@PathVariable Long id, @RequestParam String modalidad, Authentication auth) {
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        if (!solicitudService.perteneceAEstudiante(id, p.cedula()))
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("No tiene acceso a esta solicitud"));
         try {
             return ResponseEntity.ok(solicitudService.registrarModalidadGrado(id, modalidad));
         } catch (IllegalArgumentException e) {
@@ -262,7 +282,11 @@ public class SolicitudController {
     /** POST /api/solicitudes/{id}/pagar-modalidad */
     @PreAuthorize("hasRole('ESTUDIANTE')")
     @PostMapping("/{id}/pagar-modalidad")
-    public ResponseEntity<?> pagarModalidad(@PathVariable Long id) {
+    public ResponseEntity<?> pagarModalidad(@PathVariable Long id, Authentication auth) {
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        if (!solicitudService.perteneceAEstudiante(id, p.cedula()))
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("No tiene acceso a esta solicitud"));
         try {
             return ResponseEntity.ok(solicitudService.registrarPagoModalidad(id));
         } catch (IllegalArgumentException e) {
