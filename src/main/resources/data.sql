@@ -163,19 +163,18 @@ INSERT INTO tipo_certificado (codigo, label, descripcion, precio_digital, costo_
 ('CONSTANCIA_BUENA_CONDUCTA', 'CONSTANCIA BUENA CONDUCTA POSGRADO',
     'Constancia de comportamiento disciplinario y académico del estudiante.',
     7200, 3800, 'Bloque A - Oficina Admisiones y Registro', 3, true)
-ON CONFLICT (codigo) DO UPDATE SET
-    label                  = EXCLUDED.label,
-    descripcion            = EXCLUDED.descripcion,
-    precio_digital         = EXCLUDED.precio_digital,
-    costo_logistica_fisica = EXCLUDED.costo_logistica_fisica,
-    direccion_oficina      = EXCLUDED.direccion_oficina,
-    tiempo_entrega_dias    = EXCLUDED.tiempo_entrega_dias;
+ON DUPLICATE KEY UPDATE
+    label                  = VALUES(label),
+    descripcion            = VALUES(descripcion),
+    precio_digital         = VALUES(precio_digital),
+    costo_logistica_fisica = VALUES(costo_logistica_fisica),
+    direccion_oficina      = VALUES(direccion_oficina),
+    tiempo_entrega_dias    = VALUES(tiempo_entrega_dias);
 
 -- ── Costos configurables de solicitudes ──────────────────────────────
-INSERT INTO tipos_solicitud (codigo, nombre, costo, activo) VALUES
+INSERT IGNORE INTO tipos_solicitud (codigo, nombre, costo, activo) VALUES
 ('TERMINACION_MATERIAS', 'Terminación de Materias', 150000, true),
-('GRADO', 'Solicitud de Grado', 250000, true)
-ON CONFLICT (codigo) DO NOTHING;
+('GRADO', 'Solicitud de Grado', 250000, true);
 
 -- ============================================================
 -- Perfiles de Estudiante (después de usuario por el FK usuario_id)
