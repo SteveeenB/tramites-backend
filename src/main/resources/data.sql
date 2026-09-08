@@ -184,8 +184,8 @@ INSERT IGNORE INTO estudiante (nombre, apellido, cedula, codigo, email, es_posgr
     creditos_aprobados, programa_id, usuario_id)
 VALUES
     ('Juan',   'Perez',    '1098765432', '20261001', 'raulbaezjxd123@gmail.com',      true, false, 40,
-     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas'),
-     (SELECT id FROM usuario WHERE cedula = '1098765432')),
+     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1),
+     (SELECT id FROM usuario WHERE cedula = '1098765432' LIMIT 1)),
     ('Laura',  'Gomez',    '1098765435', '20261005', 'laura@example.com',     true, false, 56,
      (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1),
      (SELECT id FROM usuario WHERE cedula = '1098765435' LIMIT 1)),
