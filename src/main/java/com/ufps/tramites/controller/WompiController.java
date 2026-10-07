@@ -2,6 +2,7 @@ package com.ufps.tramites.controller;
 
 import com.ufps.tramites.security.PrincipalResolver;
 import com.ufps.tramites.security.ResolvedPrincipal;
+import com.ufps.tramites.service.SolicitudService;
 import com.ufps.tramites.service.WompiService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -18,6 +19,7 @@ public class WompiController {
 
     @Autowired private WompiService wompiService;
     @Autowired private PrincipalResolver principalResolver;
+    @Autowired private SolicitudService solicitudService;
 
     /**
      * POST /api/pagos/crear
@@ -39,6 +41,16 @@ public class WompiController {
 
             if (solicitudId == null || tipoPago == null || tipoPago.isBlank())
                 return ResponseEntity.badRequest().body(Map.of("error", "solicitudId y tipoPago son requeridos"));
+
+            // FIX TP-186 (Santiago Cepeda, 07/10/2026): evitar IDOR —
+            // confirmar que la solicitud pertenece al estudiante del token
+            // antes de generar el pago. Antes se tomaba la cédula del token
+            // pero no se verificaba la propiedad de la solicitud, por lo que
+            // un estudiante autenticado podía iniciar el checkout del pago
+            // de otro estudiante conociendo el solicitudId.
+            if (!solicitudService.perteneceAEstudiante(solicitudId, p.cedula()))
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "La solicitud no pertenece al estudiante autenticado"));
 
             return ResponseEntity.ok(wompiService.crearPago(solicitudId, p.cedula(), tipoPago));
 
