@@ -373,8 +373,14 @@ public class SolicitudService {
     public Map<String, Object> aprobarSolicitudConDirector(Long id, String cedulaDirector) {
         Solicitud s = solicitudRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
-        if (!"PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())) {
-            throw new IllegalStateException("Solo se pueden aprobar solicitudes en estado pendiente");
+        // FIX TP-188 (Diego Bermúdez, 07/10/2026): el Director sólo puede
+        // aprobar desde EN_REVISION. Antes aceptaba también PENDIENTE_PAGO,
+        // dejando saltar el pago del estudiante (CP-010 / hallazgo
+        // de flujo).
+        if (!"EN_REVISION".equals(s.getEstado())) {
+            throw new IllegalStateException(
+                "Solo se pueden aprobar solicitudes en estado EN_REVISION. "
+                + "Estado actual: " + s.getEstado());
         }
         String estadoAnterior = s.getEstado();
         String nuevoEstado = "TERMINACION_MATERIAS".equals(s.getTipo())
@@ -524,6 +530,15 @@ public class SolicitudService {
                 .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
         if (!"APROBADA".equals(s.getEstado()) || !"GRADO".equals(s.getTipo())) {
             throw new IllegalStateException("La solicitud no es una solicitud de grado aprobada");
+        }
+        // FIX TP-188 (Diego Bermúdez, 07/10/2026): el pago de grado requiere
+        // que todos los paz y salvos estén aprobados. Antes el estudiante
+        // podía pagar incluso con uno rechazado (CP-023), llegando a acta
+        // con paz y salvos pendientes.
+        if (!pazYSalvoService.todosAprobados(id)) {
+            throw new IllegalStateException(
+                "No se puede registrar el pago de grado: "
+                + "aún hay paz y salvos pendientes o rechazados.");
         }
         s.setEstadoPagoGrado("APROBADO");
         solicitudRepository.save(s);
@@ -683,6 +698,14 @@ public class SolicitudService {
         if (!"GRADO".equals(s.getTipo())) {
             throw new IllegalStateException("Este endpoint es solo para solicitudes de tipo GRADO");
         }
+        // FIX TP-188 (Diego Bermúdez, 07/10/2026): el acta exige todos los
+        // paz y salvos aprobados; antes se podía generar con alguno
+        // rechazado o pendiente (CP-023 / CP-027).
+        if (!pazYSalvoService.todosAprobados(id)) {
+            throw new IllegalStateException(
+                "No se puede generar el acta: "
+                + "aún hay paz y salvos pendientes o rechazados.");
+        }
 
         // Si el acta ya fue generada, devolver la versión guardada en disco
         Optional<byte[]> actaExistente = documentoService.obtenerActa(id);
@@ -742,9 +765,25 @@ public class SolicitudService {
     /**
      * Retorna bandeja unificada para el rol POSGRADOS.
      */
+    // FIX TP-188 (Diego Bermúdez, 07/10/2026): la bandeja de Posgrados sólo
+    // debe mostrar solicitudes que ya pasaron por el Director: aprobadas por
+    // Director/Posgrados, finalizadas o rechazadas. Antes incluía
+    // PENDIENTE_PAGO y EN_REVISION, que son de la bandeja del Director
+    // (CP-030).
+    private static final java.util.Set<String> ESTADOS_BANDEJA_POSGRADOS = java.util.Set.of(
+            "APROBADA_DIRECTOR",
+            "APROBADA",
+            "APROBADA_POSGRADOS",
+            "RECHAZADA",
+            "RECHAZADA_POSGRADOS");
+
     public Map<String, Object> getBandejaPosgrados() {
-        List<Solicitud> terminacion = solicitudRepository.findByTipo("TERMINACION_MATERIAS");
-        List<Solicitud> grado = solicitudRepository.findByTipo("GRADO");
+        List<Solicitud> terminacion = solicitudRepository.findByTipo("TERMINACION_MATERIAS").stream()
+                .filter(s -> ESTADOS_BANDEJA_POSGRADOS.contains(s.getEstado()))
+                .collect(Collectors.toList());
+        List<Solicitud> grado = solicitudRepository.findByTipo("GRADO").stream()
+                .filter(s -> ESTADOS_BANDEJA_POSGRADOS.contains(s.getEstado()))
+                .collect(Collectors.toList());
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("terminacion", terminacion.stream().map(s -> enriquecerConEstudiante(s)).collect(Collectors.toList()));
         resp.put("grado", grado.stream().map(s -> enriquecerConEstudiante(s)).collect(Collectors.toList()));
