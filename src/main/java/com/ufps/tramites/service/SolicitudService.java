@@ -30,7 +30,15 @@ import com.ufps.tramites.repository.TipoCertificadoRepository;
 import com.ufps.tramites.repository.TipoSolicitudRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
 
+// FIX TP-194 (Diego Bermúdez, 07/10/2026): se anota la clase con
+// @Transactional porque la mayoría de operaciones de este service escriben
+// en varias tablas (solicitud + estudiante + documento_solicitud +
+// notificacion). Antes cualquier fallo intermedio dejaba estado
+// inconsistente (I_integridad). Spring crea una transacción por método
+// público; los que sólo leen quedan igualmente protegidos y hacen flush
+// consistente.
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class SolicitudService {
 
     // Costo fijo del trámite de terminación de materias (COP) — valor de prueba

@@ -13,7 +13,11 @@ import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.repository.SolicitudRepository;
 import com.ufps.tramites.security.ResolvedPrincipal;
 
+// FIX TP-194 (Diego Bermúdez, 07/10/2026): registrarValidacion escribe
+// Solicitud y la vincula al Admin que decide, así que se marca la clase
+// como transaccional para evitar estados inconsistentes.
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class ValidacionGradoService {
 
     @Autowired

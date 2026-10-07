@@ -22,7 +22,12 @@ import com.ufps.tramites.repository.SolicitudRepository;
 import com.ufps.tramites.repository.TipoSolicitudRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
 
+// FIX TP-194 (Diego Bermúdez, 07/10/2026): procesarWebhook, crearPago y
+// actualizarSolicitudTrasAprobacion escriben en Pago + Solicitud (+ otros
+// agregados vía otros services). Marcamos la clase transaccional para que
+// un fallo intermedio no deje medio aplicado el pago.
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class WompiService {
 
     private static final Logger log = LoggerFactory.getLogger(WompiService.class);
