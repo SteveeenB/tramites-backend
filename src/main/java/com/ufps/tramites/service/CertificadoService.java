@@ -349,8 +349,17 @@ public class CertificadoService {
     // ── 5) FLUJO DE POSGRADOS (FÍSICOS) ─────────────────────────────────
 
     public List<Map<String, Object>> obtenerBandejaPosgrados(String estadoFiltro) {
+        return obtenerBandejaPosgrados(estadoFiltro, null);
+    }
+
+    // FIX TP-200 (Johan Bueno, 07/10/2026): la bandeja de Posgrados ahora
+    // incluye los certificados digitales además de los físicos y acepta
+    // búsqueda por identificación (coincidencia parcial). Antes sólo
+    // mostraba FISICA y no tenía filtro de cédula (CP-042).
+    public List<Map<String, Object>> obtenerBandejaPosgrados(String estadoFiltro, String cedulaFiltro) {
+        String cedula = (cedulaFiltro != null && !cedulaFiltro.isBlank()) ? cedulaFiltro.trim() : null;
         List<SolicitudCertificado> solicitudes =
-            certificadoRepository.findBandejaPosgradosFisico(estadoFiltro);
+            certificadoRepository.findBandejaPosgrados(estadoFiltro, cedula);
         List<Map<String, Object>> resultado = new ArrayList<>();
         for (SolicitudCertificado s : solicitudes) {
             Usuario estudiante = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
