@@ -550,9 +550,19 @@ public class SolicitudService {
         boolean esGrado = "GRADO".equals(s.getTipo());
         liq.put("concepto", esGrado ? "Derechos de Grado" : "Trámite de Terminación de Materias");
         liq.put("valor", s.getCosto());
-        liq.put("fechaLimite", s.getFechaSolicitud() != null
-                ? s.getFechaSolicitud().plusDays(5).toString()
-                : null);
+        // FIX TP-193 (Johan Bueno, 07/10/2026): liquidación vence a los
+        // 5 días hábiles (L-V, sin calendario de festivos documentado). Si
+        // la fecha ya pasó, se regenera a partir de hoy para que el
+        // estudiante pueda reintentar sin pedirle al soporte una nueva.
+        java.time.LocalDate base = s.getFechaSolicitud();
+        java.time.LocalDate limite = base != null
+                ? com.ufps.tramites.util.FechaUtil.sumarDiasHabiles(base, 5)
+                : null;
+        if (com.ufps.tramites.util.FechaUtil.estaVencida(limite)) {
+            limite = com.ufps.tramites.util.FechaUtil.sumarDiasHabiles(java.time.LocalDate.now(), 5);
+            liq.put("regenerada", true);
+        }
+        liq.put("fechaLimite", limite != null ? limite.toString() : null);
         liq.put("instrucciones", "Realiza el pago en la ventanilla de Tesorería o por PSE antes de la fecha límite.");
         return liq;
     }
