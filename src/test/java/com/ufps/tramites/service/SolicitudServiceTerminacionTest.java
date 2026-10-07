@@ -66,6 +66,9 @@ class SolicitudServiceTerminacionTest {
     // de AdminRepository para notificar a POSGRADOS tras la aprobación
     // del Director; mockearlo para que el test unitario no explote con NPE.
     @Mock private com.ufps.tramites.repository.AdminRepository adminRepository;
+    // FIX TP-201 (Johan Bueno, 07/10/2026): nueva dependencia para persistir
+    // el historial de cambios de estado.
+    @Mock private com.ufps.tramites.repository.CambioEstadoSolicitudRepository cambioEstadoRepository;
 
     @InjectMocks
     private SolicitudService solicitudService;
