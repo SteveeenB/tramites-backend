@@ -368,7 +368,6 @@ public class SolicitudService {
                 : "APROBADA";
         s.setEstado(nuevoEstado);
         s.setObservaciones("Aprobada por el director de programa.");
-        s.setObservaciones("Aprobada por el director de programa.");
 
         solicitudRepository.save(s);
 
