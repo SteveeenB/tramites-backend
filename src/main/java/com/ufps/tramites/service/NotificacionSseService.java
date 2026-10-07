@@ -42,8 +42,16 @@ public class NotificacionSseService {
     }
 
     public void notificarCambioEstado(Solicitud solicitud, String estadoAnterior) {
-        String cedula = solicitud.getCedula();
-        List<SseEmitter> lista = emitters.getOrDefault(cedula, List.of());
+        notificarCambioEstadoA(solicitud.getCedula(), solicitud, estadoAnterior);
+    }
+
+    // FIX TP-187 (Johan Bueno, 07/10/2026): extiende el patrón para notificar
+    // a cualquier actor (no sólo al estudiante dueño). Los call-sites van a
+    // llamar a esta versión para avisar al Director tras el pago y a
+    // Posgrados tras la aprobación del Director.
+    public void notificarCambioEstadoA(String identificador, Solicitud solicitud, String estadoAnterior) {
+        if (identificador == null) return;
+        List<SseEmitter> lista = emitters.getOrDefault(identificador, List.of());
         if (lista.isEmpty()) return;
 
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -61,10 +69,10 @@ public class NotificacionSseService {
                         .name("estado-actualizado")
                         .data(payload, MediaType.APPLICATION_JSON));
             } catch (IOException e) {
-                eliminarEmitter(cedula, emitter);
+                eliminarEmitter(identificador, emitter);
             }
         }
-        log.info("SSE enviado a {} suscriptores de cedula {}", lista.size(), cedula);
+        log.info("SSE enviado a {} suscriptores de {}", lista.size(), identificador);
     }
 
     /** Emite un evento 'notificacion-nueva' al usuario si tiene conexión SSE activa. */

@@ -28,8 +28,20 @@ public class CertificadoController {
     @Autowired private PrincipalResolver principalResolver;
     @Autowired private TipoCertificadoRepository tipoCertificadoRepository;
 
+    // FIX TP-189 (Johan Bueno, 07/10/2026): si hay estudiante autenticado,
+    // devolvemos cada tipo con "disponible": true/false, marcando no
+    // disponible el certificado de Terminación de Materias cuando el
+    // estudiante aún no tenga la solicitud de terminación aprobada. Si no
+    // hay sesión (p.ej. panel admin), se mantiene el comportamiento previo.
     @GetMapping("/tipos")
-    public ResponseEntity<?> obtenerTipos() {
+    public ResponseEntity<?> obtenerTipos(Authentication auth) {
+        if (auth != null && auth.isAuthenticated()) {
+            ResolvedPrincipal p = principalResolver.resolve(auth);
+            if (p != null && p.isUsuario() && "ESTUDIANTE".equals(p.rol())) {
+                return ResponseEntity.ok(
+                        certificadoService.listarTiposParaEstudiante(p.cedula()));
+            }
+        }
         return ResponseEntity.ok(tipoCertificadoRepository.findByActivoTrue());
     }
 
@@ -93,14 +105,18 @@ public class CertificadoController {
 
     @PreAuthorize("hasRole('POSGRADOS')")
     @GetMapping("/posgrados")
+    // FIX TP-200 (Johan Bueno, 07/10/2026): se expone el filtro por
+    // identificación (cedula) y la bandeja ya incluye los digitales
+    // además de los físicos.
     public ResponseEntity<?> bandejaPosgrados(@RequestParam(required = false) String estado,
+                                              @RequestParam(required = false) String cedula,
                                               Authentication auth) {
         ResolvedPrincipal p = principalResolver.resolve(auth);
         if (p == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
         if (!"POSGRADOS".equals(p.rol()))
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso denegado"));
         String filtro = (estado == null || estado.isBlank() || "TODOS".equalsIgnoreCase(estado)) ? null : estado;
-        return ResponseEntity.ok(certificadoService.obtenerBandejaPosgrados(filtro));
+        return ResponseEntity.ok(certificadoService.obtenerBandejaPosgrados(filtro, cedula));
     }
 
     @PreAuthorize("hasRole('POSGRADOS')")
@@ -124,6 +140,25 @@ public class CertificadoController {
         if (p == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
         try {
             return ResponseEntity.ok(certificadoService.marcarEntregado(id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
+        }
+    }
+
+    // FIX TP-199 (Johan Bueno, 07/10/2026): reintento manual del
+    // administrador cuando la generación quedó en GENERACION_FALLIDA
+    // (puede ocurrir si los 3 reintentos automáticos agotaron fallos
+    // transitorios o si el fallo es por una plantilla rota que ya se
+    // corrigió).
+    @PreAuthorize("hasRole('POSGRADOS')")
+    @PostMapping("/{id}/reintentar-pdf")
+    public ResponseEntity<?> reintentarPdf(@PathVariable Long id, Authentication auth) {
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        try {
+            return ResponseEntity.ok(certificadoService.reintentarGeneracionPdf(id));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
         } catch (IllegalStateException e) {

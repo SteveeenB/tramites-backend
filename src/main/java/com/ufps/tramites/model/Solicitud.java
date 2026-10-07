@@ -72,6 +72,12 @@ public class Solicitud {
     private String modalidadGrado;         // CEREMONIA | SECRETARIA
     private Boolean pagoModalidadRealizado = false;
 
+    // FIX TP-201 (Johan Bueno, 07/10/2026): se registra la fecha en que la
+    // solicitud entra a un estado terminal (APROBADA, RECHAZADA,
+    // RECHAZADA_POSGRADOS, APROBADA_POSGRADOS) para que los reportes y la
+    // UI muestren cuándo se cerró el trámite (CP-047).
+    private LocalDateTime fechaCierre;
+
     // ── Constructor ───────────────────────────────────────────────────────
     public Solicitud() {}
 
@@ -157,4 +163,7 @@ public class Solicitud {
 
     public Boolean getPagoModalidadRealizado() { return pagoModalidadRealizado; }
     public void setPagoModalidadRealizado(Boolean v) { this.pagoModalidadRealizado = v; }
+
+    public LocalDateTime getFechaCierre() { return fechaCierre; }
+    public void setFechaCierre(LocalDateTime fechaCierre) { this.fechaCierre = fechaCierre; }
 }

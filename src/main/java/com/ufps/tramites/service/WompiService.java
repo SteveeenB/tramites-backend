@@ -22,7 +22,12 @@ import com.ufps.tramites.repository.SolicitudRepository;
 import com.ufps.tramites.repository.TipoSolicitudRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
 
+// FIX TP-194 (Diego Bermúdez, 07/10/2026): procesarWebhook, crearPago y
+// actualizarSolicitudTrasAprobacion escriben en Pago + Solicitud (+ otros
+// agregados vía otros services). Marcamos la clase transaccional para que
+// un fallo intermedio no deje medio aplicado el pago.
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class WompiService {
 
     private static final Logger log = LoggerFactory.getLogger(WompiService.class);
@@ -275,7 +280,8 @@ public class WompiService {
     private String generarFirmaIntegridad(String referencia, long montoCentavos, String moneda) {
         try {
             String datos = referencia + montoCentavos + moneda + integrityKey;
-            log.info("[WOMPI] Firma input: '{}'", datos); // ← agrega esto
+            // FIX S-08 (Diego Bermudez, 06/09/2026): INFO a DEBUG — "datos" expone integrityKey en texto plano
+            log.debug("[WOMPI] Firma input: '{}'", datos);
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(datos.getBytes(StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder();
@@ -283,7 +289,7 @@ public class WompiService {
                 sb.append(String.format("%02x", b));
             }
             String firma = sb.toString();
-            log.info("[WOMPI] Firma generada: '{}'", firma); // ← y esto
+            log.debug("[WOMPI] Firma generada: '{}'", firma);
             return firma;
         } catch (Exception e) {
             throw new RuntimeException("Error generando firma de integridad", e);
@@ -297,7 +303,8 @@ public class WompiService {
             long amountInCents, long timestamp, String checksum) {
         try {
             String datos = transactionId + status + amountInCents + timestamp + eventsSecret;
-            log.info("[WOMPI] Webhook firma input: '{}'", datos);
+            // FIX S-08 (Diego Bermudez, dd/mm/aaaa): INFO a DEBUG — "datos" expone eventsSecret en texto plano
+            log.debug("[WOMPI] Webhook firma input: '{}'", datos);
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(datos.getBytes(StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder();
@@ -305,7 +312,7 @@ public class WompiService {
                 sb.append(String.format("%02x", b));
             }
             String calculado = sb.toString();
-            log.info("[WOMPI] Webhook firma calculada: '{}' | recibida: '{}'", calculado, checksum);
+            log.debug("[WOMPI] Webhook firma calculada: '{}' | recibida: '{}'", calculado, checksum);
             return calculado.equals(checksum);
         } catch (Exception e) {
             log.error("[WOMPI] Error verificando firma webhook: {}", e.getMessage());
