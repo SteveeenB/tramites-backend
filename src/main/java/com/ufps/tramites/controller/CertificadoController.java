@@ -147,6 +147,25 @@ public class CertificadoController {
         }
     }
 
+    // FIX TP-199 (Johan Bueno, 07/10/2026): reintento manual del
+    // administrador cuando la generación quedó en GENERACION_FALLIDA
+    // (puede ocurrir si los 3 reintentos automáticos agotaron fallos
+    // transitorios o si el fallo es por una plantilla rota que ya se
+    // corrigió).
+    @PreAuthorize("hasRole('POSGRADOS')")
+    @PostMapping("/{id}/reintentar-pdf")
+    public ResponseEntity<?> reintentarPdf(@PathVariable Long id, Authentication auth) {
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        try {
+            return ResponseEntity.ok(certificadoService.reintentarGeneracionPdf(id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.valueOf(422)).body(error(e.getMessage()));
+        }
+    }
+
     private Map<String, Object> error(String mensaje) {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("error", mensaje);

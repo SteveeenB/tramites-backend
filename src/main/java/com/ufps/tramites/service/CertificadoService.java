@@ -215,18 +215,38 @@ public class CertificadoService {
         return construirRespuesta(actualizada, estudiante, tipo);
     }
 
+    // FIX TP-199 (Johan Bueno, 07/10/2026): número de intentos y espera
+    // base del backoff exponencial para la generación del PDF. 3 intentos
+    // con 1s, 2s, 4s cubren fallos transitorios (Supabase/plantilla) sin
+    // dejar al usuario esperando demasiado.
+    private static final int PDF_MAX_INTENTOS = 3;
+    private static final long PDF_BACKOFF_BASE_MS = 1_000L;
+
     /**
      * Genera el PDF, lo sube a storage, calcula hash y envía el correo.
      *
-     * Punto de extensión para firma digital: aplicar la firma sobre `pdfBytes`
-     * antes de calcular el hash y subirlo a storage. Si la firma falla, NO
-     * se sube el PDF y la solicitud queda en PAGADO para reintento.
+     * FIX TP-199 (Johan Bueno, 07/10/2026): si la generación falla, se
+     * reintenta hasta PDF_MAX_INTENTOS veces con backoff exponencial.
+     * Antes de generar la solicitud queda en EN_GENERACION_PDF (estado
+     * intermedio visible al estudiante). Si los reintentos se agotan, la
+     * solicitud queda en GENERACION_FALLIDA y se envía una notificación
+     * al administrador POS001 para que la relance con el endpoint de
+     * reintento manual. Antes el service lanzaba una excepción y la
+     * solicitud quedaba en PAGADO, sin estado intermedio, sin reintento
+     * y sin aviso (CP-038).
+     *
+     * Punto de extensión para firma digital: aplicar la firma sobre
+     * `pdfBytes` antes de calcular el hash y subirlo a storage. Si la
+     * firma falla, NO se sube el PDF y la solicitud queda en PAGADO para
+     * reintento.
      */
     public void generarYNotificar(Long solicitudId) {
         SolicitudCertificado s = certificadoRepository.findById(solicitudId)
             .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada con id: " + solicitudId));
 
-        if (!"PAGADO".equals(s.getEstado())) {
+        // Permitimos arrancar desde PAGADO (flujo normal) y desde
+        // GENERACION_FALLIDA (reintento manual del administrador).
+        if (!"PAGADO".equals(s.getEstado()) && !"GENERACION_FALLIDA".equals(s.getEstado())) {
             log.warn("generarYNotificar invocado con estado {} para id {}", s.getEstado(), solicitudId);
             return;
         }
@@ -235,12 +255,15 @@ public class CertificadoService {
             .orElseThrow(() -> new IllegalStateException("Tipo de certificado no existe: " + s.getTipoCertificado()));
         Usuario estudiante = usuarioRepository.findByCedula(s.getCedula()).orElse(null);
 
-        byte[] pdfBytes;
-        try {
-            pdfBytes = generarPdfConstancia(tipo, s, estudiante);
-        } catch (Exception e) {
-            log.error("[CONSTANCIA] Error generando PDF para solicitud {}: {}", solicitudId, e.getMessage());
-            throw new IllegalStateException("No se pudo generar el certificado PDF. Intenta de nuevo en unos minutos.");
+        // Estado intermedio mientras los intentos están en curso.
+        s.setEstado("EN_GENERACION_PDF");
+        s.setObservaciones("Generando certificado…");
+        certificadoRepository.save(s);
+
+        byte[] pdfBytes = intentarGenerarPdf(tipo, s, estudiante, solicitudId);
+        if (pdfBytes == null) {
+            marcarGeneracionFallida(s, estudiante, tipo);
+            return;
         }
 
         String hash = sha256Hex(pdfBytes);
@@ -280,6 +303,73 @@ public class CertificadoService {
             log.error("[CONSTANCIA] PDF generado pero correo falló para solicitud {}: {}", solicitudId, e.getMessage());
             // No revertimos el estado: el PDF existe y es descargable.
         }
+    }
+
+    // FIX TP-199 (Johan Bueno, 07/10/2026): intento con backoff
+    // exponencial. Devuelve los bytes del PDF si alguno de los
+    // PDF_MAX_INTENTOS logra generarlo; null si todos fallan.
+    private byte[] intentarGenerarPdf(TipoCertificado tipo, SolicitudCertificado s,
+                                      Usuario estudiante, Long solicitudId) {
+        Exception ultimo = null;
+        for (int intento = 1; intento <= PDF_MAX_INTENTOS; intento++) {
+            try {
+                return generarPdfConstancia(tipo, s, estudiante);
+            } catch (Exception e) {
+                ultimo = e;
+                log.warn("[CONSTANCIA] Intento {}/{} fallido para solicitud {}: {}",
+                        intento, PDF_MAX_INTENTOS, solicitudId, e.getMessage());
+                if (intento < PDF_MAX_INTENTOS) {
+                    try {
+                        long espera = PDF_BACKOFF_BASE_MS * (1L << (intento - 1)); // 1s, 2s
+                        Thread.sleep(espera);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return null;
+                    }
+                }
+            }
+        }
+        log.error("[CONSTANCIA] PDF falló tras {} intentos para solicitud {}: {}",
+                PDF_MAX_INTENTOS, solicitudId, ultimo != null ? ultimo.getMessage() : "sin detalle");
+        return null;
+    }
+
+    // FIX TP-199 (Johan Bueno, 07/10/2026): cuando los reintentos se
+    // agotan, la solicitud pasa a GENERACION_FALLIDA y se notifica al
+    // administrador POS001 (patrón que ya usa generarYNotificar para los
+    // físicos). El administrador puede relanzar con el endpoint
+    // POST /api/certificados/{id}/reintentar-pdf.
+    private void marcarGeneracionFallida(SolicitudCertificado s, Usuario estudiante, TipoCertificado tipo) {
+        s.setEstado("GENERACION_FALLIDA");
+        s.setObservaciones("No se pudo generar el PDF tras " + PDF_MAX_INTENTOS
+                + " intentos. Pendiente de intervención del administrador.");
+        certificadoRepository.save(s);
+        notificacionService.crear("POS001", "FALLO_GENERACION",
+                "Fallo generando certificado",
+                "El certificado " + (tipo != null ? tipo.getLabel() : s.getTipoCertificado())
+                        + " del estudiante " + (estudiante != null ? estudiante.getNombre() : s.getCedula())
+                        + " (solicitud " + s.getId() + ") no se pudo generar automáticamente.",
+                "/tramites");
+    }
+
+    // FIX TP-199 (Johan Bueno, 07/10/2026): reintento manual disparado
+    // desde la bandeja de Posgrados cuando una solicitud quedó en
+    // GENERACION_FALLIDA. Reusa el flujo normal pasando por
+    // generarYNotificar, que acepta GENERACION_FALLIDA como punto de
+    // entrada además de PAGADO.
+    public Map<String, Object> reintentarGeneracionPdf(Long solicitudId) {
+        SolicitudCertificado s = certificadoRepository.findById(solicitudId)
+            .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada con id: " + solicitudId));
+        if (!"GENERACION_FALLIDA".equals(s.getEstado())) {
+            throw new IllegalStateException(
+                "El reintento solo aplica cuando la solicitud está en GENERACION_FALLIDA. "
+                + "Estado actual: " + s.getEstado());
+        }
+        generarYNotificar(solicitudId);
+        SolicitudCertificado actualizada = certificadoRepository.findById(solicitudId).orElse(s);
+        Usuario estudiante = usuarioRepository.findByCedula(actualizada.getCedula()).orElse(null);
+        TipoCertificado tipo = tipoCertificadoRepository.findByCodigo(actualizada.getTipoCertificado()).orElse(null);
+        return construirRespuesta(actualizada, estudiante, tipo);
     }
 
     private byte[] generarPdfConstancia(TipoCertificado tipo, SolicitudCertificado s, Usuario estudiante) throws Exception {
