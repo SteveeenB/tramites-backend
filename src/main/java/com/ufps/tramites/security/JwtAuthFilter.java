@@ -26,13 +26,28 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String authHeader = request.getHeader("Authorization");
+        String token = null;
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        } else {
+            // FIX TP-186 (Santiago Cepeda, 07/10/2026): aceptar el token por
+            // query param "token" en los endpoints SSE porque EventSource no
+            // puede enviar el header Authorization. Se restringe a las rutas
+            // SSE para no habilitar un vector de token-leak genérico (los
+            // query params pueden quedar en logs de proxy).
+            String path = request.getRequestURI();
+            if (path != null
+                    && (path.endsWith("/api/notificaciones/subscribe")
+                        || path.endsWith("/api/notificaciones/stream"))) {
+                token = request.getParameter("token");
+            }
+        }
+
+        if (token == null) {
             filterChain.doFilter(request, response);
             return;
         }
-
-        String token = authHeader.substring(7);
 
         if (!jwtService.isTokenValid(token)) {
             filterChain.doFilter(request, response);
