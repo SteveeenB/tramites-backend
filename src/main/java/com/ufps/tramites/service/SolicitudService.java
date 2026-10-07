@@ -78,6 +78,11 @@ public class SolicitudService {
     @Autowired
     private DocumentoSolicitudRepository documentoSolicitudRepository;
 
+    // FIX TP-187 (Johan Bueno, 07/10/2026): dependencias para notificar al
+    // Director tras el pago y a Posgrados tras la aprobación del Director.
+    @Autowired
+    private com.ufps.tramites.repository.AdminRepository adminRepository;
+
     @Autowired
     @Lazy
     private PazYSalvoService pazYSalvoService;
@@ -405,6 +410,10 @@ public class SolicitudService {
         solicitudRepository.save(s);
 
         notificarEstudiante(s, estadoAnterior);
+        // FIX TP-187 (Johan Bueno, 07/10/2026): tras la aprobación del
+        // Director (TERMINACION_MATERIAS → APROBADA_DIRECTOR; GRADO →
+        // APROBADA), Posgrados debe enterarse para atender el trámite.
+        notificarPosgrados(s, estadoAnterior);
         usuarioRepository.findByCedula(s.getCedula())
                 .ifPresent(est -> correoSolicitudService.notificarEstudianteAprobacion(s, est));
 
@@ -585,8 +594,36 @@ public class SolicitudService {
     s.setFechaEnRevision(LocalDateTime.now());
     solicitudRepository.save(s);
     notificarEstudiante(s, "PENDIENTE_PAGO");
+    // FIX TP-187 (Johan Bueno, 07/10/2026): el Director del programa del
+    // estudiante debe recibir la notificación de que llegó una solicitud
+    // a su bandeja tras el pago.
+    notificarDirectorDelPrograma(s, "PENDIENTE_PAGO");
     return construirRespuestaSolicitud(s);
 }
+
+    // FIX TP-187 (Johan Bueno, 07/10/2026): resuelve el director del
+    // programa del estudiante dueño de la solicitud y le empuja el cambio
+    // de estado por SSE + notificación persistida.
+    private void notificarDirectorDelPrograma(Solicitud s, String estadoAnterior) {
+        usuarioRepository.findByCedula(s.getCedula()).ifPresent(est -> {
+            if (est.getProgramaAcademico() == null) return;
+            Long programaId = est.getProgramaAcademico().getId();
+            usuarioRepository.findByProgramaAcademicoIdAndRol_Nombre(programaId, "DIRECTOR")
+                    .forEach(director -> {
+                        notificacionSseService.notificarCambioEstadoA(director.getCedula(), s, estadoAnterior);
+                        notificacionService.notificarEstudianteCambioEstado(s, director);
+                    });
+        });
+    }
+
+    // FIX TP-187 (Johan Bueno, 07/10/2026): broadcast a los admins
+    // POSGRADOS cuando el Director aprueba, para que la solicitud aparezca
+    // en su bandeja de inmediato.
+    private void notificarPosgrados(Solicitud s, String estadoAnterior) {
+        for (Admin a : adminRepository.findByTipo("POSGRADOS")) {
+            notificacionSseService.notificarCambioEstadoA(a.getCodigo(), s, estadoAnterior);
+        }
+    }
 
     /**
      * Registra la fecha de graduación elegida por el estudiante. Requiere que
