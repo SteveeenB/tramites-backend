@@ -3,6 +3,7 @@ package com.ufps.tramites.service;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -203,6 +204,10 @@ public class SolicitudService {
         solicitud.setEstudiante(perfilEstudiante);
         solicitud.setTipo("GRADO");
         solicitud.setEstado("EN_REVISION");
+        // FIX TP-161 (Diego Bermúdez, 07/10/2026): registrar fechaEnRevision
+        // al crear la solicitud de grado para que AlertaDirectorService
+        // pueda calcular el plazo de 48h del Director.
+        solicitud.setFechaEnRevision(LocalDateTime.now());
         solicitud.setFechaSolicitud(LocalDate.now());
         solicitud.setCosto(tipoSolicitudRepository.findByCodigo("GRADO")
                 .map(t -> t.getCosto()).orElse(COSTO_GRADO));
@@ -388,6 +393,14 @@ public class SolicitudService {
                 : "APROBADA";
         s.setEstado(nuevoEstado);
         s.setObservaciones("Aprobada por el director de programa.");
+        // FIX TP-161 (Diego Bermúdez, 07/10/2026): trazabilidad de la
+        // decisión del Director (campos ya existentes en el modelo que
+        // antes quedaban en null).
+        s.setDecision("APROBADA");
+        s.setFechaDecision(LocalDateTime.now());
+        if (cedulaDirector != null) {
+            s.setCedulaDirector(cedulaDirector);
+        }
 
         solicitudRepository.save(s);
 
@@ -420,6 +433,10 @@ public class SolicitudService {
      * Rechaza una solicitud de terminación de materias pendiente.
      */
     public Map<String, Object> rechazarSolicitud(Long id, String motivo) {
+        return rechazarSolicitud(id, motivo, null);
+    }
+
+    public Map<String, Object> rechazarSolicitud(Long id, String motivo, String cedulaDirector) {
         Solicitud s = solicitudRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
         if (!"PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())
@@ -432,6 +449,16 @@ public class SolicitudService {
         String estadoAnterior = s.getEstado();
         s.setEstado("RECHAZADA");
         s.setObservaciones(motivo);
+        // FIX TP-161 (Diego Bermúdez, 07/10/2026): trazabilidad del rechazo
+        // (decision, fechaDecision, cedulaDirector, observacionesDirector)
+        // antes quedaba en null, por lo que no había constancia del quien y
+        // el cuándo.
+        s.setDecision("RECHAZADA");
+        s.setFechaDecision(LocalDateTime.now());
+        s.setObservacionesDirector(motivo);
+        if (cedulaDirector != null) {
+            s.setCedulaDirector(cedulaDirector);
+        }
         solicitudRepository.save(s);
 
         notificarEstudiante(s, estadoAnterior);
@@ -552,6 +579,10 @@ public class SolicitudService {
         throw new IllegalStateException("La solicitud no está pendiente de pago");
     }
     s.setEstado("EN_REVISION");
+    // FIX TP-161 (Diego Bermúdez, 07/10/2026): registrar fechaEnRevision
+    // al confirmar el pago para que el plazo de 48h del Director arranque
+    // cuando la solicitud realmente queda sobre su escritorio.
+    s.setFechaEnRevision(LocalDateTime.now());
     solicitudRepository.save(s);
     notificarEstudiante(s, "PENDIENTE_PAGO");
     return construirRespuestaSolicitud(s);

@@ -175,7 +175,9 @@ public class SolicitudController {
         ResolvedPrincipal p = principalResolver.resolve(auth);
         if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
         try {
-            return ResponseEntity.ok(solicitudService.rechazarSolicitud(id, motivo));
+            // FIX TP-161 (Diego Bermúdez, 07/10/2026): pasar la cédula del
+            // director autenticado al service para que quede trazabilidad.
+            return ResponseEntity.ok(solicitudService.rechazarSolicitud(id, motivo, p.cedula()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
         } catch (IllegalStateException e) {
