@@ -197,6 +197,15 @@ public class PazYSalvoService {
         return lista.stream().map(this::mapearPazYSalvoConEstudiante).collect(Collectors.toList());
     }
 
+    // FIX TP-188 (Diego Bermúdez, 07/10/2026): helper para que
+    // SolicitudService.registrarPagoGrado y generarActa exijan todos los
+    // paz y salvos aprobados antes de avanzar el proceso.
+    public boolean todosAprobados(Long solicitudId) {
+        List<PazYSalvo> lista = pazYSalvoRepository.findBySolicitudId(solicitudId);
+        return !lista.isEmpty()
+                && lista.stream().allMatch(p -> "APROBADO".equals(p.getEstado()));
+    }
+
     /**
      * Retorna el estado completo de paz y salvos de una solicitud de grado.
      */

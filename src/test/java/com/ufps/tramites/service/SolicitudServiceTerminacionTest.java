@@ -181,14 +181,17 @@ class SolicitudServiceTerminacionTest {
 
     // ── 2. Máquina de estados: aprobación director ─────────────────────
 
+    // FIX TP-188 (Diego Bermúdez, 07/10/2026): el Director ya NO puede
+    // aprobar desde PENDIENTE_PAGO; sólo desde EN_REVISION. Antes este
+    // test afirmaba lo contrario y era parte del bug reportado en CP-010.
     @Test
-    void aprobarDirector_desdePendientePago_pasaAAprobadaDirector() {
+    void aprobarDirector_desdePendientePago_lanzaExcepcion() {
         Solicitud s = solicitudEnEstado("PENDIENTE_PAGO", "TERMINACION_MATERIAS", 10L);
         when(solicitudRepository.findById(10L)).thenReturn(Optional.of(s));
 
-        var respuesta = solicitudService.aprobarSolicitudConDirector(10L, "dir");
-
-        assertThat(respuesta.get("estado")).isEqualTo("APROBADA_DIRECTOR");
+        assertThatThrownBy(() -> solicitudService.aprobarSolicitudConDirector(10L, "dir"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("EN_REVISION");
     }
 
     @Test
