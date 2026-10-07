@@ -3,13 +3,17 @@ package com.ufps.tramites.service;
 import com.ufps.tramites.model.DocumentoSolicitud;
 import com.ufps.tramites.repository.DocumentoSolicitudRepository;
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,15 +21,40 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class DocumentoService {
 
-    private static final Set<String> TIPOS_PERMITIDOS = Set.of(
-        "application/pdf",
-        "image/png",
-        "image/jpeg",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    private static final String MIME_DOCX =
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+    /** Extensión permitida → tipo MIME canónico con el que se almacena. */
+    private static final Map<String, String> MIME_POR_EXTENSION = Map.of(
+        "pdf",  "application/pdf",
+        "png",  "image/png",
+        "jpg",  "image/jpeg",
+        "jpeg", "image/jpeg",
+        "docx", MIME_DOCX
     );
 
-    private static final Set<String> EXTENSIONES_PERMITIDAS = Set.of(
-        "pdf", "png", "jpg", "jpeg", "docx"
+    /** Tipos MIME aceptados en la cabecera de cada parte (image/jpg lo envían algunos clientes). */
+    private static final Set<String> TIPOS_PERMITIDOS = Set.of(
+        "application/pdf", "image/png", "image/jpeg", "image/jpg", MIME_DOCX
+    );
+
+    /** Firmas (magic bytes) que debe tener el contenido según su extensión. */
+    private static final byte[] FIRMA_PDF  = {'%', 'P', 'D', 'F', '-'};
+    private static final byte[] FIRMA_PNG  = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+    private static final byte[] FIRMA_JPEG = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
+    private static final byte[] FIRMA_ZIP  = {'P', 'K', 0x03, 0x04}; // DOCX es un contenedor ZIP
+
+    /** Formatos admitidos por tipo de documento; los tipos no listados admiten todos. */
+    private static final Map<String, Set<String>> EXTENSIONES_POR_TIPO = Map.of(
+        "FOTO_ESTUDIANTE",   Set.of("png", "jpg", "jpeg"),
+        "ACTA_SUSTENTACION", Set.of("pdf", "docx")
+    );
+
+    private static final Map<String, String> NOMBRE_TIPO = Map.of(
+        "FOTO_ESTUDIANTE",    "Fotografía actualizada",
+        "ACTA_SUSTENTACION",  "Acta de sustentación",
+        "CERTIFICADO_INGLES", "Certificado de inglés",
+        "SOPORTE",            "Documento de soporte"
     );
 
     @Autowired
@@ -47,15 +76,10 @@ public class DocumentoService {
      * Tipos usados: SOPORTE, FOTO_ESTUDIANTE, ACTA_SUSTENTACION, CERTIFICADO_INGLES
      */
     public Map<String, Object> guardarDocumento(Long solicitudId, MultipartFile archivo, String tipo) throws IOException {
-        String contentType = archivo.getContentType() != null ? archivo.getContentType() : "";
+        validarArchivo(archivo, tipo);
+
         String extension = obtenerExtension(archivo.getOriginalFilename());
-
-        if (!TIPOS_PERMITIDOS.contains(contentType) && !EXTENSIONES_PERMITIDAS.contains(extension)) {
-            throw new IllegalArgumentException(
-                "Formato no permitido: " + archivo.getOriginalFilename() + ". Use PDF, PNG, JPG o DOCX."
-            );
-        }
-
+        String contentType = MIME_POR_EXTENSION.get(extension);
         String nombreAlmacenado = UUID.randomUUID() + "." + extension;
         storageService.subir(solicitudId + "/" + nombreAlmacenado, archivo.getBytes(), contentType);
 
@@ -144,6 +168,64 @@ public class DocumentoService {
         result.put("contentType",    doc.getContentType());
         result.put("bytes",          bytes);
         return result;
+    }
+
+    /**
+     * Valida un archivo antes de almacenarlo: presencia, extensión y tipo MIME permitidos
+     * para el tipo de documento, y que el contenido real (firma) corresponda a la extensión.
+     * Lanza IllegalArgumentException con un mensaje que nombra el documento afectado.
+     */
+    public void validarArchivo(MultipartFile archivo, String tipo) throws IOException {
+        String nombreDoc = NOMBRE_TIPO.getOrDefault(tipo, "Documento");
+
+        if (archivo == null || archivo.isEmpty()) {
+            throw new IllegalArgumentException("Falta el documento obligatorio: " + nombreDoc + ".");
+        }
+
+        String nombreArchivo = archivo.getOriginalFilename();
+        String extension = obtenerExtension(nombreArchivo);
+        Set<String> permitidas = EXTENSIONES_POR_TIPO.getOrDefault(tipo, MIME_POR_EXTENSION.keySet());
+        String formatos = describirFormatos(permitidas);
+
+        String contentType = archivo.getContentType() != null ? archivo.getContentType().toLowerCase() : "";
+        if (!permitidas.contains(extension) || !TIPOS_PERMITIDOS.contains(contentType)) {
+            throw new IllegalArgumentException(
+                nombreDoc + ": formato no permitido (" + nombreArchivo + "). Use " + formatos + "."
+            );
+        }
+
+        if (!firmaCorresponde(archivo, extension)) {
+            throw new IllegalArgumentException(
+                nombreDoc + ": el contenido de " + nombreArchivo
+                    + " no corresponde a un archivo " + extension.toUpperCase() + " válido. Use " + formatos + "."
+            );
+        }
+    }
+
+    private boolean firmaCorresponde(MultipartFile archivo, String extension) throws IOException {
+        byte[] esperada = switch (extension) {
+            case "pdf"         -> FIRMA_PDF;
+            case "png"         -> FIRMA_PNG;
+            case "jpg", "jpeg" -> FIRMA_JPEG;
+            case "docx"        -> FIRMA_ZIP;
+            default            -> null;
+        };
+        if (esperada == null) return false;
+
+        byte[] cabecera = new byte[esperada.length];
+        try (InputStream in = archivo.getInputStream()) {
+            if (in.readNBytes(cabecera, 0, cabecera.length) < cabecera.length) return false;
+        }
+        return Arrays.equals(cabecera, esperada);
+    }
+
+    private String describirFormatos(Set<String> extensiones) {
+        return extensiones.stream()
+                .map(e -> "jpeg".equals(e) ? "jpg" : e)
+                .distinct()
+                .sorted(Comparator.comparingInt(List.of("pdf", "png", "jpg", "docx")::indexOf))
+                .map(String::toUpperCase)
+                .collect(Collectors.joining(", "));
     }
 
     private String obtenerExtension(String filename) {
