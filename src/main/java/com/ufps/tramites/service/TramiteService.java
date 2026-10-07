@@ -1,6 +1,5 @@
 package com.ufps.tramites.service;
 
-import com.ufps.tramites.model.Convocatoria;
 import com.ufps.tramites.model.Estudiante;
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
@@ -14,11 +13,12 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+// FIX TP-193 (Johan Bueno, 07/10/2026): se retira la convocatoria del
+// alcance. Los imports, dependencia inyectada y helper
+// construirConvocatoria desaparecen; el payload de /proceso-de-grado ya
+// no incluye el nodo "convocatoria".
 @Service
 public class TramiteService {
-
-    @Autowired
-    private ConvocatoriaService convocatoriaService;
 
     @Autowired
     private SolicitudRepository solicitudRepository;
@@ -62,7 +62,7 @@ public class TramiteService {
 
         response.put("creditos", construirCreditos(usuario));
         response.put("estadoAcademico", "Regular");
-        //response.put("convocatoria", construirConvocatoria());
+        // FIX TP-193: la convocatoria sale del alcance (no se expone).
         response.put("etapa1Completada", etapa1Habilitada);
         response.put("etapa2Disponible", etapa2Disponible);
         response.put("certificadoDisponible", certificadoDisponible);
@@ -94,14 +94,6 @@ public class TramiteService {
         creditos.put("aprobados", aprobados);
         creditos.put("requeridos", requeridos);
         return creditos;
-    }
-
-    private Map<String, Object> construirConvocatoria() {
-        Convocatoria c = convocatoriaService.getActiva();
-        Map<String, Object> conv = new LinkedHashMap<>();
-        conv.put("fechaInicio", c.getFechaInicio().toString());
-        conv.put("fechaFin", c.getFechaFin().toString());
-        return conv;
     }
 
     private List<Map<String, Object>> construirSidebar(String rol) {
