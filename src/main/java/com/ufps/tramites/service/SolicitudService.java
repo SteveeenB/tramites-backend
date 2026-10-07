@@ -79,6 +79,12 @@ public class SolicitudService {
     @Autowired
     private TipoCertificadoRepository tipoCertificadoRepository;
 
+    // FIX TP-190 (Johan Bueno, 07/10/2026): verificarCertificado debe
+    // reconocer códigos UFPS-CERT-… que generan las constancias, no sólo
+    // UFPS-TM-… del certificado de terminación.
+    @Autowired
+    private com.ufps.tramites.repository.SolicitudCertificadoRepository solicitudCertificadoRepository;
+
     @Autowired
     private TipoSolicitudRepository tipoSolicitudRepository;
 
@@ -575,41 +581,82 @@ public class SolicitudService {
     }
 
     public Map<String, Object> verificarCertificado(String codigo) {
-        // Formato: UFPS-TM-{id}-{last4cedula}
+        // FIX TP-190 (Johan Bueno, 07/10/2026): se acepta tanto UFPS-TM-{id}-
+        // {last4} del certificado de terminación como UFPS-CERT-{id}-{last4}
+        // de las constancias (matrícula, buena conducta, registro calificado).
+        // Antes el método solo entendía UFPS-TM-… y las constancias quedaban
+        // "valido": false pese a estar correctamente emitidas (CP-039).
+        if (codigo == null) return respuestaInvalida("Código de verificación inválido.");
+
         try {
             String[] partes = codigo.split("-");
-            Long solicitudId = Long.parseLong(partes[2]);
+            if (partes.length < 4 || !"UFPS".equals(partes[0])) {
+                return respuestaInvalida("Código de verificación inválido.");
+            }
+            String tipo = partes[1];
+            Long id = Long.parseLong(partes[2]);
             String last4 = partes[3];
-            Solicitud s = solicitudRepository.findById(solicitudId).orElse(null);
-            if (s == null || !"APROBADA".equals(s.getEstado()) || !"TERMINACION_MATERIAS".equals(s.getTipo())) {
-                Map<String, Object> r = new java.util.LinkedHashMap<>();
-                r.put("valido", false);
-                r.put("mensaje", "Certificado no encontrado o no válido.");
-                return r;
-            }
-            String cedulaReal = s.getCedula();
-            if (!cedulaReal.endsWith(last4)) {
-                Map<String, Object> r = new java.util.LinkedHashMap<>();
-                r.put("valido", false);
-                r.put("mensaje", "El código de verificación no coincide.");
-                return r;
-            }
-            Usuario est = usuarioRepository.findByCedula(cedulaReal).orElse(null);
-            Map<String, Object> r = new java.util.LinkedHashMap<>();
-            r.put("valido", true);
-            r.put("codigo", codigo);
-            r.put("nombre", est != null ? est.getNombre() : "—");
-            r.put("cedula", cedulaReal);
-            r.put("programa", est != null && est.getProgramaAcademico() != null ? est.getProgramaAcademico().getNombre() : "—");
-            r.put("fechaAprobacion", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : "—");
-            r.put("mensaje", "Certificado válido y auténtico.");
-            return r;
+
+            return switch (tipo) {
+                case "TM"   -> verificarTerminacion(codigo, id, last4);
+                case "CERT" -> verificarConstancia(codigo, id, last4);
+                default      -> respuestaInvalida("Código de verificación inválido.");
+            };
         } catch (Exception e) {
-            Map<String, Object> r = new java.util.LinkedHashMap<>();
-            r.put("valido", false);
-            r.put("mensaje", "Código de verificación inválido.");
-            return r;
+            return respuestaInvalida("Código de verificación inválido.");
         }
+    }
+
+    private Map<String, Object> verificarTerminacion(String codigo, Long solicitudId, String last4) {
+        Solicitud s = solicitudRepository.findById(solicitudId).orElse(null);
+        if (s == null || !"APROBADA".equals(s.getEstado()) || !"TERMINACION_MATERIAS".equals(s.getTipo())) {
+            return respuestaInvalida("Certificado no encontrado o no válido.");
+        }
+        String cedulaReal = s.getCedula();
+        if (cedulaReal == null || !cedulaReal.endsWith(last4)) {
+            return respuestaInvalida("El código de verificación no coincide.");
+        }
+        Usuario est = usuarioRepository.findByCedula(cedulaReal).orElse(null);
+        Map<String, Object> r = new java.util.LinkedHashMap<>();
+        r.put("valido", true);
+        r.put("codigo", codigo);
+        r.put("tipo", "Certificado de Terminación de Materias");
+        r.put("nombre", est != null ? est.getNombre() : "—");
+        r.put("cedula", cedulaReal);
+        r.put("programa", est != null && est.getProgramaAcademico() != null ? est.getProgramaAcademico().getNombre() : "—");
+        r.put("fechaAprobacion", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : "—");
+        r.put("mensaje", "Certificado válido y auténtico.");
+        return r;
+    }
+
+    private Map<String, Object> verificarConstancia(String codigo, Long certificadoId, String last4) {
+        com.ufps.tramites.model.SolicitudCertificado c =
+                solicitudCertificadoRepository.findById(certificadoId).orElse(null);
+        if (c == null || c.getEstado() == null
+                || !java.util.Set.of("GENERADO", "LISTO_RETIRO", "ENTREGADO").contains(c.getEstado())) {
+            return respuestaInvalida("Certificado no encontrado o no válido.");
+        }
+        String cedulaReal = c.getCedula();
+        if (cedulaReal == null || !cedulaReal.endsWith(last4)) {
+            return respuestaInvalida("El código de verificación no coincide.");
+        }
+        Usuario est = usuarioRepository.findByCedula(cedulaReal).orElse(null);
+        Map<String, Object> r = new java.util.LinkedHashMap<>();
+        r.put("valido", true);
+        r.put("codigo", codigo);
+        r.put("tipo", "Constancia académica");
+        r.put("nombre", est != null ? est.getNombre() : "—");
+        r.put("cedula", cedulaReal);
+        r.put("programa", est != null && est.getProgramaAcademico() != null ? est.getProgramaAcademico().getNombre() : "—");
+        r.put("mensaje", "Constancia válida y auténtica.");
+        return r;
+    }
+
+    private Map<String, Object> respuestaInvalida(String mensaje) {
+        Map<String, Object> r = new java.util.LinkedHashMap<>();
+        r.put("valido", false);
+        r.put("mensaje", mensaje);
+        return r;
     }
 
     /**
