@@ -13,11 +13,21 @@ import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.repository.SolicitudRepository;
 import com.ufps.tramites.security.ResolvedPrincipal;
 
+// FIX TP-194 (Diego Bermúdez, 07/10/2026): registrarValidacion escribe
+// Solicitud y la vincula al Admin que decide, así que se marca la clase
+// como transaccional para evitar estados inconsistentes.
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class ValidacionGradoService {
 
     @Autowired
     private SolicitudRepository solicitudRepository;
+
+    // FIX TP-201 (Johan Bueno, 07/10/2026): usa el helper de SolicitudService
+    // para persistir el cambio de estado en historial_estado_solicitud y
+    // marcar fechaCierre si corresponde.
+    @Autowired
+    private SolicitudService solicitudService;
 
     // Retorna todas las solicitudes de grado pendientes de validación
     public List<Solicitud> obtenerSolicitudesPendientesValidacion() {
@@ -62,11 +72,17 @@ public class ValidacionGradoService {
             solicitud.setPosgradosAdmin(actor.admin());
         }
 
-        if ("APROBADA".equals(decision)) {
-            solicitud.setEstado("APROBADA_POSGRADOS");
-        } else {
-            solicitud.setEstado("RECHAZADA_POSGRADOS");
+        // FIX TP-201 (Johan Bueno, 07/10/2026): registra la transición y
+        // marca fechaCierre (ambos son estados terminales).
+        String identificadorActor = null;
+        String tipoActor = "SISTEMA";
+        if (actor != null) {
+            identificadorActor = actor.isAdmin() ? actor.codigo() : actor.cedula();
+            tipoActor = actor.isAdmin() ? "ADMIN" : "USUARIO";
         }
+        String nuevoEstado = "APROBADA".equals(decision)
+                ? "APROBADA_POSGRADOS" : "RECHAZADA_POSGRADOS";
+        solicitudService.cambiarEstado(solicitud, nuevoEstado, identificadorActor, tipoActor);
 
         solicitudRepository.save(solicitud);
 

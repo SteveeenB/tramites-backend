@@ -39,6 +39,13 @@ public class PazYSalvoService {
     @Autowired(required = false)
     private JavaMailSender mailSender;
 
+    // FIX TP-187 (Johan Bueno, 07/10/2026): necesitamos empujar la
+    // notificación por SSE y la persistencia in-app cuando una dependencia
+    // rechaza un paz y salvo, para que el estudiante se entere en el
+    // momento (CP-023).
+    @Autowired private NotificacionSseService notificacionSseService;
+    @Autowired private NotificacionService notificacionService;
+
     // Remitente configurado en application.properties (spring.mail.username)
     @Value("${spring.mail.username:}")
     private String fromEmail;
@@ -168,6 +175,18 @@ public class PazYSalvoService {
         ps.setFechaRespuesta(LocalDateTime.now());
         pazYSalvoRepository.save(ps);
 
+        // FIX TP-187 (Johan Bueno, 07/10/2026): si una dependencia rechaza
+        // el paz y salvo, el estudiante dueño de la solicitud debe
+        // enterarse en tiempo real y encontrar la notificación en su
+        // bandeja al volver a entrar. Antes no se notificaba (CP-023).
+        if ("RECHAZADO".equals(decision)) {
+            solicitudRepository.findById(ps.getSolicitudId()).ifPresent(sol -> {
+                notificacionSseService.notificarCambioEstado(sol, sol.getEstado());
+                usuarioRepository.findByCedula(sol.getCedula()).ifPresent(est ->
+                    notificacionService.notificarEstudianteCambioEstado(sol, est));
+            });
+        }
+
         return mapearPazYSalvo(ps);
     }
 
@@ -195,6 +214,15 @@ public class PazYSalvoService {
                     : pazYSalvoRepository.findByResponsableUsuario_Id(actor.id());
         }
         return lista.stream().map(this::mapearPazYSalvoConEstudiante).collect(Collectors.toList());
+    }
+
+    // FIX TP-188 (Diego Bermúdez, 07/10/2026): helper para que
+    // SolicitudService.registrarPagoGrado y generarActa exijan todos los
+    // paz y salvos aprobados antes de avanzar el proceso.
+    public boolean todosAprobados(Long solicitudId) {
+        List<PazYSalvo> lista = pazYSalvoRepository.findBySolicitudId(solicitudId);
+        return !lista.isEmpty()
+                && lista.stream().allMatch(p -> "APROBADO".equals(p.getEstado()));
     }
 
     /**

@@ -62,6 +62,13 @@ class SolicitudServiceTerminacionTest {
     @Mock private PlantillaCertificadoService plantillaCertificadoService;
     @Mock private CorreoCertificadoService correoService;
     @Mock private CorreoSolicitudService correoSolicitudService;
+    // FIX TP-187 (Johan Bueno, 07/10/2026): SolicitudService ahora depende
+    // de AdminRepository para notificar a POSGRADOS tras la aprobación
+    // del Director; mockearlo para que el test unitario no explote con NPE.
+    @Mock private com.ufps.tramites.repository.AdminRepository adminRepository;
+    // FIX TP-201 (Johan Bueno, 07/10/2026): nueva dependencia para persistir
+    // el historial de cambios de estado.
+    @Mock private com.ufps.tramites.repository.CambioEstadoSolicitudRepository cambioEstadoRepository;
 
     @InjectMocks
     private SolicitudService solicitudService;
@@ -181,14 +188,17 @@ class SolicitudServiceTerminacionTest {
 
     // ── 2. Máquina de estados: aprobación director ─────────────────────
 
+    // FIX TP-188 (Diego Bermúdez, 07/10/2026): el Director ya NO puede
+    // aprobar desde PENDIENTE_PAGO; sólo desde EN_REVISION. Antes este
+    // test afirmaba lo contrario y era parte del bug reportado en CP-010.
     @Test
-    void aprobarDirector_desdePendientePago_pasaAAprobadaDirector() {
+    void aprobarDirector_desdePendientePago_lanzaExcepcion() {
         Solicitud s = solicitudEnEstado("PENDIENTE_PAGO", "TERMINACION_MATERIAS", 10L);
         when(solicitudRepository.findById(10L)).thenReturn(Optional.of(s));
 
-        var respuesta = solicitudService.aprobarSolicitudConDirector(10L, "dir");
-
-        assertThat(respuesta.get("estado")).isEqualTo("APROBADA_DIRECTOR");
+        assertThatThrownBy(() -> solicitudService.aprobarSolicitudConDirector(10L, "dir"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("EN_REVISION");
     }
 
     @Test

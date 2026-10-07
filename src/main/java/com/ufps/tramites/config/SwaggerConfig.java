@@ -30,7 +30,7 @@ public class SwaggerConfig {
                                 - `DIRECTOR` – Aprueba o rechaza solicitudes de su programa
                                 - `POSGRADOS` – Valida solicitudes de grado antes de la decisión del director
                                 - `DEPENDENCIA` – Gestiona paz y salvos y entrega de certificados físicos
-                                - `ADMIN` – Administra catálogo de certificados y convocatorias
+                                - `ADMIN` – Administra catálogo de certificados
 
                                 **Autenticación:** JWT Bearer token. Obtén el token en `POST /api/auth/login` \
                                 y agrégalo con el botón **Authorize** (formato: `Bearer <token>`).
