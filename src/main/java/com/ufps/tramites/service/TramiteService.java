@@ -151,8 +151,18 @@ public class TramiteService {
         Map<String, Object> liq = new LinkedHashMap<>();
         liq.put("concepto", "Derechos de Grado");
         liq.put("valor", s.getCosto());
-        liq.put("fechaLimite", s.getFechaSolicitud() != null
-                ? s.getFechaSolicitud().plusDays(5).toString() : null);
+        // FIX TP-193 (Johan Bueno, 07/10/2026): mismos 5 días hábiles que la
+        // liquidación construida en SolicitudService, con regeneración si
+        // ya venció. L-V, sin calendario de festivos.
+        java.time.LocalDate base = s.getFechaSolicitud();
+        java.time.LocalDate limite = base != null
+                ? com.ufps.tramites.util.FechaUtil.sumarDiasHabiles(base, 5)
+                : null;
+        if (com.ufps.tramites.util.FechaUtil.estaVencida(limite)) {
+            limite = com.ufps.tramites.util.FechaUtil.sumarDiasHabiles(java.time.LocalDate.now(), 5);
+            liq.put("regenerada", true);
+        }
+        liq.put("fechaLimite", limite != null ? limite.toString() : null);
         liq.put("instrucciones", "Realiza el pago en la ventanilla de Tesorería o por PSE antes de la fecha límite.");
 
         Map<String, Object> map = new LinkedHashMap<>();
