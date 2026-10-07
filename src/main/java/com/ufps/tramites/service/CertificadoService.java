@@ -17,11 +17,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
 import com.ufps.tramites.model.Estudiante;
+import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.SolicitudCertificado;
 import com.ufps.tramites.model.TipoCertificado;
 import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.repository.EstudianteRepository;
 import com.ufps.tramites.repository.SolicitudCertificadoRepository;
+import com.ufps.tramites.repository.SolicitudRepository;
 import com.ufps.tramites.repository.TipoCertificadoRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
 
@@ -35,6 +37,10 @@ public class CertificadoService {
 
     @Autowired private SolicitudCertificadoRepository certificadoRepository;
     @Autowired private TipoCertificadoRepository tipoCertificadoRepository;
+    // FIX TP-189 (Johan Bueno, 07/10/2026): el certificado
+    // TERMINACION_MATERIAS requiere que el estudiante tenga una solicitud
+    // de terminación en estado APROBADA; consultamos aquí.
+    @Autowired private SolicitudRepository solicitudRepository;
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private EstudianteRepository estudianteRepository;
     @Autowired private CertificadoConstanciaPdfService pdfService;
@@ -71,7 +77,19 @@ public class CertificadoService {
             );
         }
 
-        // Sin validación de créditos: los certificados son trámites administrativos básicos.
+        // FIX TP-189 (Johan Bueno, 07/10/2026): el certificado de
+        // Terminación de Materias sólo se puede solicitar si existe una
+        // solicitud de terminación en estado APROBADA del mismo estudiante.
+        // Las demás constancias (matrícula, buena conducta, registro
+        // calificado) siguen sin restricción, por eso la regla se aplica
+        // sólo al código TERMINACION_MATERIAS.
+        if ("TERMINACION_MATERIAS".equals(tipoCertificado)
+                && !tieneTerminacionAprobada(estudiante.getCedula())) {
+            throw new IllegalStateException(
+                "El certificado de Terminación de Materias requiere tener una "
+                + "solicitud de terminación en estado APROBADA."
+            );
+        }
 
         LocalDate hoy = LocalDate.now();
         double costo = tipo.precioTotal(modalidadEnvio);
@@ -92,6 +110,40 @@ public class CertificadoService {
 
         certificadoRepository.save(s);
         return construirRespuesta(s, estudiante, tipo);
+    }
+
+    // FIX TP-189 (Johan Bueno, 07/10/2026): helper que determina si un
+    // estudiante ya tiene la terminación de materias aprobada; se usa
+    // tanto para bloquear la solicitud del certificado como para marcar
+    // su disponibilidad en GET /api/certificados/tipos.
+    public boolean tieneTerminacionAprobada(String cedula) {
+        if (cedula == null) return false;
+        return solicitudRepository.findByCedula(cedula).stream()
+                .anyMatch(s -> "TERMINACION_MATERIAS".equals(s.getTipo())
+                        && "APROBADA".equals(s.getEstado()));
+    }
+
+    /** Devuelve el catálogo de tipos activos marcando la disponibilidad real
+     *  para el estudiante que consulta. Hoy la única restricción es la del
+     *  certificado TERMINACION_MATERIAS; los demás van siempre disponibles. */
+    public List<Map<String, Object>> listarTiposParaEstudiante(String cedulaEstudiante) {
+        boolean puedeTerminacion = tieneTerminacionAprobada(cedulaEstudiante);
+        List<Map<String, Object>> resultado = new ArrayList<>();
+        for (TipoCertificado t : tipoCertificadoRepository.findByActivoTrue()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("codigo", t.getCodigo());
+            m.put("label", t.getLabel());
+            m.put("activo", t.getActivo());
+            boolean esTerminacion = "TERMINACION_MATERIAS".equals(t.getCodigo());
+            boolean disponible = !esTerminacion || puedeTerminacion;
+            m.put("disponible", disponible);
+            if (!disponible) {
+                m.put("motivo",
+                        "Requiere tener la Terminación de Materias aprobada.");
+            }
+            resultado.add(m);
+        }
+        return resultado;
     }
 
     // ── 2) HISTORIAL DEL ESTUDIANTE ───────────────────────────────────────────

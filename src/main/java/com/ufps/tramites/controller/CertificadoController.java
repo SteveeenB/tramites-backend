@@ -28,8 +28,20 @@ public class CertificadoController {
     @Autowired private PrincipalResolver principalResolver;
     @Autowired private TipoCertificadoRepository tipoCertificadoRepository;
 
+    // FIX TP-189 (Johan Bueno, 07/10/2026): si hay estudiante autenticado,
+    // devolvemos cada tipo con "disponible": true/false, marcando no
+    // disponible el certificado de Terminación de Materias cuando el
+    // estudiante aún no tenga la solicitud de terminación aprobada. Si no
+    // hay sesión (p.ej. panel admin), se mantiene el comportamiento previo.
     @GetMapping("/tipos")
-    public ResponseEntity<?> obtenerTipos() {
+    public ResponseEntity<?> obtenerTipos(Authentication auth) {
+        if (auth != null && auth.isAuthenticated()) {
+            ResolvedPrincipal p = principalResolver.resolve(auth);
+            if (p != null && p.isUsuario() && "ESTUDIANTE".equals(p.rol())) {
+                return ResponseEntity.ok(
+                        certificadoService.listarTiposParaEstudiante(p.cedula()));
+            }
+        }
         return ResponseEntity.ok(tipoCertificadoRepository.findByActivoTrue());
     }
 
