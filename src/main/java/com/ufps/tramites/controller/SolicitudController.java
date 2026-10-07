@@ -64,6 +64,8 @@ public class SolicitudController {
             return ResponseEntity.status(HttpStatus.CREATED).body(
                     solicitudService.crearSolicitudGrado(p.usuario(), tituloProyecto, resumen,
                             tipoProyecto, foto, actaSustentacion, certificadoIngles));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error(e.getMessage()));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(422).body(error(e.getMessage()));
         } catch (IOException e) {

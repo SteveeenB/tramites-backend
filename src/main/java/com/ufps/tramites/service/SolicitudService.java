@@ -166,7 +166,16 @@ public class SolicitudService {
             );
         }
 
-        // 3. Crear y guardar la solicitud con los datos del proyecto
+        // 3. Validar los documentos antes de registrar nada, para no dejar
+        //    solicitudes creadas con archivos rechazados
+        documentoService.validarArchivo(foto, "FOTO_ESTUDIANTE");
+        documentoService.validarArchivo(actaSustentacion, "ACTA_SUSTENTACION");
+        boolean conCertificadoIngles = certificadoIngles != null && !certificadoIngles.isEmpty();
+        if (conCertificadoIngles) {
+            documentoService.validarArchivo(certificadoIngles, "CERTIFICADO_INGLES");
+        }
+
+        // 4. Crear y guardar la solicitud con los datos del proyecto
         //    (doble-write: cedula + FK Estudiante)
         Estudiante perfilEstudiante = estudianteRepository.findByUsuario(estudiante).orElse(null);
         Solicitud solicitud = new Solicitud();
@@ -184,12 +193,12 @@ public class SolicitudService {
         solicitud.setRadicado(generarRadicado(solicitud));
         solicitudRepository.save(solicitud);
 
-        // 4. Subir documentos obligatorios
+        // 5. Subir documentos obligatorios
         documentoService.guardarDocumento(solicitud.getId(), foto, "FOTO_ESTUDIANTE");
         documentoService.guardarDocumento(solicitud.getId(), actaSustentacion, "ACTA_SUSTENTACION");
 
-        // 5. Certificado de inglés es opcional
-        if (certificadoIngles != null && !certificadoIngles.isEmpty()) {
+        // 6. Certificado de inglés es opcional
+        if (conCertificadoIngles) {
             documentoService.guardarDocumento(solicitud.getId(), certificadoIngles, "CERTIFICADO_INGLES");
         }
 
