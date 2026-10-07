@@ -83,6 +83,34 @@ public class SolicitudService {
     @Autowired
     private com.ufps.tramites.repository.AdminRepository adminRepository;
 
+    // FIX TP-201 (Johan Bueno, 07/10/2026): persistir cada transición en
+    // historial_estado_solicitud y cerrar la solicitud cuando entra en
+    // estado final.
+    @Autowired
+    private com.ufps.tramites.repository.CambioEstadoSolicitudRepository cambioEstadoRepository;
+
+    // FIX TP-201 (Johan Bueno, 07/10/2026): estados terminales que marcan
+    // fechaCierre y aparecen en la lista de "cerradas" del historial.
+    private static final java.util.Set<String> ESTADOS_FINALES = java.util.Set.of(
+            "APROBADA", "APROBADA_POSGRADOS",
+            "RECHAZADA", "RECHAZADA_POSGRADOS");
+
+    /** Centraliza la transición de estado: actualiza el campo, deja un
+     *  rastro en historial_estado_solicitud y, si el nuevo estado es
+     *  terminal, marca fechaCierre. No guarda la solicitud; el llamador
+     *  conserva su save() habitual para no cambiar la secuencia de
+     *  operaciones existente. */
+    void cambiarEstado(com.ufps.tramites.model.Solicitud s, String nuevoEstado,
+                       String actor, String actorTipo) {
+        String anterior = s.getEstado();
+        s.setEstado(nuevoEstado);
+        if (ESTADOS_FINALES.contains(nuevoEstado) && s.getFechaCierre() == null) {
+            s.setFechaCierre(LocalDateTime.now());
+        }
+        cambioEstadoRepository.save(new com.ufps.tramites.model.CambioEstadoSolicitud(
+                s.getId(), anterior, nuevoEstado, LocalDateTime.now(), actor, actorTipo));
+    }
+
     @Autowired
     @Lazy
     private PazYSalvoService pazYSalvoService;
@@ -249,6 +277,17 @@ public class SolicitudService {
      * académico del director.
      */
     public Map<String, Object> obtenerBandejaDirector(Usuario director) {
+        return obtenerBandejaDirector(director, null, null, null, null);
+    }
+
+    // FIX TP-201 (Johan Bueno, 07/10/2026): la bandeja del Director acepta
+    // filtros opcionales (estado, desde, hasta, cedulaEstudiante). Si todos
+    // vienen null, el comportamiento es el histórico (CP-048).
+    public Map<String, Object> obtenerBandejaDirector(Usuario director,
+                                                      String estadoFiltro,
+                                                      LocalDate desde,
+                                                      LocalDate hasta,
+                                                      String cedulaEstudianteFiltro) {
         Long programaId = director.getProgramaAcademico() != null
                 ? director.getProgramaAcademico().getId() : null;
 
@@ -262,6 +301,27 @@ public class SolicitudService {
                 .collect(Collectors.toMap(Usuario::getCedula, u -> u));
 
         List<Solicitud> todas = solicitudRepository.findByCedulaInAndTipo(cedulas, "TERMINACION_MATERIAS");
+
+        if (estadoFiltro != null && !estadoFiltro.isBlank()) {
+            String ef = estadoFiltro;
+            todas = todas.stream().filter(s -> ef.equals(s.getEstado())).collect(Collectors.toList());
+        }
+        if (desde != null) {
+            todas = todas.stream()
+                    .filter(s -> s.getFechaSolicitud() != null && !s.getFechaSolicitud().isBefore(desde))
+                    .collect(Collectors.toList());
+        }
+        if (hasta != null) {
+            todas = todas.stream()
+                    .filter(s -> s.getFechaSolicitud() != null && !s.getFechaSolicitud().isAfter(hasta))
+                    .collect(Collectors.toList());
+        }
+        if (cedulaEstudianteFiltro != null && !cedulaEstudianteFiltro.isBlank()) {
+            String cf = cedulaEstudianteFiltro.trim();
+            todas = todas.stream()
+                    .filter(s -> s.getCedula() != null && s.getCedula().contains(cf))
+                    .collect(Collectors.toList());
+        }
 
         List<Solicitud> pendientes = todas.stream()
                 .filter(s -> "PENDIENTE_PAGO".equals(s.getEstado()) || "EN_REVISION".equals(s.getEstado()))
@@ -278,6 +338,24 @@ public class SolicitudService {
         response.put("aprobadas", mapearConEstudiante(aprobadas, porCedula));
         response.put("rechazadas", mapearConEstudiante(rechazadas, porCedula));
         return response;
+    }
+
+    // FIX TP-201 (Johan Bueno, 07/10/2026): historial cronológico de una
+    // solicitud (estado anterior, nuevo, fecha, actor, actorTipo). Lo
+    // consume GET /api/solicitudes/{id}/historial.
+    public List<Map<String, Object>> obtenerHistorial(Long solicitudId) {
+        return cambioEstadoRepository.findBySolicitudIdOrderByFechaAsc(solicitudId)
+                .stream()
+                .map(h -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("estadoAnterior", h.getEstadoAnterior());
+                    m.put("estadoNuevo",    h.getEstadoNuevo());
+                    m.put("fecha",          h.getFecha() != null ? h.getFecha().toString() : null);
+                    m.put("actor",          h.getActor());
+                    m.put("actorTipo",      h.getActorTipo());
+                    return m;
+                })
+                .collect(Collectors.toList());
     }
 
     /**
@@ -396,7 +474,9 @@ public class SolicitudService {
         String nuevoEstado = "TERMINACION_MATERIAS".equals(s.getTipo())
                 ? "APROBADA_DIRECTOR"
                 : "APROBADA";
-        s.setEstado(nuevoEstado);
+        // FIX TP-201 (Johan Bueno, 07/10/2026): registrar la transición
+        // en historial_estado_solicitud y marcar fechaCierre si es final.
+        cambiarEstado(s, nuevoEstado, cedulaDirector, "USUARIO");
         s.setObservaciones("Aprobada por el director de programa.");
         // FIX TP-161 (Diego Bermúdez, 07/10/2026): trazabilidad de la
         // decisión del Director (campos ya existentes en el modelo que
@@ -456,7 +536,9 @@ public class SolicitudService {
             throw new IllegalStateException("Se requiere motivo de rechazo");
         }
         String estadoAnterior = s.getEstado();
-        s.setEstado("RECHAZADA");
+        // FIX TP-201 (Johan Bueno, 07/10/2026): registra la transición y
+        // marca fechaCierre (RECHAZADA es estado terminal).
+        cambiarEstado(s, "RECHAZADA", cedulaDirector, "USUARIO");
         s.setObservaciones(motivo);
         // FIX TP-161 (Diego Bermúdez, 07/10/2026): trazabilidad del rechazo
         // (decision, fechaDecision, cedulaDirector, observacionesDirector)
@@ -597,7 +679,10 @@ public class SolicitudService {
     if (!"PENDIENTE_PAGO".equals(s.getEstado()) || !"TERMINACION_MATERIAS".equals(s.getTipo())) {
         throw new IllegalStateException("La solicitud no está pendiente de pago");
     }
-    s.setEstado("EN_REVISION");
+    // FIX TP-201 (Johan Bueno, 07/10/2026): historial de la transición
+    // PENDIENTE_PAGO → EN_REVISION. El actor es "SISTEMA" porque la gatilla
+    // el webhook de Wompi, no una persona.
+    cambiarEstado(s, "EN_REVISION", "SISTEMA_WOMPI", "SISTEMA");
     // FIX TP-161 (Diego Bermúdez, 07/10/2026): registrar fechaEnRevision
     // al confirmar el pago para que el plazo de 48h del Director arranque
     // cuando la solicitud realmente queda sobre su escritorio.

@@ -81,12 +81,29 @@ public class SolicitudController {
     }
 
     /** GET /api/solicitudes/bandeja — bandeja del director */
+    // FIX TP-201 (Johan Bueno, 07/10/2026): acepta filtros estado, desde,
+    // hasta y cedulaEstudiante. Antes el controller ignoraba cualquier
+    // parámetro (CP-048).
     @PreAuthorize("hasRole('DIRECTOR')")
     @GetMapping("/bandeja")
-    public ResponseEntity<?> obtenerBandeja(Authentication auth) {
+    public ResponseEntity<?> obtenerBandeja(Authentication auth,
+            @RequestParam(required = false) String estado,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate desde,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate hasta,
+            @RequestParam(required = false) String cedulaEstudiante) {
         ResolvedPrincipal p = principalResolver.resolve(auth);
         if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
-        return ResponseEntity.ok(solicitudService.obtenerBandejaDirector(p.usuario()));
+        return ResponseEntity.ok(solicitudService.obtenerBandejaDirector(
+                p.usuario(), estado, desde, hasta, cedulaEstudiante));
+    }
+
+    /** GET /api/solicitudes/{id}/historial — línea de tiempo de cambios de estado. */
+    // FIX TP-201 (Johan Bueno, 07/10/2026): expone el historial para el
+    // detalle de la solicitud en la UI del Director/Posgrados (CP-046).
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/{id}/historial")
+    public ResponseEntity<?> obtenerHistorial(@PathVariable Long id) {
+        return ResponseEntity.ok(solicitudService.obtenerHistorial(id));
     }
 
     /** GET /api/solicitudes/bandeja-grado */
