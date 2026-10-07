@@ -62,6 +62,10 @@ class SolicitudServiceTerminacionTest {
     @Mock private PlantillaCertificadoService plantillaCertificadoService;
     @Mock private CorreoCertificadoService correoService;
     @Mock private CorreoSolicitudService correoSolicitudService;
+    // FIX TP-187 (Johan Bueno, 07/10/2026): SolicitudService ahora depende
+    // de AdminRepository para notificar a POSGRADOS tras la aprobación
+    // del Director; mockearlo para que el test unitario no explote con NPE.
+    @Mock private com.ufps.tramites.repository.AdminRepository adminRepository;
 
     @InjectMocks
     private SolicitudService solicitudService;
