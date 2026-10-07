@@ -27,7 +27,11 @@ import com.ufps.tramites.repository.SolicitudRepository;
 import com.ufps.tramites.repository.TipoCertificadoRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
 
+// FIX TP-194 (Diego Bermúdez, 07/10/2026): solicitarCertificado y
+// registrarPagoCertificado escriben SolicitudCertificado + Pago + envían
+// notificaciones; se envuelve toda la clase en transacción.
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class CertificadoService {
 
     private static final Logger log = LoggerFactory.getLogger(CertificadoService.class);

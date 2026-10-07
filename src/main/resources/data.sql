@@ -20,6 +20,16 @@ INSERT IGNORE INTO roles (id, nombre) VALUES
   (4, 'POSGRADOS'),
   (5, 'DEPENDENCIA');
 
+-- FIX TP-194 (Diego Bermúdez, 07/10/2026): seed inicial de
+-- estados_estudiantes. El refactor del Bloque 5e creó el catálogo pero el
+-- data.sql nunca lo sembró y arrancar la app contra una BD limpia dejaba
+-- la tabla vacía (hallazgo I_integridad). Sintaxis compatible con MySQL
+-- y con H2 en MODE=MySQL (INSERT IGNORE respeta el UNIQUE(nombre)).
+INSERT IGNORE INTO estados_estudiantes (id, nombre) VALUES
+  (1, 'ACTIVO'),
+  (2, 'PAGO_GRADO_PENDIENTE'),
+  (3, 'GRADUADO');
+
 -- Limpiar duplicados de programa_academico antes de insertar
 -- (puede ocurrir si el primer arranque falló antes de aplicar la constraint única)
 DELETE FROM programa_academico
