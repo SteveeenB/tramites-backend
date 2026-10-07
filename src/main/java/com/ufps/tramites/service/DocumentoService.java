@@ -14,7 +14,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+// FIX TP-194 (Diego Bermúdez, 07/10/2026): guardarDocumento sube el archivo
+// a Supabase y persiste DocumentoSolicitud; si el save a BD falla, el
+// archivo queda huérfano, pero al menos la BD queda consistente dentro de
+// la transacción. @Transactional envuelve todas las operaciones.
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class DocumentoService {
 
     private static final Set<String> TIPOS_PERMITIDOS = Set.of(

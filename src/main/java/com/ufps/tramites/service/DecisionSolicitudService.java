@@ -8,7 +8,11 @@ import org.springframework.stereotype.Service;
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.repository.SolicitudRepository;
 
+// FIX TP-194 (Diego Bermúdez, 07/10/2026): registrarDecision escribe
+// Solicitud y expone trazabilidad (fechaDecision, cedulaDirector); se
+// marca la clase transaccional.
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class DecisionSolicitudService {
 
     private final SolicitudRepository solicitudRepository;

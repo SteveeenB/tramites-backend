@@ -8,16 +8,18 @@
 --                                    + paz_y_salvo.responsable_usuario_id
 --     (uno de los dos según tipo: DIRECTOR=Usuario, DEPENDENCIA/POSGRADOS=Admin)
 --
--- Las columnas viejas (cedula_posgrados, cedula_responsable) se
--- mantienen como zombie hasta Bloque 4 para no romper código
--- intermedio que aún las lea.
---
 -- Hash BCrypt de "123456" (igual que el ya usado en AUTH.md):
 --   $2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq
+--
+-- FIX TP-194 (Diego Bermúdez, 07/10/2026): se migra de la sintaxis
+-- PostgreSQL (ON CONFLICT, UPDATE ... FROM, DO $$ ... $$, CREATE INDEX
+-- IF NOT EXISTS) a MySQL 8+, que es el motor real del stack. Se
+-- preserva idempotencia (INSERT IGNORE, ADD COLUMN IF NOT EXISTS,
+-- comprobación previa de índices y constraints).
 -- ============================================================
 
 -- ── 1. Sembrar admins en la tabla `admins` ────────────────────
-INSERT INTO admins (codigo, nombre_completo, email, password, tipo, es_super_admin, dependencia_id)
+INSERT IGNORE INTO admins (codigo, nombre_completo, email, password, tipo, es_super_admin, dependencia_id)
 VALUES
   ('ADMIN1', 'Administrador',         'admin@ufps.edu.co',
       '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
@@ -27,84 +29,121 @@ VALUES
       'POSGRADOS',   false, NULL),
   ('DEP001', 'Biblioteca Central',    'kevarias.2195@gmail.com',
       '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
-      'DEPENDENCIA', false, (SELECT id FROM dependencias WHERE nombre = 'Biblioteca')),
+      'DEPENDENCIA', false, (SELECT id FROM dependencias WHERE nombre = 'Biblioteca' LIMIT 1)),
   ('DEP002', 'División Financiera',   'financiera@test.com',
       '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
-      'DEPENDENCIA', false, (SELECT id FROM dependencias WHERE nombre = 'Financiera')),
+      'DEPENDENCIA', false, (SELECT id FROM dependencias WHERE nombre = 'Financiera' LIMIT 1)),
   ('DEP003', 'Admisiones y Registro', 'admisiones@test.com',
       '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
-      'DEPENDENCIA', false, (SELECT id FROM dependencias WHERE nombre = 'Admisiones'))
-ON CONFLICT (codigo) DO NOTHING;
+      'DEPENDENCIA', false, (SELECT id FROM dependencias WHERE nombre = 'Admisiones' LIMIT 1));
 
 -- ── 2. Solicitud: posgrados_admin_id (FK formal a admins) ─────
 ALTER TABLE solicitud
-  ADD COLUMN IF NOT EXISTS posgrados_admin_id BIGINT REFERENCES admins(id);
+  ADD COLUMN IF NOT EXISTS posgrados_admin_id BIGINT NULL,
+  ADD CONSTRAINT fk_solicitud_posgrados_admin
+      FOREIGN KEY (posgrados_admin_id) REFERENCES admins(id);
 
 -- Backfill: la cédula vieja 4000000001 era POS001
 UPDATE solicitud s
-SET posgrados_admin_id = a.id
-FROM admins a
-WHERE a.codigo = 'POS001'
-  AND s.cedula_posgrados = '4000000001'
+JOIN admins a ON a.codigo = 'POS001'
+SET s.posgrados_admin_id = a.id
+WHERE s.cedula_posgrados = '4000000001'
   AND s.posgrados_admin_id IS NULL;
 
-CREATE INDEX IF NOT EXISTS idx_solicitud_posgrados_admin
-  ON solicitud(posgrados_admin_id);
+SET @idx := (
+  SELECT COUNT(*) FROM information_schema.statistics
+  WHERE table_schema = DATABASE()
+    AND table_name  = 'solicitud'
+    AND index_name  = 'idx_solicitud_posgrados_admin'
+);
+SET @sql := IF(@idx = 0,
+  'CREATE INDEX idx_solicitud_posgrados_admin ON solicitud(posgrados_admin_id)',
+  'SELECT ''index idx_solicitud_posgrados_admin ya existe'' AS info'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
--- ── 3a. Prerequisito: `usuario.id` debe ser UNIQUE para poder
---      referenciarse como FK. Hoy `usuario.cedula` es la PK real
---      y `usuario.id` existe como columna IDENTITY pero sin
---      constraint UNIQUE — es deuda preexistente (documentada en
---      plan_integracion_bd_oficial.md §3.1). Hibernate trata `id`
---      como PK por convenio JPA, pero PostgreSQL no lo sabe.
---      Añadir UNIQUE es aditivo, no rompe nada.
-DO $$ BEGIN
-  ALTER TABLE usuario ADD CONSTRAINT usuario_id_unique UNIQUE (id);
-EXCEPTION
-  WHEN duplicate_table THEN NULL;
-  WHEN duplicate_object THEN NULL;
-END $$;
+-- ── 3a. Prerequisito: usuario.id UNIQUE para poder referenciarse como FK.
+--      MySQL: añadimos la constraint sólo si no existe ya.
+SET @cnt := (
+  SELECT COUNT(*) FROM information_schema.table_constraints
+  WHERE table_schema   = DATABASE()
+    AND table_name     = 'usuario'
+    AND constraint_name= 'usuario_id_unique'
+);
+SET @sql := IF(@cnt = 0,
+  'ALTER TABLE usuario ADD CONSTRAINT usuario_id_unique UNIQUE (id)',
+  'SELECT ''constraint usuario_id_unique ya existe'' AS info'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ── 3b. PazYSalvo: separar responsable según tipo ──────────────
 ALTER TABLE paz_y_salvo
-  ADD COLUMN IF NOT EXISTS responsable_admin_id   BIGINT REFERENCES admins(id),
-  ADD COLUMN IF NOT EXISTS responsable_usuario_id BIGINT REFERENCES usuario(id);
+  ADD COLUMN IF NOT EXISTS responsable_admin_id   BIGINT NULL,
+  ADD COLUMN IF NOT EXISTS responsable_usuario_id BIGINT NULL,
+  ADD CONSTRAINT fk_pyss_resp_admin
+      FOREIGN KEY (responsable_admin_id) REFERENCES admins(id),
+  ADD CONSTRAINT fk_pyss_resp_usuario
+      FOREIGN KEY (responsable_usuario_id) REFERENCES usuario(id);
 
--- Backfill: si la cédula del responsable existe en admins (vía mapeo de
--- cédula vieja → codigo nuevo) → responsable_admin_id; si existe en
--- usuario (DIRECTOR) → responsable_usuario_id.
+-- Backfill: mapeo de cédulas viejas → códigos de admin.
+--   3000000001 → DEP001
+--   3000000002 → DEP002
+--   3000000003 → DEP003
+--   4000000001 → POS001
+--   9999999990 → ADMIN1
 UPDATE paz_y_salvo ps
-SET responsable_admin_id = a.id
-FROM admins a, (VALUES
-   ('3000000001','DEP001'),
-   ('3000000002','DEP002'),
-   ('3000000003','DEP003'),
-   ('4000000001','POS001'),
-   ('9999999990','ADMIN1')
-) AS map(cedula_vieja, codigo_admin)
-WHERE ps.cedula_responsable = map.cedula_vieja
-  AND a.codigo = map.codigo_admin
+JOIN admins a ON (
+    (ps.cedula_responsable = '3000000001' AND a.codigo = 'DEP001')
+ OR (ps.cedula_responsable = '3000000002' AND a.codigo = 'DEP002')
+ OR (ps.cedula_responsable = '3000000003' AND a.codigo = 'DEP003')
+ OR (ps.cedula_responsable = '4000000001' AND a.codigo = 'POS001')
+ OR (ps.cedula_responsable = '9999999990' AND a.codigo = 'ADMIN1')
+)
+SET ps.responsable_admin_id = a.id
+WHERE ps.responsable_admin_id IS NULL;
+
+UPDATE paz_y_salvo ps
+JOIN usuario u ON u.cedula = ps.cedula_responsable
+SET ps.responsable_usuario_id = u.id
+WHERE ps.responsable_usuario_id IS NULL
   AND ps.responsable_admin_id IS NULL;
 
-UPDATE paz_y_salvo ps
-SET responsable_usuario_id = u.id
-FROM usuario u
-WHERE u.cedula = ps.cedula_responsable
-  AND ps.responsable_usuario_id IS NULL
-  AND ps.responsable_admin_id IS NULL;
+SET @idx := (
+  SELECT COUNT(*) FROM information_schema.statistics
+  WHERE table_schema = DATABASE()
+    AND table_name  = 'paz_y_salvo'
+    AND index_name  = 'idx_paz_y_salvo_resp_admin'
+);
+SET @sql := IF(@idx = 0,
+  'CREATE INDEX idx_paz_y_salvo_resp_admin ON paz_y_salvo(responsable_admin_id)',
+  'SELECT ''index idx_paz_y_salvo_resp_admin ya existe'' AS info'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
-CREATE INDEX IF NOT EXISTS idx_paz_y_salvo_resp_admin
-  ON paz_y_salvo(responsable_admin_id);
-CREATE INDEX IF NOT EXISTS idx_paz_y_salvo_resp_usuario
-  ON paz_y_salvo(responsable_usuario_id);
+SET @idx := (
+  SELECT COUNT(*) FROM information_schema.statistics
+  WHERE table_schema = DATABASE()
+    AND table_name  = 'paz_y_salvo'
+    AND index_name  = 'idx_paz_y_salvo_resp_usuario'
+);
+SET @sql := IF(@idx = 0,
+  'CREATE INDEX idx_paz_y_salvo_resp_usuario ON paz_y_salvo(responsable_usuario_id)',
+  'SELECT ''index idx_paz_y_salvo_resp_usuario ya existe'' AS info'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ── 4. Dropear FK zombie de tipo_certificado.dependencia_cedula ──
--- En Bloque 1 migramos a tipo_certificado.dependencia_id (FK a
--- dependencias.id). La columna `dependencia_cedula` quedó como zombie
--- (insertable=false/updatable=false en la entity) pero el FK formal
--- en BD a usuario(cedula) sigue vivo y bloquearía el DELETE de admins
--- viejos en el siguiente paso. La columna se borra entera en Bloque 4.
-ALTER TABLE tipo_certificado DROP CONSTRAINT IF EXISTS fk_tc_dependencia;
+SET @fk := (
+  SELECT COUNT(*) FROM information_schema.table_constraints
+  WHERE table_schema   = DATABASE()
+    AND table_name     = 'tipo_certificado'
+    AND constraint_name= 'fk_tc_dependencia'
+);
+SET @sql := IF(@fk > 0,
+  'ALTER TABLE tipo_certificado DROP FOREIGN KEY fk_tc_dependencia',
+  'SELECT ''fk fk_tc_dependencia no existe (nada que dropear)'' AS info'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ── 5. Borrar los 5 admins viejos de `usuario` ────────────────
 DELETE FROM usuario
