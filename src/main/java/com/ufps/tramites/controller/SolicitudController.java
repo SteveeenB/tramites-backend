@@ -1,5 +1,4 @@
 package com.ufps.tramites.controller;
-
 import com.ufps.tramites.security.PrincipalResolver;
 import com.ufps.tramites.security.ResolvedPrincipal;
 import com.ufps.tramites.service.DocumentoService;
@@ -82,12 +81,29 @@ public class SolicitudController {
     }
 
     /** GET /api/solicitudes/bandeja — bandeja del director */
+    // FIX TP-201 (Johan Bueno, 07/10/2026): acepta filtros estado, desde,
+    // hasta y cedulaEstudiante. Antes el controller ignoraba cualquier
+    // parámetro (CP-048).
     @PreAuthorize("hasRole('DIRECTOR')")
     @GetMapping("/bandeja")
-    public ResponseEntity<?> obtenerBandeja(Authentication auth) {
+    public ResponseEntity<?> obtenerBandeja(Authentication auth,
+            @RequestParam(required = false) String estado,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate desde,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate hasta,
+            @RequestParam(required = false) String cedulaEstudiante) {
         ResolvedPrincipal p = principalResolver.resolve(auth);
         if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
-        return ResponseEntity.ok(solicitudService.obtenerBandejaDirector(p.usuario()));
+        return ResponseEntity.ok(solicitudService.obtenerBandejaDirector(
+                p.usuario(), estado, desde, hasta, cedulaEstudiante));
+    }
+
+    /** GET /api/solicitudes/{id}/historial — línea de tiempo de cambios de estado. */
+    // FIX TP-201 (Johan Bueno, 07/10/2026): expone el historial para el
+    // detalle de la solicitud en la UI del Director/Posgrados (CP-046).
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/{id}/historial")
+    public ResponseEntity<?> obtenerHistorial(@PathVariable Long id) {
+        return ResponseEntity.ok(solicitudService.obtenerHistorial(id));
     }
 
     /** GET /api/solicitudes/bandeja-grado */
@@ -139,10 +155,13 @@ public class SolicitudController {
         try {
             var resultado = documentoService.obtenerArchivo(id, docId);
             if (resultado == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            // FIX (Diego Bermudez, dd/mm/aaaa): guard con instanceof — el chequeo anterior solo validaba null,
+            // no el tipo, y podía lanzar ClassCastException si "contentType" no era String
+            Object ct = resultado.get("contentType");
+            String contentType = (ct instanceof String) ? (String) ct : "application/octet-stream";
             return ResponseEntity.ok()
                     .header("Content-Disposition", "inline; filename=\"" + resultado.get("nombreOriginal") + "\"")
-                    .contentType(org.springframework.http.MediaType.parseMediaType(
-                            resultado.get("contentType") != null ? (String) resultado.get("contentType") : "application/octet-stream"))
+                    .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
                     .body((byte[]) resultado.get("bytes"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
@@ -173,7 +192,9 @@ public class SolicitudController {
         ResolvedPrincipal p = principalResolver.resolve(auth);
         if (p == null || !p.isUsuario()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
         try {
-            return ResponseEntity.ok(solicitudService.rechazarSolicitud(id, motivo));
+            // FIX TP-161 (Diego Bermúdez, 07/10/2026): pasar la cédula del
+            // director autenticado al service para que quede trazabilidad.
+            return ResponseEntity.ok(solicitudService.rechazarSolicitud(id, motivo, p.cedula()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
         } catch (IllegalStateException e) {

@@ -3,6 +3,7 @@ package com.ufps.tramites.service;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -30,7 +31,15 @@ import com.ufps.tramites.repository.TipoCertificadoRepository;
 import com.ufps.tramites.repository.TipoSolicitudRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
 
+// FIX TP-194 (Diego Bermúdez, 07/10/2026): se anota la clase con
+// @Transactional porque la mayoría de operaciones de este service escriben
+// en varias tablas (solicitud + estudiante + documento_solicitud +
+// notificacion). Antes cualquier fallo intermedio dejaba estado
+// inconsistente (I_integridad). Spring crea una transacción por método
+// público; los que sólo leen quedan igualmente protegidos y hacen flush
+// consistente.
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class SolicitudService {
 
     // Costo fijo del trámite de terminación de materias (COP) — valor de prueba
@@ -69,6 +78,39 @@ public class SolicitudService {
     @Autowired
     private DocumentoSolicitudRepository documentoSolicitudRepository;
 
+    // FIX TP-187 (Johan Bueno, 07/10/2026): dependencias para notificar al
+    // Director tras el pago y a Posgrados tras la aprobación del Director.
+    @Autowired
+    private com.ufps.tramites.repository.AdminRepository adminRepository;
+
+    // FIX TP-201 (Johan Bueno, 07/10/2026): persistir cada transición en
+    // historial_estado_solicitud y cerrar la solicitud cuando entra en
+    // estado final.
+    @Autowired
+    private com.ufps.tramites.repository.CambioEstadoSolicitudRepository cambioEstadoRepository;
+
+    // FIX TP-201 (Johan Bueno, 07/10/2026): estados terminales que marcan
+    // fechaCierre y aparecen en la lista de "cerradas" del historial.
+    private static final java.util.Set<String> ESTADOS_FINALES = java.util.Set.of(
+            "APROBADA", "APROBADA_POSGRADOS",
+            "RECHAZADA", "RECHAZADA_POSGRADOS");
+
+    /** Centraliza la transición de estado: actualiza el campo, deja un
+     *  rastro en historial_estado_solicitud y, si el nuevo estado es
+     *  terminal, marca fechaCierre. No guarda la solicitud; el llamador
+     *  conserva su save() habitual para no cambiar la secuencia de
+     *  operaciones existente. */
+    void cambiarEstado(com.ufps.tramites.model.Solicitud s, String nuevoEstado,
+                       String actor, String actorTipo) {
+        String anterior = s.getEstado();
+        s.setEstado(nuevoEstado);
+        if (ESTADOS_FINALES.contains(nuevoEstado) && s.getFechaCierre() == null) {
+            s.setFechaCierre(LocalDateTime.now());
+        }
+        cambioEstadoRepository.save(new com.ufps.tramites.model.CambioEstadoSolicitud(
+                s.getId(), anterior, nuevoEstado, LocalDateTime.now(), actor, actorTipo));
+    }
+
     @Autowired
     @Lazy
     private PazYSalvoService pazYSalvoService;
@@ -78,6 +120,12 @@ public class SolicitudService {
 
     @Autowired
     private TipoCertificadoRepository tipoCertificadoRepository;
+
+    // FIX TP-190 (Johan Bueno, 07/10/2026): verificarCertificado debe
+    // reconocer códigos UFPS-CERT-… que generan las constancias, no sólo
+    // UFPS-TM-… del certificado de terminación.
+    @Autowired
+    private com.ufps.tramites.repository.SolicitudCertificadoRepository solicitudCertificadoRepository;
 
     @Autowired
     private TipoSolicitudRepository tipoSolicitudRepository;
@@ -189,6 +237,10 @@ public class SolicitudService {
         solicitud.setEstudiante(perfilEstudiante);
         solicitud.setTipo("GRADO");
         solicitud.setEstado("EN_REVISION");
+        // FIX TP-161 (Diego Bermúdez, 07/10/2026): registrar fechaEnRevision
+        // al crear la solicitud de grado para que AlertaDirectorService
+        // pueda calcular el plazo de 48h del Director.
+        solicitud.setFechaEnRevision(LocalDateTime.now());
         solicitud.setFechaSolicitud(LocalDate.now());
         solicitud.setCosto(tipoSolicitudRepository.findByCodigo("GRADO")
                 .map(t -> t.getCosto()).orElse(COSTO_GRADO));
@@ -225,6 +277,17 @@ public class SolicitudService {
      * académico del director.
      */
     public Map<String, Object> obtenerBandejaDirector(Usuario director) {
+        return obtenerBandejaDirector(director, null, null, null, null);
+    }
+
+    // FIX TP-201 (Johan Bueno, 07/10/2026): la bandeja del Director acepta
+    // filtros opcionales (estado, desde, hasta, cedulaEstudiante). Si todos
+    // vienen null, el comportamiento es el histórico (CP-048).
+    public Map<String, Object> obtenerBandejaDirector(Usuario director,
+                                                      String estadoFiltro,
+                                                      LocalDate desde,
+                                                      LocalDate hasta,
+                                                      String cedulaEstudianteFiltro) {
         Long programaId = director.getProgramaAcademico() != null
                 ? director.getProgramaAcademico().getId() : null;
 
@@ -238,6 +301,27 @@ public class SolicitudService {
                 .collect(Collectors.toMap(Usuario::getCedula, u -> u));
 
         List<Solicitud> todas = solicitudRepository.findByCedulaInAndTipo(cedulas, "TERMINACION_MATERIAS");
+
+        if (estadoFiltro != null && !estadoFiltro.isBlank()) {
+            String ef = estadoFiltro;
+            todas = todas.stream().filter(s -> ef.equals(s.getEstado())).collect(Collectors.toList());
+        }
+        if (desde != null) {
+            todas = todas.stream()
+                    .filter(s -> s.getFechaSolicitud() != null && !s.getFechaSolicitud().isBefore(desde))
+                    .collect(Collectors.toList());
+        }
+        if (hasta != null) {
+            todas = todas.stream()
+                    .filter(s -> s.getFechaSolicitud() != null && !s.getFechaSolicitud().isAfter(hasta))
+                    .collect(Collectors.toList());
+        }
+        if (cedulaEstudianteFiltro != null && !cedulaEstudianteFiltro.isBlank()) {
+            String cf = cedulaEstudianteFiltro.trim();
+            todas = todas.stream()
+                    .filter(s -> s.getCedula() != null && s.getCedula().contains(cf))
+                    .collect(Collectors.toList());
+        }
 
         List<Solicitud> pendientes = todas.stream()
                 .filter(s -> "PENDIENTE_PAGO".equals(s.getEstado()) || "EN_REVISION".equals(s.getEstado()))
@@ -254,6 +338,24 @@ public class SolicitudService {
         response.put("aprobadas", mapearConEstudiante(aprobadas, porCedula));
         response.put("rechazadas", mapearConEstudiante(rechazadas, porCedula));
         return response;
+    }
+
+    // FIX TP-201 (Johan Bueno, 07/10/2026): historial cronológico de una
+    // solicitud (estado anterior, nuevo, fecha, actor, actorTipo). Lo
+    // consume GET /api/solicitudes/{id}/historial.
+    public List<Map<String, Object>> obtenerHistorial(Long solicitudId) {
+        return cambioEstadoRepository.findBySolicitudIdOrderByFechaAsc(solicitudId)
+                .stream()
+                .map(h -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("estadoAnterior", h.getEstadoAnterior());
+                    m.put("estadoNuevo",    h.getEstadoNuevo());
+                    m.put("fecha",          h.getFecha() != null ? h.getFecha().toString() : null);
+                    m.put("actor",          h.getActor());
+                    m.put("actorTipo",      h.getActorTipo());
+                    return m;
+                })
+                .collect(Collectors.toList());
     }
 
     /**
@@ -359,20 +461,39 @@ public class SolicitudService {
     public Map<String, Object> aprobarSolicitudConDirector(Long id, String cedulaDirector) {
         Solicitud s = solicitudRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
-        if (!"PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())) {
-            throw new IllegalStateException("Solo se pueden aprobar solicitudes en estado pendiente");
+        // FIX TP-188 (Diego Bermúdez, 07/10/2026): el Director sólo puede
+        // aprobar desde EN_REVISION. Antes aceptaba también PENDIENTE_PAGO,
+        // dejando saltar el pago del estudiante (CP-010 / hallazgo
+        // de flujo).
+        if (!"EN_REVISION".equals(s.getEstado())) {
+            throw new IllegalStateException(
+                "Solo se pueden aprobar solicitudes en estado EN_REVISION. "
+                + "Estado actual: " + s.getEstado());
         }
         String estadoAnterior = s.getEstado();
         String nuevoEstado = "TERMINACION_MATERIAS".equals(s.getTipo())
                 ? "APROBADA_DIRECTOR"
                 : "APROBADA";
-        s.setEstado(nuevoEstado);
+        // FIX TP-201 (Johan Bueno, 07/10/2026): registrar la transición
+        // en historial_estado_solicitud y marcar fechaCierre si es final.
+        cambiarEstado(s, nuevoEstado, cedulaDirector, "USUARIO");
         s.setObservaciones("Aprobada por el director de programa.");
-        s.setObservaciones("Aprobada por el director de programa.");
+        // FIX TP-161 (Diego Bermúdez, 07/10/2026): trazabilidad de la
+        // decisión del Director (campos ya existentes en el modelo que
+        // antes quedaban en null).
+        s.setDecision("APROBADA");
+        s.setFechaDecision(LocalDateTime.now());
+        if (cedulaDirector != null) {
+            s.setCedulaDirector(cedulaDirector);
+        }
 
         solicitudRepository.save(s);
 
         notificarEstudiante(s, estadoAnterior);
+        // FIX TP-187 (Johan Bueno, 07/10/2026): tras la aprobación del
+        // Director (TERMINACION_MATERIAS → APROBADA_DIRECTOR; GRADO →
+        // APROBADA), Posgrados debe enterarse para atender el trámite.
+        notificarPosgrados(s, estadoAnterior);
         usuarioRepository.findByCedula(s.getCedula())
                 .ifPresent(est -> correoSolicitudService.notificarEstudianteAprobacion(s, est));
 
@@ -401,6 +522,10 @@ public class SolicitudService {
      * Rechaza una solicitud de terminación de materias pendiente.
      */
     public Map<String, Object> rechazarSolicitud(Long id, String motivo) {
+        return rechazarSolicitud(id, motivo, null);
+    }
+
+    public Map<String, Object> rechazarSolicitud(Long id, String motivo, String cedulaDirector) {
         Solicitud s = solicitudRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
         if (!"PENDIENTE_PAGO".equals(s.getEstado()) && !"EN_REVISION".equals(s.getEstado())
@@ -411,8 +536,20 @@ public class SolicitudService {
             throw new IllegalStateException("Se requiere motivo de rechazo");
         }
         String estadoAnterior = s.getEstado();
-        s.setEstado("RECHAZADA");
+        // FIX TP-201 (Johan Bueno, 07/10/2026): registra la transición y
+        // marca fechaCierre (RECHAZADA es estado terminal).
+        cambiarEstado(s, "RECHAZADA", cedulaDirector, "USUARIO");
         s.setObservaciones(motivo);
+        // FIX TP-161 (Diego Bermúdez, 07/10/2026): trazabilidad del rechazo
+        // (decision, fechaDecision, cedulaDirector, observacionesDirector)
+        // antes quedaba en null, por lo que no había constancia del quien y
+        // el cuándo.
+        s.setDecision("RECHAZADA");
+        s.setFechaDecision(LocalDateTime.now());
+        s.setObservacionesDirector(motivo);
+        if (cedulaDirector != null) {
+            s.setCedulaDirector(cedulaDirector);
+        }
         solicitudRepository.save(s);
 
         notificarEstudiante(s, estadoAnterior);
@@ -495,9 +632,19 @@ public class SolicitudService {
         boolean esGrado = "GRADO".equals(s.getTipo());
         liq.put("concepto", esGrado ? "Derechos de Grado" : "Trámite de Terminación de Materias");
         liq.put("valor", s.getCosto());
-        liq.put("fechaLimite", s.getFechaSolicitud() != null
-                ? s.getFechaSolicitud().plusDays(5).toString()
-                : null);
+        // FIX TP-193 (Johan Bueno, 07/10/2026): liquidación vence a los
+        // 5 días hábiles (L-V, sin calendario de festivos documentado). Si
+        // la fecha ya pasó, se regenera a partir de hoy para que el
+        // estudiante pueda reintentar sin pedirle al soporte una nueva.
+        java.time.LocalDate base = s.getFechaSolicitud();
+        java.time.LocalDate limite = base != null
+                ? com.ufps.tramites.util.FechaUtil.sumarDiasHabiles(base, 5)
+                : null;
+        if (com.ufps.tramites.util.FechaUtil.estaVencida(limite)) {
+            limite = com.ufps.tramites.util.FechaUtil.sumarDiasHabiles(java.time.LocalDate.now(), 5);
+            liq.put("regenerada", true);
+        }
+        liq.put("fechaLimite", limite != null ? limite.toString() : null);
         liq.put("instrucciones", "Realiza el pago en la ventanilla de Tesorería o por PSE antes de la fecha límite.");
         return liq;
     }
@@ -512,6 +659,15 @@ public class SolicitudService {
         if (!"APROBADA".equals(s.getEstado()) || !"GRADO".equals(s.getTipo())) {
             throw new IllegalStateException("La solicitud no es una solicitud de grado aprobada");
         }
+        // FIX TP-188 (Diego Bermúdez, 07/10/2026): el pago de grado requiere
+        // que todos los paz y salvos estén aprobados. Antes el estudiante
+        // podía pagar incluso con uno rechazado (CP-023), llegando a acta
+        // con paz y salvos pendientes.
+        if (!pazYSalvoService.todosAprobados(id)) {
+            throw new IllegalStateException(
+                "No se puede registrar el pago de grado: "
+                + "aún hay paz y salvos pendientes o rechazados.");
+        }
         s.setEstadoPagoGrado("APROBADO");
         solicitudRepository.save(s);
         return construirRespuestaSolicitud(s);
@@ -523,11 +679,46 @@ public class SolicitudService {
     if (!"PENDIENTE_PAGO".equals(s.getEstado()) || !"TERMINACION_MATERIAS".equals(s.getTipo())) {
         throw new IllegalStateException("La solicitud no está pendiente de pago");
     }
-    s.setEstado("EN_REVISION");
+    // FIX TP-201 (Johan Bueno, 07/10/2026): historial de la transición
+    // PENDIENTE_PAGO → EN_REVISION. El actor es "SISTEMA" porque la gatilla
+    // el webhook de Wompi, no una persona.
+    cambiarEstado(s, "EN_REVISION", "SISTEMA_WOMPI", "SISTEMA");
+    // FIX TP-161 (Diego Bermúdez, 07/10/2026): registrar fechaEnRevision
+    // al confirmar el pago para que el plazo de 48h del Director arranque
+    // cuando la solicitud realmente queda sobre su escritorio.
+    s.setFechaEnRevision(LocalDateTime.now());
     solicitudRepository.save(s);
     notificarEstudiante(s, "PENDIENTE_PAGO");
+    // FIX TP-187 (Johan Bueno, 07/10/2026): el Director del programa del
+    // estudiante debe recibir la notificación de que llegó una solicitud
+    // a su bandeja tras el pago.
+    notificarDirectorDelPrograma(s, "PENDIENTE_PAGO");
     return construirRespuestaSolicitud(s);
 }
+
+    // FIX TP-187 (Johan Bueno, 07/10/2026): resuelve el director del
+    // programa del estudiante dueño de la solicitud y le empuja el cambio
+    // de estado por SSE + notificación persistida.
+    private void notificarDirectorDelPrograma(Solicitud s, String estadoAnterior) {
+        usuarioRepository.findByCedula(s.getCedula()).ifPresent(est -> {
+            if (est.getProgramaAcademico() == null) return;
+            Long programaId = est.getProgramaAcademico().getId();
+            usuarioRepository.findByProgramaAcademicoIdAndRol_Nombre(programaId, "DIRECTOR")
+                    .forEach(director -> {
+                        notificacionSseService.notificarCambioEstadoA(director.getCedula(), s, estadoAnterior);
+                        notificacionService.notificarEstudianteCambioEstado(s, director);
+                    });
+        });
+    }
+
+    // FIX TP-187 (Johan Bueno, 07/10/2026): broadcast a los admins
+    // POSGRADOS cuando el Director aprueba, para que la solicitud aparezca
+    // en su bandeja de inmediato.
+    private void notificarPosgrados(Solicitud s, String estadoAnterior) {
+        for (Admin a : adminRepository.findByTipo("POSGRADOS")) {
+            notificacionSseService.notificarCambioEstadoA(a.getCodigo(), s, estadoAnterior);
+        }
+    }
 
     /**
      * Registra la fecha de graduación elegida por el estudiante. Requiere que
@@ -576,41 +767,82 @@ public class SolicitudService {
     }
 
     public Map<String, Object> verificarCertificado(String codigo) {
-        // Formato: UFPS-TM-{id}-{last4cedula}
+        // FIX TP-190 (Johan Bueno, 07/10/2026): se acepta tanto UFPS-TM-{id}-
+        // {last4} del certificado de terminación como UFPS-CERT-{id}-{last4}
+        // de las constancias (matrícula, buena conducta, registro calificado).
+        // Antes el método solo entendía UFPS-TM-… y las constancias quedaban
+        // "valido": false pese a estar correctamente emitidas (CP-039).
+        if (codigo == null) return respuestaInvalida("Código de verificación inválido.");
+
         try {
             String[] partes = codigo.split("-");
-            Long solicitudId = Long.parseLong(partes[2]);
+            if (partes.length < 4 || !"UFPS".equals(partes[0])) {
+                return respuestaInvalida("Código de verificación inválido.");
+            }
+            String tipo = partes[1];
+            Long id = Long.parseLong(partes[2]);
             String last4 = partes[3];
-            Solicitud s = solicitudRepository.findById(solicitudId).orElse(null);
-            if (s == null || !"APROBADA".equals(s.getEstado()) || !"TERMINACION_MATERIAS".equals(s.getTipo())) {
-                Map<String, Object> r = new java.util.LinkedHashMap<>();
-                r.put("valido", false);
-                r.put("mensaje", "Certificado no encontrado o no válido.");
-                return r;
-            }
-            String cedulaReal = s.getCedula();
-            if (!cedulaReal.endsWith(last4)) {
-                Map<String, Object> r = new java.util.LinkedHashMap<>();
-                r.put("valido", false);
-                r.put("mensaje", "El código de verificación no coincide.");
-                return r;
-            }
-            Usuario est = usuarioRepository.findByCedula(cedulaReal).orElse(null);
-            Map<String, Object> r = new java.util.LinkedHashMap<>();
-            r.put("valido", true);
-            r.put("codigo", codigo);
-            r.put("nombre", est != null ? est.getNombre() : "—");
-            r.put("cedula", cedulaReal);
-            r.put("programa", est != null && est.getProgramaAcademico() != null ? est.getProgramaAcademico().getNombre() : "—");
-            r.put("fechaAprobacion", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : "—");
-            r.put("mensaje", "Certificado válido y auténtico.");
-            return r;
+
+            return switch (tipo) {
+                case "TM"   -> verificarTerminacion(codigo, id, last4);
+                case "CERT" -> verificarConstancia(codigo, id, last4);
+                default      -> respuestaInvalida("Código de verificación inválido.");
+            };
         } catch (Exception e) {
-            Map<String, Object> r = new java.util.LinkedHashMap<>();
-            r.put("valido", false);
-            r.put("mensaje", "Código de verificación inválido.");
-            return r;
+            return respuestaInvalida("Código de verificación inválido.");
         }
+    }
+
+    private Map<String, Object> verificarTerminacion(String codigo, Long solicitudId, String last4) {
+        Solicitud s = solicitudRepository.findById(solicitudId).orElse(null);
+        if (s == null || !"APROBADA".equals(s.getEstado()) || !"TERMINACION_MATERIAS".equals(s.getTipo())) {
+            return respuestaInvalida("Certificado no encontrado o no válido.");
+        }
+        String cedulaReal = s.getCedula();
+        if (cedulaReal == null || !cedulaReal.endsWith(last4)) {
+            return respuestaInvalida("El código de verificación no coincide.");
+        }
+        Usuario est = usuarioRepository.findByCedula(cedulaReal).orElse(null);
+        Map<String, Object> r = new java.util.LinkedHashMap<>();
+        r.put("valido", true);
+        r.put("codigo", codigo);
+        r.put("tipo", "Certificado de Terminación de Materias");
+        r.put("nombre", est != null ? est.getNombre() : "—");
+        r.put("cedula", cedulaReal);
+        r.put("programa", est != null && est.getProgramaAcademico() != null ? est.getProgramaAcademico().getNombre() : "—");
+        r.put("fechaAprobacion", s.getFechaSolicitud() != null ? s.getFechaSolicitud().toString() : "—");
+        r.put("mensaje", "Certificado válido y auténtico.");
+        return r;
+    }
+
+    private Map<String, Object> verificarConstancia(String codigo, Long certificadoId, String last4) {
+        com.ufps.tramites.model.SolicitudCertificado c =
+                solicitudCertificadoRepository.findById(certificadoId).orElse(null);
+        if (c == null || c.getEstado() == null
+                || !java.util.Set.of("GENERADO", "LISTO_RETIRO", "ENTREGADO").contains(c.getEstado())) {
+            return respuestaInvalida("Certificado no encontrado o no válido.");
+        }
+        String cedulaReal = c.getCedula();
+        if (cedulaReal == null || !cedulaReal.endsWith(last4)) {
+            return respuestaInvalida("El código de verificación no coincide.");
+        }
+        Usuario est = usuarioRepository.findByCedula(cedulaReal).orElse(null);
+        Map<String, Object> r = new java.util.LinkedHashMap<>();
+        r.put("valido", true);
+        r.put("codigo", codigo);
+        r.put("tipo", "Constancia académica");
+        r.put("nombre", est != null ? est.getNombre() : "—");
+        r.put("cedula", cedulaReal);
+        r.put("programa", est != null && est.getProgramaAcademico() != null ? est.getProgramaAcademico().getNombre() : "—");
+        r.put("mensaje", "Constancia válida y auténtica.");
+        return r;
+    }
+
+    private Map<String, Object> respuestaInvalida(String mensaje) {
+        Map<String, Object> r = new java.util.LinkedHashMap<>();
+        r.put("valido", false);
+        r.put("mensaje", mensaje);
+        return r;
     }
 
     /**
@@ -628,6 +860,14 @@ public class SolicitudService {
         }
         if (!"GRADO".equals(s.getTipo())) {
             throw new IllegalStateException("Este endpoint es solo para solicitudes de tipo GRADO");
+        }
+        // FIX TP-188 (Diego Bermúdez, 07/10/2026): el acta exige todos los
+        // paz y salvos aprobados; antes se podía generar con alguno
+        // rechazado o pendiente (CP-023 / CP-027).
+        if (!pazYSalvoService.todosAprobados(id)) {
+            throw new IllegalStateException(
+                "No se puede generar el acta: "
+                + "aún hay paz y salvos pendientes o rechazados.");
         }
 
         // Si el acta ya fue generada, devolver la versión guardada en disco
@@ -688,9 +928,25 @@ public class SolicitudService {
     /**
      * Retorna bandeja unificada para el rol POSGRADOS.
      */
+    // FIX TP-188 (Diego Bermúdez, 07/10/2026): la bandeja de Posgrados sólo
+    // debe mostrar solicitudes que ya pasaron por el Director: aprobadas por
+    // Director/Posgrados, finalizadas o rechazadas. Antes incluía
+    // PENDIENTE_PAGO y EN_REVISION, que son de la bandeja del Director
+    // (CP-030).
+    private static final java.util.Set<String> ESTADOS_BANDEJA_POSGRADOS = java.util.Set.of(
+            "APROBADA_DIRECTOR",
+            "APROBADA",
+            "APROBADA_POSGRADOS",
+            "RECHAZADA",
+            "RECHAZADA_POSGRADOS");
+
     public Map<String, Object> getBandejaPosgrados() {
-        List<Solicitud> terminacion = solicitudRepository.findByTipo("TERMINACION_MATERIAS");
-        List<Solicitud> grado = solicitudRepository.findByTipo("GRADO");
+        List<Solicitud> terminacion = solicitudRepository.findByTipo("TERMINACION_MATERIAS").stream()
+                .filter(s -> ESTADOS_BANDEJA_POSGRADOS.contains(s.getEstado()))
+                .collect(Collectors.toList());
+        List<Solicitud> grado = solicitudRepository.findByTipo("GRADO").stream()
+                .filter(s -> ESTADOS_BANDEJA_POSGRADOS.contains(s.getEstado()))
+                .collect(Collectors.toList());
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("terminacion", terminacion.stream().map(s -> enriquecerConEstudiante(s)).collect(Collectors.toList()));
         resp.put("grado", grado.stream().map(s -> enriquecerConEstudiante(s)).collect(Collectors.toList()));

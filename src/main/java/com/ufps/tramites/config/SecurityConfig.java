@@ -36,7 +36,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/solicitudes/verificar").permitAll()
                 .requestMatchers("/api/pagos/webhook").permitAll()
-                .requestMatchers("/api/notificaciones/subscribe", "/api/notificaciones/stream").permitAll()
+                // FIX TP-186 (Santiago Cepeda, 07/10/2026): /subscribe y /stream
+                // ya no son públicos. La autenticación llega vía JwtAuthFilter
+                // leyendo también el query param "token=" porque EventSource no
+                // envía Authorization header.
                 .requestMatchers("/swagger-ui/**", "/api-docs/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/error").permitAll()
                 // Todo lo demás requiere autenticación
