@@ -50,14 +50,28 @@ public class DocumentoService {
         String contentType = archivo.getContentType() != null ? archivo.getContentType() : "";
         String extension = obtenerExtension(archivo.getOriginalFilename());
 
-        if (!TIPOS_PERMITIDOS.contains(contentType) && !EXTENSIONES_PERMITIDAS.contains(extension)) {
+        // FIX TP-191 (Bryan Niño, 07/10/2026): antes se usaba &&, por lo que
+        // un .exe declarado como application/pdf pasaba la validación. Ahora
+        // rechazamos si CUALQUIERA de los dos (MIME o extensión) está fuera
+        // del catálogo, y además validamos los magic bytes del contenido
+        // para que un atacante no pueda renombrar/relabel un ejecutable.
+        if (!TIPOS_PERMITIDOS.contains(contentType) || !EXTENSIONES_PERMITIDAS.contains(extension)) {
             throw new IllegalArgumentException(
                 "Formato no permitido: " + archivo.getOriginalFilename() + ". Use PDF, PNG, JPG o DOCX."
             );
         }
 
+        byte[] contenido = archivo.getBytes();
+        if (!firmaCoincideConExtension(contenido, extension)) {
+            throw new IllegalArgumentException(
+                "El contenido del archivo \"" + archivo.getOriginalFilename()
+                        + "\" no coincide con un " + extension.toUpperCase()
+                        + " válido."
+            );
+        }
+
         String nombreAlmacenado = UUID.randomUUID() + "." + extension;
-        storageService.subir(solicitudId + "/" + nombreAlmacenado, archivo.getBytes(), contentType);
+        storageService.subir(solicitudId + "/" + nombreAlmacenado, contenido, contentType);
 
         DocumentoSolicitud doc = new DocumentoSolicitud();
         doc.setSolicitudId(solicitudId);
@@ -149,5 +163,30 @@ public class DocumentoService {
     private String obtenerExtension(String filename) {
         if (filename == null || !filename.contains(".")) return "";
         return filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
+    }
+
+    // FIX TP-191 (Bryan Niño, 07/10/2026): verifica los magic bytes para que
+    // un ejecutable renombrado o con MIME forjado no se cuele por el
+    // catálogo de MIME/extensión. Cada rama es una comparación mínima para
+    // detectar inconsistencia; no es un parser de formato.
+    private boolean firmaCoincideConExtension(byte[] contenido, String extension) {
+        if (contenido == null || contenido.length < 4) return false;
+        return switch (extension) {
+            case "pdf" ->
+                contenido[0] == '%' && contenido[1] == 'P'
+                        && contenido[2] == 'D' && contenido[3] == 'F';
+            case "png" ->
+                (contenido[0] & 0xFF) == 0x89
+                        && contenido[1] == 'P' && contenido[2] == 'N' && contenido[3] == 'G';
+            case "jpg", "jpeg" ->
+                (contenido[0] & 0xFF) == 0xFF
+                        && (contenido[1] & 0xFF) == 0xD8
+                        && (contenido[2] & 0xFF) == 0xFF;
+            case "docx" ->
+                // DOCX es ZIP: cabecera PK\x03\x04
+                contenido[0] == 'P' && contenido[1] == 'K'
+                        && contenido[2] == 0x03 && contenido[3] == 0x04;
+            default -> false;
+        };
     }
 }
