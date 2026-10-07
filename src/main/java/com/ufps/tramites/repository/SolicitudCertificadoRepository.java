@@ -32,4 +32,16 @@ public interface SolicitudCertificadoRepository extends JpaRepository<SolicitudC
            ORDER BY s.fechaSolicitud DESC, s.id DESC
            """)
     List<SolicitudCertificado> findBandejaPosgradosFisico(@Param("estado") String estado);
+
+    // FIX TP-200 (Johan Bueno, 07/10/2026): bandeja de Posgrados sobre
+    // certificados que incluye los digitales (modalidadEnvio=DIGITAL) y
+    // permite filtrar por identificación del estudiante (CP-042).
+    @Query("""
+           SELECT s FROM SolicitudCertificado s
+           WHERE (:estado IS NULL OR s.estado = :estado)
+             AND (:cedula IS NULL OR s.cedula LIKE CONCAT('%', :cedula, '%'))
+           ORDER BY s.fechaSolicitud DESC, s.id DESC
+           """)
+    List<SolicitudCertificado> findBandejaPosgrados(@Param("estado") String estado,
+                                                    @Param("cedula") String cedula);
 }

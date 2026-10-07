@@ -105,14 +105,18 @@ public class CertificadoController {
 
     @PreAuthorize("hasRole('POSGRADOS')")
     @GetMapping("/posgrados")
+    // FIX TP-200 (Johan Bueno, 07/10/2026): se expone el filtro por
+    // identificación (cedula) y la bandeja ya incluye los digitales
+    // además de los físicos.
     public ResponseEntity<?> bandejaPosgrados(@RequestParam(required = false) String estado,
+                                              @RequestParam(required = false) String cedula,
                                               Authentication auth) {
         ResolvedPrincipal p = principalResolver.resolve(auth);
         if (p == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
         if (!"POSGRADOS".equals(p.rol()))
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Acceso denegado"));
         String filtro = (estado == null || estado.isBlank() || "TODOS".equalsIgnoreCase(estado)) ? null : estado;
-        return ResponseEntity.ok(certificadoService.obtenerBandejaPosgrados(filtro));
+        return ResponseEntity.ok(certificadoService.obtenerBandejaPosgrados(filtro, cedula));
     }
 
     @PreAuthorize("hasRole('POSGRADOS')")
