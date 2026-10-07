@@ -668,11 +668,17 @@ git stash pop
 | Clase | Capa | Sprint | Cobertura |
 |---|---|---|---|
 | `TramitesApplicationTests` | Integración | S1 | Carga del contexto Spring Boot |
-| `SolicitudRepositoryTest` | Repository | S1 | Consultas JPA sobre `Solicitud` |
+| `SolicitudRepositoryTest` | Repository | S1 | Consultas JPA sobre `Solicitud` (`@DataJpaTest` real) |
 | `AlertaDirectorServiceTest` | Service | S2 | Alertas por plazo vencido del Director (TP-44) |
 | `DecisionSolicitudServiceTest` | Service | S2 | Flujo completo de aprobación y rechazo (HU-04) |
-| `CertificadoEndpointTest` | Service | S3 | Catálogo de tipos, validación de tipo/modalidad, duplicados y precios — HU-12 (TP-87) |
-| `CertificadoQRValidationTest` | Service | S3 | Radicado único, QR con ZXing, hash SHA-256, reglas de pago — HU-13 (TP-97) |
+| `SolicitudServiceTerminacionTest` | Service | S2 | Reglas de terminación de materias en `SolicitudService` |
+| `AuthControllerTest` | Controller | S3 | `/auth/login-demo` responde 404 con `demo.auth.enabled=false` |
+| `JwtAuthFilterTest` | Security | S3 | Token válido autentica; token inválido pasa sin autenticar |
+
+<!-- FIX TP-195 (Kevin Arias, 07/10/2026): se retiran de este inventario
+     CertificadoEndpointTest y CertificadoQRValidationTest porque no
+     existen en el repositorio (ni en src/test/java ni en el historial
+     git). Si se vuelven a implementar en S3, se agregan de nuevo. -->
 
 ### Ejecutar
 
