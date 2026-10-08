@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 /**
@@ -30,6 +31,7 @@ public class CorreoConstanciaService {
     @Value("${spring.mail.username:}")
     private String fromEmail;
 
+    @Async
     public void enviarConstancia(Usuario estudiante, TipoCertificado tipo, SolicitudCertificado solicitud, byte[] pdfBytes) {
         String correo = estudiante != null ? estudiante.getCorreo() : null;
         String nombre = estudiante != null ? estudiante.getNombre() : "Estudiante";
@@ -87,6 +89,7 @@ public class CorreoConstanciaService {
         }
     }
 
+    @Async
     public void enviarAvisoListoRetiro(Usuario estudiante, TipoCertificado tipo, SolicitudCertificado solicitud) {
         String correo = estudiante != null ? estudiante.getCorreo() : null;
         String nombre = estudiante != null ? estudiante.getNombre() : "Estudiante";

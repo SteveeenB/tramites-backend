@@ -15,9 +15,8 @@ import com.ufps.tramites.security.ResolvedPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -36,8 +35,7 @@ public class PazYSalvoService {
     @Autowired private AdminRepository adminRepository;
     @Autowired private EstudianteRepository estudianteRepository;
 
-    @Autowired(required = false)
-    private JavaMailSender mailSender;
+    @Autowired private CorreoPazYSalvoService correoPazYSalvoService;
 
     // FIX TP-187 (Johan Bueno, 07/10/2026): necesitamos empujar la
     // notificación por SSE y la persistencia in-app cuando una dependencia
@@ -45,10 +43,6 @@ public class PazYSalvoService {
     // momento (CP-023).
     @Autowired private NotificacionSseService notificacionSseService;
     @Autowired private NotificacionService notificacionService;
-
-    // Remitente configurado en application.properties (spring.mail.username)
-    @Value("${spring.mail.username:}")
-    private String fromEmail;
 
     /**
      * Cuando el director aprueba una solicitud de GRADO, se crean los paz y
@@ -101,47 +95,27 @@ public class PazYSalvoService {
 
         pazYSalvoRepository.saveAll(nuevos);
 
-        for (Admin admin : admins) {
-            enviarCorreoPazYSalvo(admin.getEmail(), admin.getNombreCompleto(),
-                    nombreEstudiante, solicitud.getId());
-        }
-        enviarCorreoPazYSalvo(director.getCorreo(), "Director de Programa",
-                nombreEstudiante, solicitud.getId());
+        // Los correos salen en segundo plano y solo si la transacción hace commit
+        // (si la aprobación se revierte no debe avisarse a las dependencias).
+        Long solicitudId = solicitud.getId();
+        String correoDirector = director.getCorreo();
+        despuesDelCommit(() -> {
+            for (Admin admin : admins) {
+                correoPazYSalvoService.enviar(admin.getEmail(), admin.getNombreCompleto(),
+                        nombreEstudiante, solicitudId);
+            }
+            correoPazYSalvoService.enviar(correoDirector, "Director de Programa",
+                    nombreEstudiante, solicitudId);
+        });
     }
 
-    private void enviarCorreoPazYSalvo(String correo, String nombreDependencia,
-                                        String nombreEstudiante, Long solicitudId) {
-        String asunto = "[UFPS Posgrados] Verificación de Paz y Salvo requerida";
-        String cuerpo = "Estimado/a " + nombreDependencia + ",\n\n"
-            + "El/la estudiante " + nombreEstudiante + " ha solicitado su grado académico "
-            + "y requiere verificación de paz y salvo con su dependencia.\n\n"
-            + "Por favor ingrese al sistema y confirme si el estudiante se encuentra a paz y salvo.\n"
-            + "Solicitud N°: " + solicitudId + "\n\n"
-            + "Atentamente,\nUniversidad Francisco de Paula Santander (UFPS)\n"
-            + "Sistema de Trámites de Posgrado";
-
-        if (correo == null || correo.isBlank()) {
-            log.warn("[PAZ Y SALVO - SIN CORREO] Destinatario '{}' sin correo registrado.\nAsunto: {}\n{}",
-                    nombreDependencia, asunto, cuerpo);
-            return;
-        }
-
-        if (mailSender != null) {
-            try {
-                SimpleMailMessage msg = new SimpleMailMessage();
-                if (fromEmail != null && !fromEmail.isBlank()) msg.setFrom(fromEmail);
-                msg.setTo(correo);
-                msg.setSubject(asunto);
-                msg.setText(cuerpo);
-                mailSender.send(msg);
-                log.info("[PAZ Y SALVO] Correo enviado a {} ({})", nombreDependencia, correo);
-            } catch (Exception e) {
-                log.error("[PAZ Y SALVO] Error enviando correo a {} ({}): {}",
-                        nombreDependencia, correo, e.getMessage());
-            }
+    private void despuesDelCommit(Runnable accion) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCommit() { accion.run(); }
+            });
         } else {
-            log.info("=== [SIMULACIÓN CORREO PAZ Y SALVO] ===\nPara: {} <{}>\nAsunto: {}\n{}\n===",
-                    nombreDependencia, correo, asunto, cuerpo);
+            accion.run();
         }
     }
 
