@@ -317,10 +317,21 @@ public class SolicitudController {
         }
     }
 
-    /** POST /api/solicitudes/{id}/fecha-grado */
-    @PreAuthorize("hasAnyRole('DIRECTOR', 'POSGRADOS')")
+    /**
+     * POST /api/solicitudes/{id}/fecha-grado
+     *
+     * El estudiante elige su fecha de grado en el Paso 3 del proceso (la pantalla
+     * llama a este endpoint con su propio token). Antes solo se permitía
+     * DIRECTOR/POSGRADOS y el estudiante recibía 403, quedando atascado. Un
+     * estudiante solo puede fijar la fecha de SU solicitud.
+     */
+    @PreAuthorize("hasAnyRole('ESTUDIANTE', 'DIRECTOR', 'POSGRADOS')")
     @PostMapping("/{id}/fecha-grado")
-    public ResponseEntity<?> registrarFechaGrado(@PathVariable Long id, @RequestParam String fecha) {
+    public ResponseEntity<?> registrarFechaGrado(@PathVariable Long id, @RequestParam String fecha, Authentication auth) {
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("No autenticado"));
+        if ("ESTUDIANTE".equals(p.rol()) && !solicitudService.perteneceAEstudiante(id, p.cedula()))
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("No tiene acceso a esta solicitud"));
         try {
             return ResponseEntity.ok(solicitudService.registrarFechaGrado(id, java.time.LocalDate.parse(fecha)));
         } catch (java.time.format.DateTimeParseException e) {
