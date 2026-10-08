@@ -205,3 +205,12 @@ VALUES
      (SELECT id FROM usuario WHERE cedula = '2000000010' LIMIT 1));
      -- FIX RN-04 (Diego Bermudez, 06/09/2026): se retira usuario de prueba personal steven/steven del seed
 
+-- ── Fechas de grado de ejemplo (solo local/H2; en producción las publica Posgrados) ──
+INSERT IGNORE INTO fechas_grado (fecha, modalidad, hora, lugar, activa) VALUES
+('2026-11-04', 'SECRETARIA', '8:00 AM',  'Secretaría de Posgrados', true),
+('2026-11-13', 'CEREMONIA',  '9:00 AM',  'Auditorio Principal UFPS', true),
+('2026-11-18', 'SECRETARIA', '8:00 AM',  'Secretaría de Posgrados', true),
+('2026-11-27', 'CEREMONIA',  '10:00 AM', 'Auditorio Principal UFPS', true),
+('2026-12-02', 'SECRETARIA', '8:00 AM',  'Secretaría de Posgrados', true),
+('2026-12-11', 'CEREMONIA',  '9:00 AM',  'Coliseo UFPS', true),
+('2026-12-16', 'SECRETARIA', '8:00 AM',  'Secretaría de Posgrados', true);

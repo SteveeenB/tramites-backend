@@ -58,6 +58,9 @@ public class SolicitudService {
     private UsuarioRepository usuarioRepository;
 
     @Autowired
+    private com.ufps.tramites.repository.FechaGradoRepository fechaGradoRepository;
+
+    @Autowired
     private EstudianteRepository estudianteRepository;
 
     @Autowired
@@ -736,6 +739,20 @@ public class SolicitudService {
         }
         if (!"APROBADO".equals(s.getEstadoPagoGrado())) {
             throw new IllegalStateException("El pago de grado no ha sido registrado");
+        }
+        // La fecha debe ser una de las que Posgrados publicó (activas y no
+        // vencidas); si el estudiante ya eligió modalidad, debe coincidir con
+        // la de la fecha para que no pueda saltarse el costo de la ceremonia.
+        java.util.List<com.ufps.tramites.model.FechaGrado> publicadas = fechaGradoRepository
+                .findByActivaTrueAndFechaGreaterThanEqualAndFecha(LocalDate.now(), fechaGrado);
+        if (s.getModalidadGrado() != null) {
+            publicadas = publicadas.stream()
+                    .filter(f -> f.getModalidad().equals(s.getModalidadGrado()))
+                    .collect(Collectors.toList());
+        }
+        if (publicadas.isEmpty()) {
+            throw new IllegalStateException(
+                "La fecha elegida no está disponible. Elige una de las fechas publicadas por la oficina de Posgrados.");
         }
         s.setFechaGrado(fechaGrado);
         solicitudRepository.save(s);
