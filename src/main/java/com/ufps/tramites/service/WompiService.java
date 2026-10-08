@@ -203,6 +203,15 @@ public class WompiService {
      * Procesa el evento de webhook enviado por Wompi. Verifica la firma y
      * actualiza el estado de la solicitud.
      */
+    // NOT_SUPPORTED: la clase es @Transactional (TP-194). Si todo el webhook
+    // corría en una sola transacción, un fallo al actualizar la solicitud
+    // (capturado más abajo) dejaba la transacción en rollback-only: el registro
+    // del pago volvía a PENDIENTE y Wompi recibía un 500
+    // (UnexpectedRollbackException). Así el pago queda registrado
+    // (cada save() hace su propio commit) y el efecto sobre la solicitud corre en
+    // su propia transacción, cuyo fallo solo se registra en el log.
+    @org.springframework.transaction.annotation.Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     @SuppressWarnings("unchecked")
     public void procesarWebhook(Map<String, Object> evento) {
         try {
