@@ -659,15 +659,15 @@ public class SolicitudService {
         if (!"APROBADA".equals(s.getEstado()) || !"GRADO".equals(s.getTipo())) {
             throw new IllegalStateException("La solicitud no es una solicitud de grado aprobada");
         }
-        // FIX TP-188 (Diego Bermúdez, 07/10/2026): el pago de grado requiere
-        // que todos los paz y salvos estén aprobados. Antes el estudiante
-        // podía pagar incluso con uno rechazado (CP-023), llegando a acta
-        // con paz y salvos pendientes.
-        if (!pazYSalvoService.todosAprobados(id)) {
-            throw new IllegalStateException(
-                "No se puede registrar el pago de grado: "
-                + "aún hay paz y salvos pendientes o rechazados.");
-        }
+        // TP-188 exigía aquí todos los paz y salvos aprobados, pero el flujo del
+        // estudiante es Paso 1 Pago → Paso 2 Paz y salvos → Paso 3 Fecha (los paz
+        // y salvos solo se muestran cuando el pago ya está confirmado) y se
+        // inician al aprobar el director, es decir, siempre están pendientes
+        // cuando se paga. La regla hacía fallar el webhook de Wompi y el pago
+        // quedaba en "en proceso" para siempre. La exigencia de paz y salvos se
+        // mantiene donde es el último filtro: generarActa(). Si el equipo
+        // prefiere exigirlos antes de pagar, hay que reordenar el flujo y
+        // validarlo al crear el pago (POST /api/pagos/crear), no aquí.
         s.setEstadoPagoGrado("APROBADO");
         solicitudRepository.save(s);
         return construirRespuestaSolicitud(s);
