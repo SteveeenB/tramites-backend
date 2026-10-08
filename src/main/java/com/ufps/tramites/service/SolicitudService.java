@@ -323,14 +323,18 @@ public class SolicitudService {
                     .collect(Collectors.toList());
         }
 
+        // APROBADA_DIRECTOR (el director ya aprobó, falta Posgrados) y
+        // RECHAZADA_POSGRADOS (Posgrados rechazó) no estaban en ningún grupo, así
+        // que la solicitud desaparecía de las tres pestañas del director apenas
+        // cambiaba de estado. Cada estado terminal o intermedio debe caer en una.
         List<Solicitud> pendientes = todas.stream()
                 .filter(s -> "PENDIENTE_PAGO".equals(s.getEstado()) || "EN_REVISION".equals(s.getEstado()))
                 .collect(Collectors.toList());
         List<Solicitud> aprobadas = todas.stream()
-                .filter(s -> "APROBADA".equals(s.getEstado()))
+                .filter(s -> "APROBADA".equals(s.getEstado()) || "APROBADA_DIRECTOR".equals(s.getEstado()))
                 .collect(Collectors.toList());
         List<Solicitud> rechazadas = todas.stream()
-                .filter(s -> "RECHAZADA".equals(s.getEstado()))
+                .filter(s -> "RECHAZADA".equals(s.getEstado()) || "RECHAZADA_POSGRADOS".equals(s.getEstado()))
                 .collect(Collectors.toList());
 
         Map<String, Object> response = new LinkedHashMap<>();
