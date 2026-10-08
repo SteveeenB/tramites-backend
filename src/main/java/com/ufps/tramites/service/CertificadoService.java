@@ -138,6 +138,16 @@ public class CertificadoService {
             m.put("codigo", t.getCodigo());
             m.put("label", t.getLabel());
             m.put("activo", t.getActivo());
+            // TP-189 dejó este mapa con solo codigo/label/activo/disponible, así que
+            // el estudiante no recibía el precio y la pantalla de certificados
+            // mostraba "Valor: $ 0" (y el recargo de la modalidad física). Se incluyen
+            // los mismos campos de catálogo que devuelve findByActivoTrue(), salvo
+            // plantillaHtml, que es pesada y solo la usa el admin.
+            m.put("descripcion", t.getDescripcion());
+            m.put("precioDigital", t.getPrecioDigital());
+            m.put("costoLogisticaFisica", t.getCostoLogisticaFisica());
+            m.put("direccionOficina", t.getDireccionOficina());
+            m.put("tiempoEntregaDias", t.getTiempoEntregaDias());
             boolean esTerminacion = "TERMINACION_MATERIAS".equals(t.getCodigo());
             boolean disponible = !esTerminacion || puedeTerminacion;
             m.put("disponible", disponible);
