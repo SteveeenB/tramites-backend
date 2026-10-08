@@ -6,9 +6,15 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 @Entity
-@Table(name = "tipo_certificado")
+// `codigo` es la clave natural (findByCodigo devuelve Optional). Sin UNIQUE, el
+// seed de data.sql (INSERT IGNORE / ON DUPLICATE KEY UPDATE, que dependen de una
+// clave única) insertaba las mismas filas en cada ejecución y findByCodigo
+// fallaba con "Query did not return a unique result".
+@Table(name = "tipo_certificado",
+       uniqueConstraints = @UniqueConstraint(name = "uq_tipo_certificado_codigo", columnNames = "codigo"))
 public class TipoCertificado {
 
     @Id
