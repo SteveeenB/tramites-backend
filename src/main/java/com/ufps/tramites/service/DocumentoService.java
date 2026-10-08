@@ -16,10 +16,16 @@ import org.springframework.web.multipart.MultipartFile;
 
 // FIX TP-194 (Diego Bermúdez, 07/10/2026): guardarDocumento sube el archivo
 // a Supabase y persiste DocumentoSolicitud; si el save a BD falla, el
-// archivo queda huérfano, pero al menos la BD queda consistente dentro de
-// la transacción. @Transactional envuelve todas las operaciones.
+// archivo queda huérfano, pero la BD queda consistente.
+//
+// Esta clase NO es @Transactional a propósito: cada método hace como mucho un
+// save() (atómico por sí solo en SimpleJpaRepository) y el resto es E/S contra
+// Supabase (subir, descargar, firmar URLs). Con @Transactional a nivel de clase
+// cada llamada retenía una conexión de BD durante toda la E/S de red y con el
+// pool pequeño dejaba a las demás peticiones esperando (HikariPool timeout).
+// Cuando la llaman servicios transaccionales (SolicitudService) se une a su
+// transacción igual que antes.
 @Service
-@org.springframework.transaction.annotation.Transactional
 public class DocumentoService {
 
     private static final Set<String> TIPOS_PERMITIDOS = Set.of(
