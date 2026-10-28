@@ -19,6 +19,7 @@ API REST desarrollada con Java + Spring Boot para la gestión de trámites acad�
 6. [Reglas de Negocio](#6-reglas-de-negocio)
 7. [Instalación y Ejecución Local](#7-instalación-y-ejecución-local)
 8. [Pruebas](#8-pruebas)
+9. [Documentación Adicional](#9-documentación-adicional)
 
 ---
 
@@ -702,3 +703,18 @@ Reporte HTML:
 | `ValidacionGradoService` | Validación de posgrados HU-09 |
 | `JwtService` | Tests de generación y validación de tokens (TP-137) |
 
+---
+
+## 9. Documentación Adicional
+
+Documentos de diseño y guías complementarias, en la carpeta [`docs/`](docs/):
+
+| Documento | Contenido |
+|---|---|
+| [`docs/AUTH.md`](docs/AUTH.md) | Resumen de la implementación de autenticación y roles |
+| [`docs/DEPENDENCIAS.md`](docs/DEPENDENCIAS.md) | Análisis de opciones para modelar las dependencias (paz y salvo) |
+| [`docs/guia_credenciales_wompi.md`](docs/guia_credenciales_wompi.md) | Configuración de pagos con Wompi |
+| [`docs/IMPLEMENTACION_GRADO_TP45.md`](docs/IMPLEMENTACION_GRADO_TP45.md) | Bandeja y detalle de solicitudes de grado (TP-45) |
+| [`docs/rules/instrucciones_proyecto_v2.md`](docs/rules/instrucciones_proyecto_v2.md) | Instrucciones generales del proyecto |
+| [`docs/rules/plan_certificados.md`](docs/rules/plan_certificados.md) | Plan de implementación del módulo de certificados (HU11) |
+| [`docs/rules/PLAN_aDMIN.md`](docs/rules/PLAN_aDMIN.md) | Plan de funcionalidades de la vista de administrador |
