@@ -21,13 +21,13 @@
 -- ── 1. Sembrar admins en la tabla `admins` ────────────────────
 INSERT IGNORE INTO admins (codigo, nombre_completo, email, password, tipo, es_super_admin, dependencia_id)
 VALUES
-  ('ADMIN1', 'Administrador',         'admin@ufps.edu.co',
+  ('ADMIN1', 'Administrador',         'admin@test.com',
       '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
       'SUPER',       true,  NULL),
-  ('POS001', 'Oficina Posgrados',     'posgrados@ufps.edu.co',
+  ('POS001', 'Oficina Posgrados',     'posgrados@test.com',
       '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
       'POSGRADOS',   false, NULL),
-  ('DEP001', 'Biblioteca Central',    'kevarias.2195@gmail.com',
+  ('DEP001', 'Biblioteca Central',    'biblioteca@test.com',
       '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
       'DEPENDENCIA', false, (SELECT id FROM dependencias WHERE nombre = 'Biblioteca' LIMIT 1)),
   ('DEP002', 'División Financiera',   'financiera@test.com',

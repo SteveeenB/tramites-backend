@@ -86,8 +86,8 @@ INSERT IGNORE INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id,
     (SELECT id FROM roles WHERE nombre = 'POSGRADOS' LIMIT 1),
     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1));
 
--- Asignar correo real al director de Maestría en Gerencia de Empresas
-UPDATE usuario SET email = 'steven.bueno.06.604@gmail.com' WHERE cedula = '1098765433';
+-- Asignar correo de prueba al director de Maestría en Gerencia de Empresas
+UPDATE usuario SET email = 'maria.director@example.com' WHERE cedula = '1098765433';
 
 INSERT IGNORE INTO solicitud (cedula, tipo, estado, fecha_solicitud, costo, observaciones) VALUES
 ('1098765435', 'TERMINACION_MATERIAS', 'APROBADA',       '2026-04-10', 150000, 'Aprobada por el director.'),
@@ -119,13 +119,13 @@ INSERT IGNORE INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id,
 -- ============================================================
 INSERT IGNORE INTO admins (codigo, nombre_completo, email, password, tipo, es_super_admin, dependencia_id)
 VALUES
-  ('ADMIN1', 'Administrador',         'admin@ufps.edu.co',
+  ('ADMIN1', 'Administrador',         'admin@test.com',
       '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
       'SUPER',       true,  NULL),
-  ('POS001', 'Oficina Posgrados',     'posgrados@ufps.edu.co',
+  ('POS001', 'Oficina Posgrados',     'posgrados@test.com',
       '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
       'POSGRADOS',   false, NULL),
-  ('DEP001', 'Biblioteca Central',    'kevarias.2195@gmail.com',
+  ('DEP001', 'Biblioteca Central',    'biblioteca@test.com',
       '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
       'DEPENDENCIA', false, (SELECT id FROM dependencias WHERE nombre = 'Biblioteca' LIMIT 1)),
   ('DEP002', 'División Financiera',   'financiera@test.com',
@@ -188,7 +188,7 @@ INSERT IGNORE INTO tipos_solicitud (codigo, nombre, costo, activo) VALUES
 INSERT IGNORE INTO estudiante (nombre, apellido, cedula, codigo, email, es_posgrado, migrado,
     creditos_aprobados, programa_id, usuario_id)
 VALUES
-    ('Juan',   'Perez',    '1098765432', '20261001', 'raulbaezjxd123@gmail.com',      true, false, 40,
+    ('Juan',   'Perez',    '1098765432', '20261001', 'juan.perez@example.com',        true, false, 40,
      (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1),
      (SELECT id FROM usuario WHERE cedula = '1098765432' LIMIT 1)),
     ('Laura',  'Gomez',    '1098765435', '20261005', 'laura@example.com',     true, false, 56,
@@ -214,3 +214,11 @@ INSERT IGNORE INTO fechas_grado (fecha, modalidad, hora, lugar, activa) VALUES
 ('2026-12-02', 'SECRETARIA', '8:00 AM',  'Secretaría de Posgrados', true),
 ('2026-12-11', 'CEREMONIA',  '9:00 AM',  'Coliseo UFPS', true),
 ('2026-12-16', 'SECRETARIA', '8:00 AM',  'Secretaría de Posgrados', true);
+
+-- Los seeds de admins usan INSERT IGNORE, así que no corrigen filas ya existentes.
+-- Evita que el sistema envíe correos reales (Posgrados, Biblioteca, admin) desde
+-- entornos de prueba: las cuentas semilla deben apuntar a direcciones @test.com.
+UPDATE admins SET email = 'admin@test.com'      WHERE codigo = 'ADMIN1' AND email <> 'admin@test.com';
+UPDATE admins SET email = 'posgrados@test.com'  WHERE codigo = 'POS001' AND email <> 'posgrados@test.com';
+UPDATE admins SET email = 'biblioteca@test.com' WHERE codigo = 'DEP001' AND email <> 'biblioteca@test.com';
+UPDATE estudiante SET email = 'juan.perez@example.com' WHERE cedula = '1098765432' AND email <> 'juan.perez@example.com';
