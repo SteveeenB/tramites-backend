@@ -1,3 +1,4 @@
+[![CI](https://github.com/SteveeenB/tramites-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/SteveeenB/tramites-backend/actions/workflows/ci.yml)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/SteveeenB/tramites-backend)
 # tramites-backend
 
