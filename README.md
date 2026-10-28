@@ -2,6 +2,14 @@
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/SteveeenB/tramites-backend)
 # tramites-backend
 
+> **Qué es:** API REST para gestionar en línea los trámites de posgrado de la UFPS (terminación de materias, grado, certificados, paz y salvos y pagos).  
+> **Stack:** Java 17 · Spring Boot 4 · Spring Security + JWT · MySQL / Hibernate · Supabase Storage · Wompi · Docker.  
+> **Equipo:** proyecto académico desarrollado por un equipo de 6 personas ([ver Equipo](#10-equipo)).
+
+<!-- Demo en producción (descomentar cuando se confirme que el servicio está activo):
+> **Demo:** [tramites-frontend-r08z.onrender.com](https://tramites-frontend-r08z.onrender.com) · API: [Swagger UI](https://tramites-backend.onrender.com/swagger-ui.html)
+-->
+
 Documentación técnica del backend del sistema **GROWEB — TposgradosUFPS**.  
 API REST desarrollada con Java + Spring Boot para la gestión de trámites académicos de posgrado de la Universidad Francisco de Paula Santander (UFPS).
 
@@ -21,6 +29,7 @@ API REST desarrollada con Java + Spring Boot para la gestión de trámites acad�
 7. [Instalación y Ejecución Local](#7-instalación-y-ejecución-local)
 8. [Pruebas](#8-pruebas)
 9. [Documentación Adicional](#9-documentación-adicional)
+10. [Equipo](#10-equipo)
 
 ---
 
@@ -719,3 +728,18 @@ Documentos de diseño y guías complementarias, en la carpeta [`docs/`](docs/):
 | [`docs/rules/instrucciones_proyecto_v2.md`](docs/rules/instrucciones_proyecto_v2.md) | Instrucciones generales del proyecto |
 | [`docs/rules/plan_certificados.md`](docs/rules/plan_certificados.md) | Plan de implementación del módulo de certificados (HU11) |
 | [`docs/rules/PLAN_aDMIN.md`](docs/rules/PLAN_aDMIN.md) | Plan de funcionalidades de la vista de administrador |
+
+---
+
+## 10. Equipo
+
+Proyecto desarrollado para la asignatura **Análisis y Diseño de Sistemas** (UFPS, 2026) por:
+
+| Integrante |
+|---|
+| Raúl David Báez Suárez |
+| Johan Steven Bueno Rojas |
+| Kevin David Arias Villamizar |
+| Santiago Danilo Cepeda Galeano |
+| Diego Alexander Bermúdez Flores |
+| Bryan Alexander Niño López |
