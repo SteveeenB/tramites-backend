@@ -19,12 +19,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.ufps.tramites.dto.LoginResponseDTO;
+import com.ufps.tramites.model.Rol;
 import com.ufps.tramites.model.Usuario;
 import com.ufps.tramites.repository.AdminRepository;
 import com.ufps.tramites.repository.EstudianteRepository;
 import com.ufps.tramites.repository.RolRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
 import com.ufps.tramites.security.JwtService;
+import com.ufps.tramites.service.SincronizacionMatriculaService;
 
 @ExtendWith(MockitoExtension.class)
 class AuthControllerTest {
@@ -35,6 +37,7 @@ class AuthControllerTest {
     @Mock private EstudianteRepository estudianteRepository;
     @Mock private RolRepository rolRepository;
     @Mock private PasswordEncoder passwordEncoder;
+    @Mock private SincronizacionMatriculaService sincronizacionMatriculaService;
 
     @InjectMocks
     private AuthController authController;
@@ -77,5 +80,38 @@ class AuthControllerTest {
         assertThat(body.getCedula()).isEqualTo("123456789");
 
         verify(adminRepository, never()).findByCodigo(any());
+    }
+
+    @Test
+    void loginDeEstudiante_despiertaAMatriculaEnSegundoPlano() {
+        ReflectionTestUtils.setField(authController, "demoAuthEnabled", true);
+        Usuario usuario = usuarioConRol("1098765435", "ESTUDIANTE");
+        when(usuarioRepository.findByCedula("1098765435")).thenReturn(Optional.of(usuario));
+        when(estudianteRepository.findByUsuario(usuario)).thenReturn(Optional.empty());
+
+        authController.loginDemo("1098765435");
+
+        verify(sincronizacionMatriculaService).precalentar("1098765435");
+    }
+
+    @Test
+    void loginDeDirector_noConsultaMatricula() {
+        ReflectionTestUtils.setField(authController, "demoAuthEnabled", true);
+        Usuario usuario = usuarioConRol("1098765433", "DIRECTOR");
+        when(usuarioRepository.findByCedula("1098765433")).thenReturn(Optional.of(usuario));
+        when(estudianteRepository.findByUsuario(usuario)).thenReturn(Optional.empty());
+
+        authController.loginDemo("1098765433");
+
+        verify(sincronizacionMatriculaService, never()).precalentar(any());
+    }
+
+    private static Usuario usuarioConRol(String cedula, String rol) {
+        Rol r = new Rol();
+        r.setNombre(rol);
+        Usuario usuario = new Usuario();
+        usuario.setCedula(cedula);
+        usuario.setRol(r);
+        return usuario;
     }
 }

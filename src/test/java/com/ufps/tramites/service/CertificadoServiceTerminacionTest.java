@@ -36,6 +36,7 @@ class CertificadoServiceTerminacionTest {
     @Mock private SolicitudRepository solicitudRepository;
     @Mock private UsuarioRepository usuarioRepository;
     @Mock private EstudianteRepository estudianteRepository;
+    @Mock private SincronizacionMatriculaService sincronizacionMatriculaService;
     @InjectMocks private CertificadoService certificadoService;
 
     private Usuario estudiante() {

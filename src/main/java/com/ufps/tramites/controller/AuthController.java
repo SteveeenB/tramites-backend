@@ -15,6 +15,7 @@ import com.ufps.tramites.repository.EstudianteRepository;
 import com.ufps.tramites.repository.RolRepository;
 import com.ufps.tramites.repository.UsuarioRepository;
 import com.ufps.tramites.security.JwtService;
+import com.ufps.tramites.service.SincronizacionMatriculaService;
 import java.util.Collections;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +39,7 @@ public class AuthController {
     @Autowired private EstudianteRepository estudianteRepository;
     @Autowired private RolRepository rolRepository;
     @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private SincronizacionMatriculaService sincronizacionMatriculaService;
 
     @Value("${google.client-id:}")
     private String googleClientId;
@@ -188,6 +190,11 @@ public class AuthController {
     }
 
     private LoginResponseDTO buildUsuarioResponse(Usuario usuario) {
+        // Despierta a Matrícula en segundo plano y refresca la copia del
+        // estudiante (SC-03, N6); no retrasa el login.
+        if ("ESTUDIANTE".equals(usuario.getRolNombre())) {
+            sincronizacionMatriculaService.precalentar(usuario.getCedula());
+        }
         java.util.Optional<Estudiante> estudiante = estudianteRepository.findByUsuario(usuario);
         String token = jwtService.generateToken(usuario, estudiante);
         String programaNombre = usuario.getProgramaAcademico() != null

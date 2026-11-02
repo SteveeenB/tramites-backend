@@ -356,6 +356,15 @@ Lo que ya implementa la rama:
 3. Sin un *snapshot* vigente, se bloquea **solo el inicio** de trámites nuevos con el mensaje de `ConsultaMatricula.noDisponible()`. Los trámites ya iniciados siguen su curso (RF16).
 4. Opcional, **decisión de ellos**: un *ping* externo a C2 cada 10 minutos para mantener despierto su servicio. Consume horas del plan free.
 
+**Hecho en N5 y N6** (`SincronizacionMatriculaService`):
+- El *warm-up* y la consulta se hacen al hacer *login* un estudiante (C2 y, si responde, C1). Además, C1 se consulta antes de crear una terminación, un grado o un certificado.
+- El *snapshot* va en `estudiante.estado_matricula` y `estudiante.matricula_sincronizado_en`. El programa se mapea por `programa_academico.codigo`; si el programa aún no tiene código, lo adopta del programa con el mismo nombre. Script: `.docs/sql/migracion_sc03_snapshot_matricula.sql`.
+- Interruptor: `matricula.sincronizar` / `MATRICULA_SINCRONIZAR`.
+  - Con `false` (valor por defecto) no se consulta ni se bloquea nada, para no guardar datos del mock en una BD real.
+  - En el perfil `h2` está en `true`.
+  - En producción se activa junto con `matricula.modo=http`.
+- Vigencia de la copia: `matricula.snapshot-vigencia-horas` (24).
+
 ### 6.4 Mapeo de su respuesta a nuestro modelo
 
 | C1 | Nuestro modelo | Nota |
