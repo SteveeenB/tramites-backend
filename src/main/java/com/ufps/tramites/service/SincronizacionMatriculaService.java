@@ -1,8 +1,10 @@
 package com.ufps.tramites.service;
 
+import java.text.Normalizer;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -211,8 +213,10 @@ public class SincronizacionMatriculaService {
     }
 
     /**
-     * Busca el programa por su código en Matrícula. Si aún no tiene código,
-     * lo adopta del programa con el mismo nombre (los del seed no lo traen).
+     * Busca el programa por su código en Matrícula. Si ningún programa tiene
+     * ese código, lo adopta el programa sin código con el mismo nombre, sin
+     * distinguir tildes ni mayúsculas (Matrícula escribe «Maestria», nosotros
+     * «Maestría»).
      * Los créditos requeridos los define Matrícula: si difieren, gana ella.
      */
     private Optional<ProgramaAcademico> resolverPrograma(SituacionAcademica s) {
@@ -220,8 +224,9 @@ public class SincronizacionMatriculaService {
             return Optional.empty();
         }
         Optional<ProgramaAcademico> encontrado = programaRepository.findByCodigo(s.programaCodigo())
-                .or(() -> programaRepository.findFirstByNombreIgnoreCase(s.programaNombre())
-                        .filter(p -> p.getCodigo() == null)
+                .or(() -> programaRepository.findAll().stream()
+                        .filter(p -> p.getCodigo() == null && mismoNombre(p.getNombre(), s.programaNombre()))
+                        .findFirst()
                         .map(p -> {
                             log.info("[MATRICULA] programa '{}' queda con codigo={}", p.getNombre(), s.programaCodigo());
                             p.setCodigo(s.programaCodigo());
@@ -239,6 +244,18 @@ public class SincronizacionMatriculaService {
             programa.setTotalCreditos(s.creditosRequeridos());
         }
         return Optional.of(programaRepository.save(programa));
+    }
+
+    static boolean mismoNombre(String a, String b) {
+        return a != null && b != null && normalizar(a).equals(normalizar(b));
+    }
+
+    private static String normalizar(String texto) {
+        return Normalizer.normalize(texto, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     private static Estudiante nuevoPerfil(Usuario usuario) {

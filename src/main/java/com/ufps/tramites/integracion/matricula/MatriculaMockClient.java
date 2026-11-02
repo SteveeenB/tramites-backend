@@ -78,7 +78,7 @@ public class MatriculaMockClient implements MatriculaClient {
                 cedula, codigo, nombres, apellidos,
                 nombres.toLowerCase().split(" ")[0] + "@example.com",
                 "ACTIVO",
-                1L, "MGE", "Maestría en Gerencia de Empresas",
+                12L, "2203", "Maestria en Gerencia de Empresas",
                 34L, "Cohorte 2025-1", "2025-1",
                 LocalDate.of(2025, 1, 20), LocalDate.of(2025, 2, 3),
                 "COMPLETADO", new BigDecimal("4500000"), LocalDate.of(2025, 2, 1),

@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -73,7 +74,7 @@ class SincronizacionMatriculaServiceTest {
         when(estudianteRepository.save(any(Estudiante.class))).thenAnswer(i -> i.getArgument(0));
         when(programaRepository.save(any(ProgramaAcademico.class))).thenAnswer(i -> i.getArgument(0));
         when(programaRepository.findByCodigo(any())).thenReturn(Optional.empty());
-        when(programaRepository.findFirstByNombreIgnoreCase(programa.getNombre())).thenReturn(Optional.of(programa));
+        when(programaRepository.findAll()).thenReturn(List.of(programa));
     }
 
     private SincronizacionMatriculaService servicio(boolean habilitada) {
@@ -87,7 +88,7 @@ class SincronizacionMatriculaServiceTest {
 
     private static SituacionAcademica situacion(String cedula, int creditosRequeridos) {
         return new SituacionAcademica(cedula, "20261005", "Laura Marcela", "Gómez Ruiz",
-                "laura@ufps.edu.co", "ACTIVO", 1L, "MGE", "Maestría en Gerencia de Empresas",
+                "laura@ufps.edu.co", "ACTIVO", 12L, "2203", "Maestria en Gerencia de Empresas",
                 34L, "Cohorte 2025-1", "2025-1", LocalDate.of(2025, 1, 20), LocalDate.of(2025, 2, 3),
                 "COMPLETADO", new BigDecimal("4500000"), LocalDate.of(2025, 2, 1),
                 creditosRequeridos, null);
@@ -148,9 +149,17 @@ class SincronizacionMatriculaServiceTest {
 
         servicio(true).verificarParaIniciarTramite(usuario);
 
-        assertThat(programa.getCodigo()).isEqualTo("MGE");
+        assertThat(programa.getCodigo()).isEqualTo("2203");
         assertThat(programa.getTotalCreditos()).isEqualTo(60);
         verify(programaRepository).save(programa);
+    }
+
+    @Test
+    void mismoNombre_ignoraTildesMayusculasYEspacios() {
+        assertThat(SincronizacionMatriculaService.mismoNombre(
+                "Maestría en  Gerencia de Empresas", "MAESTRIA EN GERENCIA DE EMPRESAS ")).isTrue();
+        assertThat(SincronizacionMatriculaService.mismoNombre(
+                "Maestría en Gerencia de Empresas", "Maestria en Negocios Internacionales")).isFalse();
     }
 
     @Test
