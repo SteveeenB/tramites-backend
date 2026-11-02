@@ -23,6 +23,8 @@ import com.ufps.tramites.integracion.matricula.ConsultaMatricula.Resultado;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
@@ -30,13 +32,14 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 // TP-146: adaptador del Módulo de Matrícula contra un servidor simulado.
-// Cubre el contrato v0.1 (TP-143) y los umbrales de RNF06.
+// Cubre el contrato v1 (TP-144), el login técnico y los umbrales de RNF06.
 class MatriculaHttpClientTest {
 
     private static final String BASE = "http://matricula.test/posgrados-project";
     private static final String CEDULA = "1090000001";
-    private static final String URL_SITUACION = BASE + "/api/application/case/integracion/estudiantes/" + CEDULA;
+    private static final String URL_SITUACION = BASE + "/api/application/case/integracion/v1/estudiantes/" + CEDULA;
     private static final String URL_SALUD = BASE + "/actuator/health";
+    private static final String URL_LOGIN = BASE + "/auth/login";
 
     private static final String RESPUESTA_OK = """
             {
@@ -61,12 +64,13 @@ class MatriculaHttpClientTest {
         reloj = new RelojFalso();
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new MatriculaHttpClient(builder, BASE, "token-servicio",
+        client = new MatriculaHttpClient(builder, BASE, "svc-tramites", "clave",
                 Duration.ofSeconds(7), 2, Duration.ofSeconds(15), reloj);
     }
 
     @Test
     void respuestaValida_traduceTodosLosCamposYEnviaCredencial() {
+        esperarLogin("token-servicio");
         server.expect(requestTo(URL_SITUACION))
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(header("Authorization", "Bearer token-servicio"))
@@ -91,6 +95,7 @@ class MatriculaHttpClientTest {
     @Test
     void creditosAprobadosNulo_esValido() {
         // Brecha B1: Matrícula no registra créditos aprobados; el contrato admite null.
+        esperarLogin("token-servicio");
         server.expect(requestTo(URL_SITUACION)).andRespond(withSuccess(
                 RESPUESTA_OK.replace("\"aprobados\": 40", "\"aprobados\": null"), MediaType.APPLICATION_JSON));
 
@@ -102,6 +107,7 @@ class MatriculaHttpClientTest {
 
     @Test
     void cedula404_noEncontradoSinReintentar() {
+        esperarLogin("token-servicio");
         server.expect(ExpectedCount.once(), requestTo(URL_SITUACION))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON)
                         .body("{\"code\":\"ESTUDIANTE_NOT_FOUND\",\"message\":\"No existe\",\"param\":null}"));
@@ -115,6 +121,7 @@ class MatriculaHttpClientTest {
 
     @Test
     void error400_cedulaInvalidaSinReintentar() {
+        esperarLogin("token-servicio");
         server.expect(ExpectedCount.once(), requestTo(URL_SITUACION))
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST));
 
@@ -133,6 +140,7 @@ class MatriculaHttpClientTest {
 
     @Test
     void errores5xx_reintentaHastaDosVecesYRecupera() {
+        esperarLogin("token-servicio");
         server.expect(requestTo(URL_SITUACION)).andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
         server.expect(requestTo(URL_SITUACION)).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
         server.expect(requestTo(URL_SITUACION)).andRespond(withSuccess(RESPUESTA_OK, MediaType.APPLICATION_JSON));
@@ -143,6 +151,7 @@ class MatriculaHttpClientTest {
 
     @Test
     void servicioCaido_tresIntentosYNoDisponible() {
+        esperarLogin("token-servicio");
         server.expect(ExpectedCount.times(3), requestTo(URL_SITUACION))
                 .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
 
@@ -156,6 +165,7 @@ class MatriculaHttpClientTest {
 
     @Test
     void timeout_seReintentaYTerminaEnNoDisponible() {
+        esperarLogin("token-servicio");
         server.expect(ExpectedCount.times(3), requestTo(URL_SITUACION))
                 .andRespond(withException(new SocketTimeoutException("Read timed out")));
 
@@ -167,6 +177,7 @@ class MatriculaHttpClientTest {
     void intentosLentos_noSePasaDelPresupuestoTotal() {
         // Cada intento agota 7 s (2 s conexión + 5 s respuesta). Tras dos intentos
         // (14 s) un tercero podría llegar a 21 s > 15 s, así que no se lanza.
+        esperarLogin("token-servicio");
         server.expect(ExpectedCount.times(2), requestTo(URL_SITUACION))
                 .andRespond(request -> {
                     reloj.avanzar(Duration.ofSeconds(7));
@@ -179,9 +190,15 @@ class MatriculaHttpClientTest {
     }
 
     @Test
-    void credencialRechazadaUnaVez_reintentaYRecupera() {
-        server.expect(requestTo(URL_SITUACION)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
-        server.expect(requestTo(URL_SITUACION)).andRespond(withSuccess(RESPUESTA_OK, MediaType.APPLICATION_JSON));
+    void credencialRechazadaUnaVez_renuevaElTokenYRecupera() {
+        esperarLogin("token-viejo");
+        server.expect(requestTo(URL_SITUACION))
+                .andExpect(header("Authorization", "Bearer token-viejo"))
+                .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        esperarLogin("token-nuevo");
+        server.expect(requestTo(URL_SITUACION))
+                .andExpect(header("Authorization", "Bearer token-nuevo"))
+                .andRespond(withSuccess(RESPUESTA_OK, MediaType.APPLICATION_JSON));
 
         assertThat(client.consultarSituacion(CEDULA).resultado()).isEqualTo(Resultado.ENCONTRADO);
         server.verify();
@@ -189,8 +206,10 @@ class MatriculaHttpClientTest {
 
     @Test
     void credencialRechazadaDosVeces_noDisponibleSinMasIntentos() {
-        server.expect(ExpectedCount.times(2), requestTo(URL_SITUACION))
-                .andRespond(withStatus(HttpStatus.FORBIDDEN));
+        esperarLogin("token-servicio");
+        server.expect(requestTo(URL_SITUACION)).andRespond(withStatus(HttpStatus.FORBIDDEN));
+        esperarLogin("token-servicio");
+        server.expect(requestTo(URL_SITUACION)).andRespond(withStatus(HttpStatus.FORBIDDEN));
 
         assertThat(client.consultarSituacion(CEDULA).resultado()).isEqualTo(Resultado.NO_DISPONIBLE);
         server.verify();
@@ -198,6 +217,7 @@ class MatriculaHttpClientTest {
 
     @Test
     void respuestaSinCampoObligatorio_esInvalidaYNoSeReintenta() {
+        esperarLogin("token-servicio");
         server.expect(ExpectedCount.once(), requestTo(URL_SITUACION)).andRespond(withSuccess(
                 RESPUESTA_OK.replace("\"estado\": \"ACTIVO\",", ""), MediaType.APPLICATION_JSON));
 
@@ -207,6 +227,7 @@ class MatriculaHttpClientTest {
 
     @Test
     void respuestaDeOtraCedula_esInvalida() {
+        esperarLogin("token-servicio");
         server.expect(requestTo(URL_SITUACION)).andRespond(withSuccess(
                 RESPUESTA_OK.replace("\"cedula\": \"1090000001\"", "\"cedula\": \"1090000002\""),
                 MediaType.APPLICATION_JSON));
@@ -216,6 +237,7 @@ class MatriculaHttpClientTest {
 
     @Test
     void fechaFueraDeIso8601_esInvalida() {
+        esperarLogin("token-servicio");
         server.expect(requestTo(URL_SITUACION)).andRespond(withSuccess(
                 RESPUESTA_OK.replace("\"2025-02-03\"", "\"03/02/2025\""), MediaType.APPLICATION_JSON));
 
@@ -224,9 +246,53 @@ class MatriculaHttpClientTest {
 
     @Test
     void cuerpoQueNoEsJson_esInvalido() {
+        esperarLogin("token-servicio");
         server.expect(requestTo(URL_SITUACION)).andRespond(withSuccess("<html>proxy</html>", MediaType.TEXT_HTML));
 
         assertThat(client.consultarSituacion(CEDULA).resultado()).isEqualTo(Resultado.RESPUESTA_INVALIDA);
+    }
+
+    @Test
+    void tokenVigente_seReutilizaEntreConsultas() {
+        esperarLogin("token-servicio");
+        server.expect(ExpectedCount.times(2), requestTo(URL_SITUACION))
+                .andExpect(header("Authorization", "Bearer token-servicio"))
+                .andRespond(withSuccess(RESPUESTA_OK, MediaType.APPLICATION_JSON));
+
+        client.consultarSituacion(CEDULA);
+        reloj.avanzar(Duration.ofMinutes(100));
+        client.consultarSituacion(CEDULA);
+
+        server.verify();
+    }
+
+    @Test
+    void tokenVencido_vuelveAHacerLogin() {
+        esperarLogin("token-1");
+        server.expect(requestTo(URL_SITUACION)).andRespond(withSuccess(RESPUESTA_OK, MediaType.APPLICATION_JSON));
+        esperarLogin("token-2");
+        server.expect(requestTo(URL_SITUACION))
+                .andExpect(header("Authorization", "Bearer token-2"))
+                .andRespond(withSuccess(RESPUESTA_OK, MediaType.APPLICATION_JSON));
+
+        client.consultarSituacion(CEDULA);
+        reloj.avanzar(MatriculaHttpClient.VIGENCIA_TOKEN);
+        client.consultarSituacion(CEDULA);
+
+        server.verify();
+    }
+
+    @Test
+    void loginRechazado_noDisponibleYSinCredencial() {
+        // Cuenta técnica mal configurada: el login falla dos veces y la consulta sale sin token.
+        server.expect(ExpectedCount.times(1), requestTo(URL_LOGIN)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        server.expect(requestTo(URL_SITUACION)).andExpect(headerDoesNotExist("Authorization"))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN));
+        server.expect(ExpectedCount.times(1), requestTo(URL_LOGIN)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        server.expect(requestTo(URL_SITUACION)).andRespond(withStatus(HttpStatus.FORBIDDEN));
+
+        assertThat(client.consultarSituacion(CEDULA).resultado()).isEqualTo(Resultado.NO_DISPONIBLE);
+        server.verify();
     }
 
     @Test
@@ -245,10 +311,20 @@ class MatriculaHttpClientTest {
 
     @Test
     void modoHttpSinUrl_fallaAlArrancar() {
-        assertThatThrownBy(() -> new MatriculaHttpClient(RestClient.builder(), "", "t",
+        assertThatThrownBy(() -> new MatriculaHttpClient(RestClient.builder(), "", "u", "p",
                 Duration.ofSeconds(7), 2, Duration.ofSeconds(15), reloj))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("MATRICULA_URL");
+    }
+
+    /** Login técnico esperado: POST /auth/login con el rol SERVICIO_TRAMITES. */
+    private void esperarLogin(String accessToken) {
+        server.expect(requestTo(URL_LOGIN))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.username").value("svc-tramites"))
+                .andExpect(jsonPath("$.requestedRole").value("SERVICIO_TRAMITES"))
+                .andRespond(withSuccess("{\"accessToken\":\"" + accessToken + "\",\"refreshToken\":\"r\"}",
+                        MediaType.APPLICATION_JSON));
     }
 
     /** Reloj controlado por la prueba para simular intentos lentos sin esperar. */

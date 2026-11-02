@@ -7,6 +7,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +32,9 @@ import tools.jackson.databind.json.JsonMapper;
  * <ul>
  *   <li>Tiempo de espera: 2 s de conexión y 5 s de respuesta.</li>
  *   <li>Reintentos: máximo 2, solo ante 5xx o tiempo agotado; nunca ante 4xx.</li>
+ *   <li>Credencial: login con la cuenta técnica (rol SERVICIO_TRAMITES) en
+ *       POST /auth/login; el token se guarda en memoria 110 min (Matrícula lo
+ *       emite por 120).</li>
  *   <li>401/403: renueva la credencial una vez y reintenta; si vuelve a fallar
  *       se trata como indisponibilidad y se registra como error de configuración.</li>
  *   <li>Contingencia: no se inicia un intento que pueda pasarse del presupuesto
@@ -46,13 +50,19 @@ public class MatriculaHttpClient implements MatriculaClient {
 
     private static final Logger log = LoggerFactory.getLogger(MatriculaHttpClient.class);
 
-    static final String RUTA_SITUACION = "/api/application/case/integracion/estudiantes/{cedula}";
+    static final String RUTA_SITUACION = "/api/application/case/integracion/v1/estudiantes/{cedula}";
     static final String RUTA_SALUD = "/actuator/health";
+    static final String RUTA_LOGIN = "/auth/login";
+    static final String ROL_TECNICO = "SERVICIO_TRAMITES";
+    static final Duration VIGENCIA_TOKEN = Duration.ofMinutes(110);
 
     private static final int SIN_RESPUESTA = -1;
 
     private final RestClient restClient;
-    private final String token;
+    private final String usuario;
+    private final String password;
+    private String token;
+    private Instant tokenVence;
     private final Duration duracionMaximaIntento;
     private final int maxReintentos;
     private final Duration presupuesto;
@@ -64,19 +74,20 @@ public class MatriculaHttpClient implements MatriculaClient {
     @Autowired
     public MatriculaHttpClient(
             @Value("${matricula.url:}") String url,
-            @Value("${matricula.token:}") String token,
+            @Value("${matricula.usuario:}") String usuario,
+            @Value("${matricula.password:}") String password,
             @Value("${matricula.timeout-conexion-ms:2000}") long timeoutConexionMs,
             @Value("${matricula.timeout-respuesta-ms:5000}") long timeoutRespuestaMs,
             @Value("${matricula.max-reintentos:2}") int maxReintentos,
             @Value("${matricula.presupuesto-ms:15000}") long presupuestoMs) {
         this(RestClient.builder().requestFactory(fabrica(timeoutConexionMs, timeoutRespuestaMs)),
-                url, token,
+                url, usuario, password,
                 Duration.ofMillis(timeoutConexionMs + timeoutRespuestaMs),
                 maxReintentos, Duration.ofMillis(presupuestoMs), Clock.systemUTC());
     }
 
     /** Para pruebas: permite enlazar MockRestServiceServer y controlar el reloj. */
-    MatriculaHttpClient(RestClient.Builder builder, String url, String token,
+    MatriculaHttpClient(RestClient.Builder builder, String url, String usuario, String password,
                         Duration duracionMaximaIntento, int maxReintentos,
                         Duration presupuesto, Clock clock) {
         if (url == null || url.isBlank()) {
@@ -84,13 +95,14 @@ public class MatriculaHttpClient implements MatriculaClient {
                     "matricula.modo=http requiere MATRICULA_URL (ej. https://host/posgrados-project)");
         }
         this.restClient = builder.baseUrl(url).build();
-        this.token = token == null ? "" : token;
+        this.usuario = usuario == null ? "" : usuario;
+        this.password = password == null ? "" : password;
         this.duracionMaximaIntento = duracionMaximaIntento;
         this.maxReintentos = maxReintentos;
         this.presupuesto = presupuesto;
         this.clock = clock;
-        if (this.token.isBlank()) {
-            log.warn("[MATRICULA] MATRICULA_TOKEN vacío: las llamadas irán sin credencial de servicio");
+        if (this.usuario.isBlank() || this.password.isBlank()) {
+            log.warn("[MATRICULA] MATRICULA_USUARIO o MATRICULA_PASSWORD vacíos: las llamadas irán sin credencial de servicio");
         }
     }
 
@@ -130,7 +142,7 @@ public class MatriculaHttpClient implements MatriculaClient {
                     renovarCredencial();
                     continue;
                 }
-                log.error("[MATRICULA] credencial de servicio rechazada ({}): error de configuración, revisar MATRICULA_TOKEN", status);
+                log.error("[MATRICULA] credencial de servicio rechazada ({}): error de configuración, revisar MATRICULA_USUARIO, MATRICULA_PASSWORD y que la cuenta tenga el rol Servicio Tramites", status);
                 return ConsultaMatricula.noDisponible();
             }
             if (status == 404) {
@@ -153,7 +165,6 @@ public class MatriculaHttpClient implements MatriculaClient {
         try {
             int status = restClient.get()
                     .uri(RUTA_SALUD)
-                    .headers(this::autenticar)
                     .exchange((req, res) -> res.getStatusCode().value());
             log.info("[MATRICULA] GET {} status={} duracionMs={}", RUTA_SALUD, status, msDesde(t0));
             return status == 200;
@@ -185,19 +196,54 @@ public class MatriculaHttpClient implements MatriculaClient {
     }
 
     private void autenticar(HttpHeaders headers) {
-        if (!token.isBlank()) {
-            headers.setBearerAuth(token);
+        String vigente = tokenVigente();
+        if (vigente != null) {
+            headers.setBearerAuth(vigente);
         }
     }
 
-    /**
-     * Hoy la credencial es un token fijo (MATRICULA_TOKEN), así que renovar no
-     * cambia nada y el reintento solo cubre un rechazo transitorio. Cuando TP-144
-     * cierre el mecanismo (opción A: login con cuenta técnica y token de 120 min),
-     * aquí va la llamada a POST /auth/login o /auth/refresh.
-     */
-    private void renovarCredencial() {
-        log.warn("[MATRICULA] credencial rechazada, se reintenta una vez");
+    private synchronized String tokenVigente() {
+        if (token == null || !clock.instant().isBefore(tokenVence)) {
+            iniciarSesion();
+        }
+        return token;
+    }
+
+    /** Si el login falla, token queda en null: la consulta sale sin credencial y Matrícula responde 403. */
+    private void iniciarSesion() {
+        token = null;
+        if (usuario.isBlank() || password.isBlank()) {
+            return;
+        }
+        long t0 = System.nanoTime();
+        try {
+            Respuesta r = restClient.post()
+                    .uri(RUTA_LOGIN)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("username", usuario, "password", password, "requestedRole", ROL_TECNICO))
+                    .exchange((req, res) -> new Respuesta(
+                            res.getStatusCode().value(),
+                            StreamUtils.copyToByteArray(res.getBody())));
+            log.info("[MATRICULA] POST {} status={} duracionMs={}", RUTA_LOGIN, r.status(), msDesde(t0));
+            if (r.status() != 200) {
+                return;
+            }
+            String accessToken = jsonMapper.readTree(r.cuerpo()).path("accessToken").asString("");
+            if (accessToken.isBlank()) {
+                log.error("[MATRICULA] login técnico sin accessToken en la respuesta");
+                return;
+            }
+            token = accessToken;
+            tokenVence = clock.instant().plus(VIGENCIA_TOKEN);
+        } catch (RestClientException | JacksonException e) {
+            log.warn("[MATRICULA] POST {} falló duracionMs={} causa={}", RUTA_LOGIN, msDesde(t0), e.getMessage());
+        }
+    }
+
+    /** Descarta el token para que la siguiente llamada vuelva a hacer login. */
+    private synchronized void renovarCredencial() {
+        log.warn("[MATRICULA] credencial rechazada, se renueva el token y se reintenta una vez");
+        token = null;
     }
 
     /** Solo se inicia otro intento si, en el peor caso, termina dentro del presupuesto. */
