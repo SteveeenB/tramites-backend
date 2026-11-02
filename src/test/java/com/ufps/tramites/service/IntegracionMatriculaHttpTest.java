@@ -63,11 +63,11 @@ class IntegracionMatriculaHttpTest {
               "cedula": "1098765435", "codigo": "20261005",
               "nombres": "Laura", "apellidos": "Gomez",
               "email": "laura@example.com", "estado": "ACTIVO",
-              "programa": { "id": 1, "codigo": "MGE", "nombre": "Maestría en Gerencia de Empresas", "creditosRequeridos": 56 },
+              "programa": { "id": 12, "codigo": "2203", "nombre": "Maestria en Gerencia de Empresas", "creditosRequeridos": 48 },
               "admision": { "cohorteId": 34, "cohorte": "Cohorte 2025-1", "semestre": "2025-1",
                             "fechaAdmision": "2025-01-20", "fechaIngreso": "2025-02-03" },
               "matricula": { "estado": "COMPLETADO", "valor": 4500000, "fechaVencimiento": "2025-02-01" },
-              "creditos": { "requeridos": 56, "aprobados": null }
+              "creditos": { "requeridos": 48, "aprobados": null }
             }
             """;
 
@@ -127,7 +127,7 @@ class IntegracionMatriculaHttpTest {
         when(estudianteRepository.findByUsuario(usuario)).thenReturn(Optional.of(perfil));
         when(estudianteRepository.save(any(Estudiante.class))).thenAnswer(i -> i.getArgument(0));
         when(programaRepository.findByCodigo(any())).thenReturn(Optional.empty());
-        when(programaRepository.findFirstByNombreIgnoreCase(programa.getNombre())).thenReturn(Optional.of(programa));
+        when(programaRepository.findAll()).thenReturn(List.of(programa));
         when(programaRepository.save(any(ProgramaAcademico.class))).thenAnswer(i -> i.getArgument(0));
     }
 
@@ -147,7 +147,8 @@ class IntegracionMatriculaHttpTest {
         assertThat(perfil.getEstadoMatricula()).isEqualTo("ACTIVO");
         assertThat(perfil.getMatriculaSincronizadoEn()).isNotNull();
         assertThat(perfil.getPrograma()).isSameAs(programa);
-        assertThat(programa.getCodigo()).isEqualTo("MGE");
+        assertThat(programa.getCodigo()).isEqualTo("2203");
+        assertThat(programa.getTotalCreditos()).isEqualTo(48); // gana Matrícula
         assertThat(perfil.getCreditosAprobados()).isEqualTo(56);
     }
 

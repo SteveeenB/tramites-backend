@@ -207,7 +207,7 @@
 | Los trámites ya iniciados siguen | Cumplido | La validación solo está en la creación de terminación, grado y certificado (#51) |
 | Cada consulta registrada con fecha, cédula, código HTTP y duración | Cumplido | Log `[MATRICULA]` de `MatriculaHttpClient` (#50) |
 | Sin lecturas de DEMO_USERS en producción | Cumplido | Frontend #44 |
-| Prueba contra el servicio real | **Pendiente** | Requiere la URL de Matrícula (o la copia en Render) y la cuenta técnica |
+| Prueba contra el servicio real | Hecha en local (2 nov 2026); falta en Render | Su backend (rama `SC-03-integracion-tramites`) sobre MySQL con su `DDL_Final`/`DML_Final`, cuenta técnica real y estudiantes ficticios. Ver la sección 5 |
 
 ---
 
@@ -225,3 +225,27 @@ Notas:
 - Las solicitudes de terminación, grado y certificado (EI ya contadas) ahora referencian también el EIF de Matrícula. Si su complejidad sube por ese FTR adicional, hay que recalcularlas en TP-145.
 - C2 (health check) no se cuenta: no entrega datos de negocio.
 - El login técnico es un mecanismo de seguridad, no una función de usuario, así que tampoco se cuenta.
+
+---
+
+## 5. Prueba contra el Módulo de Matrícula real (local, 2 nov 2026)
+
+**Montaje:** MySQL 8.0 aparte (puerto 3307) con el `DDL_Final.sql` y el `DML_Final.sql` que entregó el equipo de Matrícula, su backend compilado desde `SC-03-integracion-tramites` (JDK 21, puerto 8081), la cuenta técnica `svc-tramites` con el rol `Servicio Tramites` y cuatro estudiantes ficticios del programa 2203 con las cédulas de nuestro seed. Nuestro backend en el perfil `h2` con `MATRICULA_MODO=http` y `MATRICULA_SINCRONIZAR=true`.
+
+| Caso | Resultado |
+|---|---|
+| Login técnico (`POST /auth/login`, `requestedRole=SERVICIO_TRAMITES`) | 200 |
+| C1 con estudiante existente | 200 con el contrato completo |
+| C1 con cédula inexistente | 404 `ESTUDIANTE_NOT_FOUND`; Trámites bloquea con el mensaje de RF16 |
+| C1 con cédula inválida | 400 `CEDULA_INVALIDA` |
+| Otra ruta con la cuenta técnica | 403 |
+| C1 sin token | 403 |
+| Warm-up al iniciar sesión | C2 → login → C1 en segundo plano |
+| Créditos requeridos | El programa se mapea por código (2203) y pasan de 56 a 48: «Te faltan 8 créditos (llevas 40 de 48)» |
+
+**Hallazgos y arreglos:**
+1. **M1 devolvía `programa: null`** porque su `EstudiantesMapper` no copia `programaId` al DTO. Se corrigió en su rama (`cdc20fbc`) sin cambiar el mapper.
+2. **El programa no se mapeaba**: Matrícula escribe los nombres sin tildes y dos programas tienen nombres distintos. Se asignaron los códigos de Matrícula a nuestros 16 programas (`.docs/sql/migracion_sc03_codigos_programa.sql` y `data.sql`), y la comparación por nombre ahora ignora tildes y mayúsculas.
+3. **Su `DDL_Final.sql` no corre de una vez:** al final trae sus migraciones de octubre, que necesitan los catálogos del DML. Orden correcto: esquema del DDL → DML → migraciones → `2026-11-SC03-rol-servicio-tramites.sql`.
+4. **Su catálogo no coincide con el nuestro en créditos**: todas sus maestrías piden 48 y sus especializaciones 24 (las nuestras van de 41 a 77). Con la sincronización activa, gana Matrícula; hay que confirmar con ellos que esos valores son los reales.
+5. **El `DML_Final.sql` trae contraseñas en texto plano y datos de personas** en los usuarios semilla. No se versionó en ningún repositorio.
