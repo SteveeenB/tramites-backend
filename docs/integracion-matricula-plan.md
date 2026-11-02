@@ -334,7 +334,7 @@ Es *pull* a propósito, para no depender de webhooks entre dos Render free.
 ### 6.2 Ajustes al adaptador existente antes del merge
 
 1. **Ruta:** `RUTA_SITUACION` pasa de `/api/application/case/integracion/estudiantes/{cedula}` a `/api/application/case/integracion/v1/estudiantes/{cedula}`.
-2. **Credencial:**
+2. **Credencial** (hecho en N2):
    - Hoy `matricula.token` es un token fijo y `renovarCredencial()` no hace nada.
    - Sus tokens duran 120 minutos, así que un token fijo **caduca**. Hay que implementar el *login* técnico (`/auth/login` con `requestedRole`) y guardar el token en memoria hasta unos 110 minutos.
    - Ante un 401 o 403, `renovarCredencial()` vuelve a hacer *login*.
@@ -390,7 +390,7 @@ Lo que ya implementa la rama:
 | N1 | Cerrar TP-144: compartir este documento y el contrato v1 con el equipo de Matrícula y el ing. Matías, y registrar sus respuestas | Respuestas a la sección 8 registradas en TP-144. Contrato v1 marcado como «acordado» o con cambios |
 | N2 | **Reabrir o corregir TP-146**: integrar `HU19-ClienteMatricula` en `main` con la ruta `/v1` y el *login* técnico | PR mergeado. Pruebas `MatriculaHttpClientTest` y `MatriculaMockClientTest` en verde en la CI (perfil `h2`). `matricula.modo=mock` por defecto |
 | N3 | `AvanceAcademicoService` sustituyendo las cuatro copias del cálculo (sin `AvanceAcademicoProvider`: la fuente es solo nuestra BD, ver 7.1) | Un solo punto de cálculo, mensaje «Faltan N créditos», pruebas de borde (null, programa sin créditos, 0, igual, mayor) |
-| N4 | Opción 3: auditoría de créditos, endpoint del director, CSV de Posgrados, UI | Script SQL en `.docs/sql/`. Carga individual y masiva con trazabilidad. Pruebas de servicio |
+| N4 (descartada) | Opción 3: auditoría de créditos, endpoint del director, CSV de Posgrados, UI | Script SQL en `.docs/sql/`. Carga individual y masiva con trazabilidad. Pruebas de servicio |
 | N5 | Sincronizar el *snapshot* del estudiante desde C1, incluido `ProgramaAcademico.codigo` y `estadoMatricula` | Al *login* o al iniciar un trámite se actualiza el *snapshot* y se registra la hora |
 | N6 | Contingencia: *warm-up* contra C2 y política de *snapshot* con TTL | Con el mock en modo «caído», el estudiante recibe respuesta en ≤ 15 s y no se habilita ningún trámite sin un *snapshot* vigente |
 | N7 (aplazada) | Corregir el *login* de Google sin cédula (bloquea la llave de la integración) | Un usuario de Google sin cédula no queda con principal `null`: se le pide completar la cédula o no se le crea la cuenta |
@@ -412,14 +412,14 @@ Lo que ya implementa la rama:
 | M6 (si Opción 2) | `avanceacademico` (script, entidad, C3, UI de carga) según la sección 3.1 | C3 según contrato, con script idempotente en `db/scripts/` |
 | M7 (opcional) | Botón «Ir a Trámites» en `AspiranteInicio.tsx:277-286` con `VITE_TRAMITES_URL` | Visible solo cuando el aspirante está legalizado |
 
-**Orden:** N1 → (M1, M2, M3 en paralelo con N2, N3, N4, N8) → N5, N6 → N9 contra el servicio real → N10. N11, N12 y N7 quedan fuera de esta iteración.
+**Orden:** N1 → (M1, M2, M3 en paralelo con N2, N3, N8) → N5, N6 → N9 contra el servicio real → N10. N11, N12 y N7 quedan fuera de esta iteración; N4 se descarta (7.1, punto 4).
 
 ### 7.1 Decisiones del PO (2 nov 2026)
 
 1. **Contingencia (6.3):** si Matrícula no responde, se usa el *snapshot* si tiene menos de 24 h; si no, se bloquea el inicio de trámites nuevos y los ya iniciados siguen su curso.
 2. **Login con Google:** hoy no funciona; N7 se aplaza.
 3. **Condición de acceso (pregunta 12, brecha B5):** basta con que el estudiante exista en Matrícula (antes de registrarse ni siquiera es aspirante). No se valida matrícula por semestre.
-4. **Créditos aprobados (preguntas 10 y 11):** no tienen dueño institucional; vienen precargados en nuestra BD (Opción 3). Los requeridos los define el superadmin de Matrícula al crear el programa. Por eso N3 no lleva el puerto `AvanceAcademicoProvider`.
+4. **Créditos aprobados (preguntas 10 y 11):** no tienen dueño institucional; vienen precargados en nuestra BD (Opción 3). Los requeridos los define el superadmin de Matrícula al crear el programa. Se asume que **siempre** serán precargados: ni Matrícula ni Trámites manejan materias, notas ni pensum (en Matrícula, `pensum_id` siempre queda en null y «semestre» es el periodo de la cohorte). Por eso N3 no lleva el puerto `AvanceAcademicoProvider` y N4 se descarta: los créditos se actualizan directamente en la BD. La pregunta 1 de la sección 8 queda cerrada.
 5. **Autenticación (pregunta 3):** Matrícula autentica por rol + JWT, así que se usa la cuenta técnica `SERVICIO_TRAMITES` con su `/auth/login`. La API key se descarta.
 6. **Inicio de sesión único:** fuera de esta iteración; si se hace, con token de paso (N12). No se comparte su `app.jwt.secret`, que además firma los enlaces de confirmación de correo y de cambio de contraseña (`EmailConfirmationTokenService.java:25-26`, `PasswordResetTokenService.java:25-26`).
 7. **Producción de Matrícula:** la rama `render` (confirmado). Los PR van a `dev`.
@@ -429,7 +429,7 @@ Lo que ya implementa la rama:
 ## 8. Preguntas abiertas
 
 **Para el equipo de Matrícula**
-1. ¿Existe en su BD la tabla `pensum` u otras sin mapear (materias, notas)? En el código no hay ningún rastro y su `.gitignore` excluye los `.sql`.
+1. ~~¿Existe en su BD la tabla `pensum` u otras sin mapear (materias, notas)? En el código no hay ningún rastro y su `.gitignore` excluye los `.sql`.~~ Cerrada: créditos precargados (7.1).
 2. ¿Aceptan un PR nuestro en su repo, o prefieren implementar M1, M2 y M3 ellos? ¿Sobre qué rama (`dev`)?
 3. ¿Aceptan el rol técnico `SERVICIO_TRAMITES` con cuenta de servicio, o prefieren API key con un filtro propio? ¿Algún otro mecanismo?
 4. ¿Agregan la búsqueda por cédula (C1)? ¿Garantizan que la cédula es única (`existsByCedula` lo valida en la aplicación, pero no hay índice `UNIQUE`)?
