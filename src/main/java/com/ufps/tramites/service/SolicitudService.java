@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.ufps.tramites.dto.AvanceAcademico;
 import com.ufps.tramites.model.Admin;
 import com.ufps.tramites.model.EstadoEstudiante;
 import com.ufps.tramites.model.Estudiante;
@@ -142,23 +143,19 @@ public class SolicitudService {
     @Autowired
     private CorreoSolicitudService correoSolicitudService;
 
+    @Autowired
+    private AvanceAcademicoService avanceAcademicoService;
+
     /**
      * Crea una solicitud de terminación de materias. Valida: período de
      * convocatoria, créditos aprobados y duplicados.
      */
     public Map<String, Object> crearSolicitudTerminacion(Usuario estudiante) {
-        // 1. Validar créditos (requisito reglamentario)
+        // 1. Validar créditos (requisito reglamentario, RF16)
         Estudiante perfilEstudiante = estudianteRepository.findByUsuario(estudiante).orElse(null);
-        int creditosAprobados = perfilEstudiante != null && perfilEstudiante.getCreditosAprobados() != null
-                ? perfilEstudiante.getCreditosAprobados() : 0;
-        int creditosRequeridos = estudiante.getProgramaAcademico() != null
-                ? estudiante.getProgramaAcademico().getTotalCreditos()
-                : Integer.MAX_VALUE;
-        if (creditosAprobados < creditosRequeridos) {
-            throw new IllegalStateException(
-                    "No cumple los requisitos académicos: tiene " + creditosAprobados
-                    + "/" + creditosRequeridos + " créditos aprobados."
-            );
+        AvanceAcademico avance = avanceAcademicoService.calcular(estudiante, perfilEstudiante);
+        if (!avance.cumple()) {
+            throw new IllegalStateException("No cumples los requisitos académicos. " + avance.mensaje());
         }
 
         LocalDate hoy = LocalDate.now();
@@ -419,15 +416,14 @@ public class SolicitudService {
 
             Usuario est = porCedula.get(s.getCedula());
             if (est != null) {
-                Estudiante perfil = estudianteRepository.findByUsuario(est).orElse(null);
+                AvanceAcademico avance = avanceAcademicoService.calcular(est);
                 Map<String, Object> estMap = new LinkedHashMap<>();
                 estMap.put("cedula", est.getCedula());
                 estMap.put("nombre", est.getNombre());
                 estMap.put("programa", est.getProgramaAcademico() != null
                         ? est.getProgramaAcademico().getNombre() : null);
-                estMap.put("creditosAprobados", perfil != null ? perfil.getCreditosAprobados() : null);
-                estMap.put("creditosRequeridos", est.getProgramaAcademico() != null
-                        ? est.getProgramaAcademico().getTotalCreditos() : null);
+                estMap.put("creditosAprobados", avance.aprobados());
+                estMap.put("creditosRequeridos", avance.requeridos());
                 map.put("estudiante", estMap);
             }
             return map;

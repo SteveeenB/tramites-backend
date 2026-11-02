@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.ufps.tramites.model.Admin;
 import com.ufps.tramites.model.Estudiante;
@@ -79,6 +80,11 @@ class SolicitudServiceTerminacionTest {
 
     @BeforeEach
     void setUp() {
+        // AvanceAcademicoService es lógica pura sobre el repositorio mockeado:
+        // se usa la real para probar la regla de créditos de punta a punta.
+        ReflectionTestUtils.setField(solicitudService, "avanceAcademicoService",
+                new AvanceAcademicoService(estudianteRepository));
+
         programa = new ProgramaAcademico();
         programa.setNombre("Maestría en Ingeniería");
         programa.setTotalCreditos(48);
@@ -129,7 +135,7 @@ class SolicitudServiceTerminacionTest {
 
         assertThatThrownBy(() -> solicitudService.crearSolicitudTerminacion(estudianteUsuario))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("30/48");
+                .hasMessageContaining("Te faltan 18 créditos (llevas 30 de 48)");
     }
 
     @Test
@@ -152,12 +158,34 @@ class SolicitudServiceTerminacionTest {
 
     @Test
     void crear_sinPerfilEstudiante_bloqueaPorDefecto() {
-        // Si el usuario no tiene ficha en `estudiante`, se toman 0 créditos.
+        // Sin ficha en `estudiante` no hay créditos registrados: se bloquea.
         when(estudianteRepository.findByUsuario(any(Usuario.class))).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> solicitudService.crearSolicitudTerminacion(estudianteUsuario))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("requisitos académicos");
+                .hasMessageContaining("requisitos académicos")
+                .hasMessageContaining("no están registrados");
+    }
+
+    @Test
+    void crear_sinProgramaAcademico_bloqueaConMensajeDePosgrados() {
+        estudiantePerfil.setCreditosAprobados(48);
+        estudianteUsuario.setProgramaAcademico(null);
+
+        assertThatThrownBy(() -> solicitudService.crearSolicitudTerminacion(estudianteUsuario))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("oficina de Posgrados");
+    }
+
+    @Test
+    void crear_programaSinTotalCreditos_bloqueaSinNullPointer() {
+        // Antes: auto-unboxing de un Integer null lanzaba NullPointerException.
+        estudiantePerfil.setCreditosAprobados(48);
+        programa.setTotalCreditos(null);
+
+        assertThatThrownBy(() -> solicitudService.crearSolicitudTerminacion(estudianteUsuario))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("oficina de Posgrados");
     }
 
     @Test
