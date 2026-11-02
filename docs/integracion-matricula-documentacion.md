@@ -65,7 +65,7 @@
 | ID | Decisión | Alternativas descartadas y motivo |
 |---|---|---|
 | ADR-SC03-1 | Integración **REST síncrona y de solo lectura**, de Trámites hacia Matrícula, con una sola consulta por cédula (C1) que trae toda la situación del estudiante | Llamar a varias rutas existentes de Matrícula (más llamadas y rutas de otros roles). Replicar su base de datos (acoplamiento fuerte con su modelo) |
-| ADR-SC03-2 | **Créditos aprobados precargados** en la base de datos de Trámites (`estudiante.creditos_aprobados`); los requeridos los define Matrícula por programa | Pedirlos a Matrícula (no tiene materias ni notas). Registro académico institucional (no existe una fuente disponible hoy) |
+| ADR-SC03-2 | **Créditos aprobados precargados** en la base de datos de Trámites (`estudiante.creditos_aprobados`); los requeridos también son de Trámites (`programa_academico.total_creditos`, con los valores reales que carga el PO); los de Matrícula solo se comparan | Pedirlos a Matrícula (no tiene materias ni notas). Registro académico institucional (no existe una fuente disponible hoy) |
 | ADR-SC03-3 | **Cuenta técnica con rol propio** `SERVICIO_TRAMITES`, que solo puede hacer `GET /integracion/v1/**`; login con el `/auth/login` de Matrícula | Cuenta con rol Super Administrador (privilegio excesivo). API key fija (Matrícula debía crear un filtro nuevo y la clave no caduca) |
 | ADR-SC03-4 | **Copia del estudiante con vigencia de 24 h** como contingencia; sin copia vigente se bloquea solo el inicio de trámites nuevos | Bloquear todo ante cualquier caída (afecta trámites en curso). Usar datos simulados (prohibido por RF16) |
 
@@ -119,7 +119,7 @@
 2. Trámites consulta a Matrícula la situación académica de la cédula del estudiante.
 3. Matrícula responde con identidad, programa, cohorte y estado.
 4. Trámites valida que la respuesta cumpla el contrato y sea de la misma cédula.
-5. Trámites actualiza la copia del estudiante y los créditos requeridos del programa.
+5. Trámites actualiza la copia del estudiante y asigna el código de Matrícula al programa si aún no lo tiene.
 6. El trámite continúa con sus validaciones propias (por ejemplo, el 100 % de créditos).
 
 **6. Flujos alternativos y excepciones**
@@ -136,7 +136,7 @@
 - RB-1: Trámites nunca escribe en Matrícula.
 - RB-2: Ningún trámite se habilita con datos simulados (RF16).
 - RB-3: Los trámites ya iniciados no dependen de la disponibilidad de Matrícula.
-- RB-4: Los créditos requeridos los define Matrícula; si difieren de los de Trámites, gana Matrícula.
+- RB-4: Los créditos requeridos son los de Trámites; si Matrícula reporta otros, solo se registra un aviso.
 
 **8. Datos y validaciones clave**
 
@@ -241,11 +241,11 @@ Notas:
 | Otra ruta con la cuenta técnica | 403 |
 | C1 sin token | 403 |
 | Warm-up al iniciar sesión | C2 → login → C1 en segundo plano |
-| Créditos requeridos | El programa se mapea por código (2203) y pasan de 56 a 48: «Te faltan 8 créditos (llevas 40 de 48)» |
+| Créditos requeridos | El programa se mapea por código (2203). En la prueba los requeridos pasaron de 56 a 48; después se decidió conservar los de Trámites (ver el hallazgo 4) |
 
 **Hallazgos y arreglos:**
 1. **M1 devolvía `programa: null`** porque su `EstudiantesMapper` no copia `programaId` al DTO. Se corrigió en su rama (`cdc20fbc`) sin cambiar el mapper.
 2. **El programa no se mapeaba**: Matrícula escribe los nombres sin tildes y dos programas tienen nombres distintos. Se asignaron los códigos de Matrícula a nuestros 16 programas (`.docs/sql/migracion_sc03_codigos_programa.sql` y `data.sql`), y la comparación por nombre ahora ignora tildes y mayúsculas.
 3. **Su `DDL_Final.sql` no corre de una vez:** al final trae sus migraciones de octubre, que necesitan los catálogos del DML. Orden correcto: esquema del DDL → DML → migraciones → `2026-11-SC03-rol-servicio-tramites.sql`.
-4. **Su catálogo no coincide con el nuestro en créditos**: todas sus maestrías piden 48 y sus especializaciones 24 (las nuestras van de 41 a 77). Con la sincronización activa, gana Matrícula; hay que confirmar con ellos que esos valores son los reales.
+4. **Su catálogo no coincide con el nuestro en créditos**: todas sus maestrías piden 48 y sus especializaciones 24, y las nuestras van de 41 a 77. **Decisión del PO:** los créditos reales son los de Trámites (los carga el PO). La sincronización ya no los reemplaza; solo registra un aviso cuando difieren.
 5. **El `DML_Final.sql` trae contraseñas en texto plano y datos de personas** en los usuarios semilla. No se versionó en ningún repositorio.

@@ -217,7 +217,9 @@ public class SincronizacionMatriculaService {
      * ese código, lo adopta el programa sin código con el mismo nombre, sin
      * distinguir tildes ni mayúsculas (Matrícula escribe «Maestria», nosotros
      * «Maestría»).
-     * Los créditos requeridos los define Matrícula: si difieren, gana ella.
+     * Los créditos requeridos son los de Trámites, que el PO carga con los
+     * valores reales de cada programa; si Matrícula reporta otros, solo se
+     * registra un aviso.
      */
     private Optional<ProgramaAcademico> resolverPrograma(SituacionAcademica s) {
         if (s.programaCodigo() == null || s.programaCodigo().isBlank()) {
@@ -239,9 +241,8 @@ public class SincronizacionMatriculaService {
         }
         ProgramaAcademico programa = encontrado.get();
         if (s.creditosRequeridos() > 0 && !Objects.equals(programa.getTotalCreditos(), s.creditosRequeridos())) {
-            log.warn("[MATRICULA] programa '{}': créditos requeridos {} → {} (los define Matrícula)",
-                    programa.getNombre(), programa.getTotalCreditos(), s.creditosRequeridos());
-            programa.setTotalCreditos(s.creditosRequeridos());
+            log.warn("[MATRICULA] programa '{}': Matrícula pide {} créditos y Trámites {}; se conservan los de Trámites",
+                    programa.getNombre(), s.creditosRequeridos(), programa.getTotalCreditos());
         }
         return Optional.of(programaRepository.save(programa));
     }
