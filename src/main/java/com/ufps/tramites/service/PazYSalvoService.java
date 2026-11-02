@@ -1,5 +1,6 @@
 package com.ufps.tramites.service;
 
+import com.ufps.tramites.dto.AvanceAcademico;
 import com.ufps.tramites.model.Admin;
 import com.ufps.tramites.model.Estudiante;
 import com.ufps.tramites.model.PazYSalvo;
@@ -34,6 +35,7 @@ public class PazYSalvoService {
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private AdminRepository adminRepository;
     @Autowired private EstudianteRepository estudianteRepository;
+    @Autowired private AvanceAcademicoService avanceAcademicoService;
 
     @Autowired private CorreoPazYSalvoService correoPazYSalvoService;
 
@@ -241,10 +243,9 @@ public class PazYSalvoService {
         info.put("cedula", est.getCedula());
         info.put("nombre", est.getNombre());
         info.put("codigo", est.getCodigo());
-        int creditos      = perfil != null && perfil.getCreditosAprobados() != null ? perfil.getCreditosAprobados() : 0;
-        int totalCreditos = est.getProgramaAcademico() != null ? est.getProgramaAcademico().getTotalCreditos() : 0;
-        info.put("creditosAprobados", creditos);
-        info.put("totalCreditos",     totalCreditos);
+        AvanceAcademico avance = avanceAcademicoService.calcular(est, perfil);
+        info.put("creditosAprobados", avance.aprobados() != null ? avance.aprobados() : 0);
+        info.put("totalCreditos",     avance.requeridos() != null ? avance.requeridos() : 0);
 
         boolean graduado = perfil != null
                 && perfil.getEstadoEstudiante() != null
@@ -294,12 +295,14 @@ public class PazYSalvoService {
             return info;
         }
 
-        if (creditos >= totalCreditos) {
+        // Sin datos de créditos el estudiante no es "Requisitos completos":
+        // antes, con total 0, cualquiera caía en esa etapa.
+        if (avance.cumple()) {
             info.put("etapa",      "REQUISITOS_COMPLETOS");
             info.put("etapaLabel", "Requisitos completos – puede iniciar terminación");
         } else {
             info.put("etapa",      "CURSANDO");
-            info.put("etapaLabel", "Cursando materias");
+            info.put("etapaLabel", avance.evaluable() ? "Cursando materias" : "Cursando materias (créditos sin registrar)");
         }
         return info;
     }
