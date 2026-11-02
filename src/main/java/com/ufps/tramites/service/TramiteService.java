@@ -1,9 +1,8 @@
 package com.ufps.tramites.service;
 
-import com.ufps.tramites.model.Estudiante;
+import com.ufps.tramites.dto.AvanceAcademico;
 import com.ufps.tramites.model.Solicitud;
 import com.ufps.tramites.model.Usuario;
-import com.ufps.tramites.repository.EstudianteRepository;
 import com.ufps.tramites.repository.SolicitudRepository;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -24,7 +23,7 @@ public class TramiteService {
     private SolicitudRepository solicitudRepository;
 
     @Autowired
-    private EstudianteRepository estudianteRepository;
+    private AvanceAcademicoService avanceAcademicoService;
 
     public Map<String, Object> construirModuloPorRol(Usuario usuario) {
         String rol = usuario.getRolNombre();
@@ -39,13 +38,8 @@ public class TramiteService {
     }
 
     public Map<String, Object> construirProcesoDeGrado(Usuario usuario) {
-        Estudiante perfil = estudianteRepository.findByUsuario(usuario).orElse(null);
-        int creditosAprobados = perfil != null && perfil.getCreditosAprobados() != null
-                ? perfil.getCreditosAprobados() : 0;
-        int creditosRequeridos = usuario.getProgramaAcademico() != null
-                ? usuario.getProgramaAcademico().getTotalCreditos() : Integer.MAX_VALUE;
-
-        boolean etapa1Habilitada = creditosAprobados >= creditosRequeridos;
+        AvanceAcademico avance = avanceAcademicoService.calcular(usuario);
+        boolean etapa1Habilitada = avance.cumple();
 
         Optional<Solicitud> solicitudTerminacion = solicitudRepository
                 .findFirstByCedulaAndTipoOrderByIdDesc(usuario.getCedula(), "TERMINACION_MATERIAS");
@@ -60,7 +54,7 @@ public class TramiteService {
 
         Map<String, Object> response = new LinkedHashMap<>();
 
-        response.put("creditos", construirCreditos(usuario));
+        response.put("creditos", construirCreditos(avance));
         response.put("estadoAcademico", "Regular");
         // FIX TP-193: la convocatoria sale del alcance (no se expone).
         response.put("etapa1Completada", etapa1Habilitada);
@@ -72,27 +66,26 @@ public class TramiteService {
     }
 
     private Map<String, Object> construirUsuario(Usuario usuario) {
-        Estudiante perfil = estudianteRepository.findByUsuario(usuario).orElse(null);
         Map<String, Object> usuarioMap = new LinkedHashMap<>();
         usuarioMap.put("cedula", usuario.getCedula());
         usuarioMap.put("nombre", usuario.getNombre());
         usuarioMap.put("codigo", usuario.getCodigo());
         usuarioMap.put("rol", usuario.getRolNombre());
-        usuarioMap.put("creditosAprobados", perfil != null ? perfil.getCreditosAprobados() : null);
+        usuarioMap.put("creditosAprobados", avanceAcademicoService.calcular(usuario).aprobados());
         usuarioMap.put("programaAcademico", usuario.getProgramaAcademico() != null
                 ? usuario.getProgramaAcademico().getNombre() : null);
         return usuarioMap;
     }
 
-    private Map<String, Object> construirCreditos(Usuario usuario) {
-        Estudiante perfil = estudianteRepository.findByUsuario(usuario).orElse(null);
+    // aprobados y requeridos siguen siendo enteros (0 si no hay dato) para no
+    // romper la barra del frontend; "cumple" y "mensaje" dicen la verdad.
+    private Map<String, Object> construirCreditos(AvanceAcademico avance) {
         Map<String, Object> creditos = new LinkedHashMap<>();
-        int aprobados = perfil != null && perfil.getCreditosAprobados() != null
-                ? perfil.getCreditosAprobados() : 0;
-        int requeridos = usuario.getProgramaAcademico() != null
-                ? usuario.getProgramaAcademico().getTotalCreditos() : 0;
-        creditos.put("aprobados", aprobados);
-        creditos.put("requeridos", requeridos);
+        creditos.put("aprobados", avance.aprobados() != null ? avance.aprobados() : 0);
+        creditos.put("requeridos", avance.requeridos() != null ? avance.requeridos() : 0);
+        creditos.put("faltantes", avance.faltantes());
+        creditos.put("cumple", avance.cumple());
+        creditos.put("mensaje", avance.mensaje());
         return creditos;
     }
 
