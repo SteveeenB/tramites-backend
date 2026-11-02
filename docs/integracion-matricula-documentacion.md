@@ -8,11 +8,15 @@
 | Documento | Ubicación encontrada | Qué hay que hacer |
 |---|---|---|
 | ADD (EP4) | Drive: `EP4- ADD -Arquitectura de alto nivel -Modelo del Negocio - Tramites de Postgrados v2.docx` (junio 2026) | Pegar los textos de la sección 1 en las secciones indicadas |
-| Casos de uso (EP3) | **No se encontró el de Trámites.** El `EP3_Casos_de_Uso.docx` de la carpeta «4.3. Casos de uso» es del Sistema de Gestión de Casos Jurídicos (su CU-05 es «Procesos Judiciales») | Ubicar el EP3 de Trámites y agregar el caso de la sección 2. Confirmar que el número CU-05 está libre, porque RF16 y TP-143 ya lo citan |
-| SRS (EP2) | **No se encontró en Drive.** El plan de pruebas y TP-143 lo citan | Aplicar los cambios de la sección 3 |
+| Casos de uso (EP3) | No existe para Trámites. El `EP3_Casos_de_Uso.docx` de la carpeta «4.3. Casos de uso» es del grupo jurídico, al que le hacemos auditoría | El caso de la sección 2 puede ser el primero de un EP3 de Trámites. Se mantiene el número CU-05 porque RF16 y TP-143 ya lo citan |
+| SRS (EP2) | Probablemente no existe como documento aparte. Los requisitos viven en el informe final (Tabla 12) y en el informe TP-143 | Aplicar los cambios de la sección 3 donde estén los requisitos |
 | TP-145 (EIF) | Jira | Usar la propuesta de la sección 4 como punto de partida |
 
-**Hallazgo adicional en el ADD:** el documento dice PostgreSQL en el glosario, en las tecnologías y en la capa de infraestructura, pero la base de datos real es MySQL (`application.properties`). Supabase hoy solo se usa como Storage. Conviene corregirlo en la misma edición.
+**Corrección en el ADD:** el documento dice PostgreSQL en el glosario, en las tecnologías y en la capa de infraestructura. La base de datos es MySQL desde SC-01 (AD-CCA-07), y Supabase solo se usa como Storage. Hay que corregirlo en la misma edición.
+
+**Numeración decidida por el PO (2 nov 2026):**
+- El requisito no funcional de interoperabilidad es **RNF-09** (el informe final ya usa RNF-06 para Mantenibilidad). En Jira se sigue llamando RNF06; se anota «RNF06 (RNF-09 en el SRS)».
+- El riesgo de dependencia de Matrícula es **R8**, como ya lo registra la versión corregida de AD-CCA-07 (SC-03). R7 sigue siendo el riesgo de las llaves de Wompi.
 
 ---
 
@@ -38,12 +42,12 @@
 
 ### 1.4 «Consideraciones de Calidad» (agregar)
 
-> **Interoperabilidad y disponibilidad (RNF06):** la integración con Matrícula es de backend a backend y la credencial nunca llega al navegador. Cada consulta tiene 2 s de conexión y 5 s de respuesta, hasta 2 reintentos solo ante 5xx o timeout, y un presupuesto total de 15 s. Si Matrícula no responde, se usa la copia del estudiante si tiene menos de 24 horas; si no, se bloquea solo el inicio de trámites nuevos, y los trámites ya iniciados siguen su curso. Cada llamada queda registrada con ruta, cédula, intento, código HTTP y duración.
+> **Interoperabilidad y disponibilidad (RNF-09):** la integración con Matrícula es de backend a backend y la credencial nunca llega al navegador. Cada consulta tiene 2 s de conexión y 5 s de respuesta, hasta 2 reintentos solo ante 5xx o timeout, y un presupuesto total de 15 s. Si Matrícula no responde, se usa la copia del estudiante si tiene menos de 24 horas; si no, se bloquea solo el inicio de trámites nuevos, y los trámites ya iniciados siguen su curso. Cada llamada queda registrada con ruta, cédula, intento, código HTTP y duración.
 
 ### 1.5 «Riesgos Técnicos Iniciales» (actualizar y agregar)
 
 - **Desconocimiento de la plataforma existente** → agregar al final: *«Para el Módulo de Matrícula el riesgo se mitigó: se analizó su código (TP-143), se acordó un contrato v1 y se implementó un adaptador que aísla sus nombres de campos (RNF06).»*
-- **R7 · Dependencia de un servicio y un equipo externos (nuevo).** Trámites depende de que Matrícula esté disponible y mantenga el contrato. Matrícula corre en el plan gratuito de Render, con cold start de unos 50 s. *Mitigación:* adaptador con modo simulado (`matricula.modo=mock`), copia del estudiante con vigencia de 24 h, warm-up al iniciar sesión, contrato versionado `/v1` y bloqueo solo del inicio de trámites nuevos. *Pendiente:* el número R7 choca con el riesgo de las llaves de Wompi; hay que renumerar uno de los dos.
+- **R8 · Dependencia de un servicio y un equipo externos (nuevo).** Trámites depende de que Matrícula esté disponible y mantenga el contrato. Matrícula corre en el plan gratuito de Render, con cold start de unos 50 s. *Mitigación:* adaptador con modo simulado (`matricula.modo=mock`), copia del estudiante con vigencia de 24 h, warm-up al iniciar sesión, contrato versionado `/v1` y bloqueo solo del inicio de trámites nuevos. (Numerado R8 en AD-CCA-07; R7 es el riesgo de las llaves de Wompi.)
 - **Copia desactualizada del estudiante (nuevo).** Durante una caída, la copia puede tener hasta 24 h de antigüedad. *Mitigación:* la vigencia es configurable (`MATRICULA_SNAPSHOT_VIGENCIA_HORAS`) y un 404 de Matrícula bloquea aunque haya copia.
 - **Créditos aprobados sin fuente oficial (nuevo).** Ni Matrícula ni Trámites registran materias ni notas, así que los créditos aprobados se precargan en la base de datos de Trámites. *Mitigación:* decisión documentada del PO (plan, 7.1.4); si en el futuro aparece una fuente institucional, se integra en `AvanceAcademicoService` sin tocar el resto del código.
 
@@ -79,7 +83,7 @@
 
 | | |
 |---|---|
-| CU-Id: | CU-05 (confirmar que el número está libre en el EP3 de Trámites) |
+| CU-Id: | CU-05 |
 | Nombre del caso de uso: | Consultar la situación académica en el Módulo de Matrícula |
 | Módulo/Épica asociada: | SC-03 · Interoperabilidad con el Módulo de Matrícula (TP-138) |
 | Actor(es) principal(es): | Sistema de Trámites (consumidor). Actor secundario: Módulo de Matrícula (proveedor) |
@@ -158,7 +162,7 @@
 **11. Consideraciones no funcionales**
 
 - Seguridad: cuenta técnica con rol `SERVICIO_TRAMITES` (solo `GET /integracion/v1/**`), credenciales en variables de entorno.
-- Disponibilidad: umbrales de RNF06 (2 s, 5 s, 2 reintentos, 15 s) y copia con vigencia de 24 h.
+- Disponibilidad: umbrales de RNF-09 (2 s, 5 s, 2 reintentos, 15 s) y copia con vigencia de 24 h.
 - Trazabilidad: log `[MATRICULA]` por llamada con ruta, cédula, intento, código HTTP y duración.
 
 **12. Dependencias y trazabilidad**
@@ -167,11 +171,11 @@
 |---|---|
 | Depende de: | CU de inicio de sesión; contrato v1 (TP-144). |
 | Historias de usuario relacionadas: | HU-19 (TP-140). |
-| Requisitos SRS asociados: | RF16, RNF06 (o RNF-09, ver la sección 3), R7. |
+| Requisitos SRS asociados: | RF16, RNF-09 (RNF06 en Jira), riesgo R8. |
 
 **13. Preguntas abiertas / decisiones pendientes**
 
-- PO-1: Confirmar el número del caso de uso y el código definitivo del RNF de interoperabilidad.
+- PO-1: Ninguna pendiente (numeración decidida el 2 nov 2026: RNF-09 y R8).
 
 **14. Aprobaciones**
 
@@ -182,15 +186,15 @@
 
 ---
 
-## 3. SRS (EP2)
+## 3. Requisitos (informe final, Tabla 12, y TP-143)
 
-1. **Numeración del RNF de interoperabilidad.** Jira lo llama RNF06, pero el informe final ya usa RNF-06 para Mantenibilidad y registra la interoperabilidad como RNF-09. **Propuesta:** dejarlo como **RNF-09** en el SRS, y en Jira anotar «RNF06 (RNF-09 en el SRS)» para no renombrar issues.
+1. **Numeración del RNF de interoperabilidad (decidido):** **RNF-09**. En Jira se anota «RNF06 (RNF-09 en el SRS)» para no renombrar issues.
 2. **RF16 · ajustes a la versión de TP-143:**
    - *Descripción:* reemplazar «la identidad, el programa, la admisión, la matrícula y los créditos del estudiante» por «la identidad, el programa, la cohorte y el estado del estudiante, y los créditos requeridos del programa». Los créditos aprobados no vienen de Matrícula (ADR-SC03-2).
    - *Flujo normal, paso 4:* «Evalúa las reglas: el estudiante existe en Matrícula y sus créditos aprobados (precargados en Trámites) cubren los requeridos».
    - *Flujo alterno nuevo:* «Matrícula no responde y existe una copia de menos de 24 h → se usa la copia».
 3. **RNF-09 (interoperabilidad):** agregar la fila *Contingencia con copia: vigencia de 24 h, configurable*. Los demás umbrales quedan como en TP-143.
-4. **Riesgo R7:** registrarlo y resolver el choque de numeración con el riesgo de las llaves de Wompi (ver 1.5).
+4. **Riesgo R8 (decidido):** dependencia del Módulo de Matrícula, como en AD-CCA-07. Donde TP-143 dice «R7», leer «R8».
 
 **Estado de los criterios de aceptación de RF16**
 
