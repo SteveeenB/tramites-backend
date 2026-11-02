@@ -52,7 +52,12 @@ public class CertificadoService {
     @Autowired private CorreoConstanciaService correoService;
     @Autowired private SupabaseStorageService storage;
     @Autowired private NotificacionService notificacionService;
-    @Autowired private SincronizacionMatriculaService sincronizacionMatriculaService;
+    private SincronizacionMatriculaService sincronizacionMatriculaService;
+
+    @Autowired
+    void setSincronizacionMatriculaService(SincronizacionMatriculaService sincronizacionMatriculaService) {
+        this.sincronizacionMatriculaService = sincronizacionMatriculaService;
+    }
 
     // ── 1) SOLICITUD ──────────────────────────────────────────────────────────
 

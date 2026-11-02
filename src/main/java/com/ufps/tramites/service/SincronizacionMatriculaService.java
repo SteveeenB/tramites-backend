@@ -72,7 +72,8 @@ public class SincronizacionMatriculaService {
 
     @Autowired
     public SincronizacionMatriculaService(
-            MatriculaClient matriculaClient,
+            // S9352 es falso positivo: solo existe un adaptador a la vez (@ConditionalOnProperty matricula.modo)
+            MatriculaClient matriculaClient, // NOSONAR
             UsuarioRepository usuarioRepository,
             EstudianteRepository estudianteRepository,
             ProgramaAcademicoRepository programaRepository,

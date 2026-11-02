@@ -39,7 +39,12 @@ public class AuthController {
     @Autowired private EstudianteRepository estudianteRepository;
     @Autowired private RolRepository rolRepository;
     @Autowired private PasswordEncoder passwordEncoder;
-    @Autowired private SincronizacionMatriculaService sincronizacionMatriculaService;
+    private SincronizacionMatriculaService sincronizacionMatriculaService;
+
+    @Autowired
+    void setSincronizacionMatriculaService(SincronizacionMatriculaService sincronizacionMatriculaService) {
+        this.sincronizacionMatriculaService = sincronizacionMatriculaService;
+    }
 
     @Value("${google.client-id:}")
     private String googleClientId;

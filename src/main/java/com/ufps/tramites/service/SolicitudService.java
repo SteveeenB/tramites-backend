@@ -146,8 +146,12 @@ public class SolicitudService {
     @Autowired
     private AvanceAcademicoService avanceAcademicoService;
 
-    @Autowired
     private SincronizacionMatriculaService sincronizacionMatriculaService;
+
+    @Autowired
+    void setSincronizacionMatriculaService(SincronizacionMatriculaService sincronizacionMatriculaService) {
+        this.sincronizacionMatriculaService = sincronizacionMatriculaService;
+    }
 
     /**
      * Crea una solicitud de terminación de materias. Valida: período de
