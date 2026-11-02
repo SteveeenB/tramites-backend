@@ -146,7 +146,7 @@ Rutas relativas a `ACA-0001` en `origin/dev`. Abreviaturas: `B=backend/api-base/
 | Autenticación servicio a servicio | Cuenta técnica con rol nuevo `SERVICIO_TRAMITES` en **su** `SecurityConfig` | Nosotros necesitaríamos un filtro de API key o una cuenta técnica en **nuestra** `SecurityConfig` (`config/SecurityConfig.java:28-63`) | Las dos cosas, más firma HMAC del webhook. Su webhook de Wompi hoy no valida firma (`PagoWompiWebhookCase`), así que no hay un patrón que reutilizar |
 | Cambios en SU repo | Endpoint C1 por cédula, rol técnico, rutas en `SecurityConfig`, cuerpos de error | Cliente HTTP nuevo (no tienen ninguno salvo el de Wompi) y una vista o un proceso que lo use | Publicador HTTP de eventos, reintentos y cola. Es lo que más esfuerzo les pide |
 | Cambios en el NUESTRO | Mergear y ajustar `HU19-ClienteMatricula` y conectar las reglas | Endpoint `/api/integracion/v1/...` más filtro de servicio | Receptor de webhook, idempotencia y el publicador del grado (el evento actual nunca se publica) |
-| Riesgos | R7 (dependencia externa), *cold start*, cambios en su contrato | Bajo valor: hoy no tienen vista de estudiante donde mostrarlo | Alto esfuerzo y fragilidad sin infraestructura de mensajería; difícil de probar en dos Render free |
+| Riesgos | R8 (dependencia externa), *cold start*, cambios en su contrato | Bajo valor: hoy no tienen vista de estudiante donde mostrarlo | Alto esfuerzo y fragilidad sin infraestructura de mensajería; difícil de probar en dos Render free |
 
 **Lectura.**
 - A cubre RF16 y HU-19 tal como están redactados.
@@ -405,7 +405,7 @@ Lo que ya implementa la rama:
 | N7 (aplazada) | Corregir el *login* de Google sin cédula (bloquea la llave de la integración) | Un usuario de Google sin cédula no queda con principal `null`: se le pide completar la cédula o no se le crea la cuenta |
 | N8 | TP-147: eliminar `DEMO_USERS` (`menuConfig.js:47`, `AuthContext.js:85`) en producción | Ninguna lectura de `DEMO_USERS` fuera del perfil dev |
 | N9 | TP-148: pruebas de integración con mock (`MockRestServiceServer`, que ya se usa) y contra su servicio real | Caminos feliz, 404, 401/403, *timeout*, *cold start* y respuesta inválida, con evidencia en el log |
-| N10 | Documentación: ADD, CU-05, SRS (unificar RNF06 / RNF-09) y riesgo R7 (resolver el choque con el riesgo de Wompi); TP-145 (EIF) | Secciones de la sección 9 actualizadas y enlazadas desde TP-144 |
+| N10 | Documentación: ADD, CU-05, requisitos (RNF-09) y riesgo R8; TP-145 (EIF). Hecho en `docs/integracion-matricula-documentacion.md` | Secciones de la sección 9 actualizadas y enlazadas desde TP-144 |
 | N11 (fase 2) | T1, el endpoint del estado del grado, con filtro de API key | Solo si Matrícula lo pide |
 | N12 (fase 2) | Inicio de sesión único con **token de paso**: Matrícula emite un token de 2 min, solo para Trámites, con la cédula y firmado con un secreto exclusivo; nuestro `POST /api/auth/matricula` lo verifica, busca al estudiante por cédula y entrega nuestro JWT | El botón «Ir a Trámites» deja al estudiante dentro sin volver a iniciar sesión. Ni su JWT principal ni su `app.jwt.secret` salen de Matrícula |
 
@@ -431,7 +431,9 @@ Lo que ya implementa la rama:
 4. **Créditos aprobados (preguntas 10 y 11):** no tienen dueño institucional; vienen precargados en nuestra BD (Opción 3). Los requeridos los define el superadmin de Matrícula al crear el programa. Se asume que **siempre** serán precargados: ni Matrícula ni Trámites manejan materias, notas ni pensum (en Matrícula, `pensum_id` siempre queda en null y «semestre» es el periodo de la cohorte). Por eso N3 no lleva el puerto `AvanceAcademicoProvider` y N4 se descarta: los créditos se actualizan directamente en la BD. La pregunta 1 de la sección 8 queda cerrada.
 5. **Autenticación (pregunta 3):** Matrícula autentica por rol + JWT, así que se usa la cuenta técnica `SERVICIO_TRAMITES` con su `/auth/login`. La API key se descarta.
 6. **Inicio de sesión único:** fuera de esta iteración; si se hace, con token de paso (N12). No se comparte su `app.jwt.secret`, que además firma los enlaces de confirmación de correo y de cambio de contraseña (`EmailConfirmationTokenService.java:25-26`, `PasswordResetTokenService.java:25-26`).
-7. **Producción de Matrícula:** la rama `render` (confirmado). Los PR van a `dev`.
+7. **Producción de Matrícula:** la rama `render` (confirmado). Nuestra rama `SC-03-integracion-tramites` se mantiene al día con `render`.
+8. **Numeración:** el requisito de interoperabilidad es **RNF-09** (RNF06 en Jira) y el riesgo de dependencia de Matrícula es **R8**, como en AD-CCA-07; R7 es el de las llaves de Wompi.
+9. **Documentos:** no hay EP3 ni SRS propios de Trámites; los requisitos viven en el informe final (Tabla 12) y en TP-143. El EP3 de la carpeta 4.3 es del grupo jurídico (auditoría).
 
 ---
 
@@ -466,7 +468,7 @@ Lo que ya implementa la rama:
 | Vista de componentes | Puerto `MatriculaClient` (o `MatriculaGateway`), adaptadores `http` y `mock`, `AvanceAcademicoProvider` y `AvanceAcademicoService`, y el límite de aislamiento de RNF06 |
 | Vista de despliegue | Dos servicios en Render free con BD separadas, variables `MATRICULA_*`, C2 como *health check* |
 | Atributos de calidad | Escenarios RNF06: disponibilidad (*cold start* de unos 50 s y respuesta en ≤ 15 s), seguridad (credencial solo en el backend), trazabilidad (log por llamada), modificabilidad (contrato versionado `/v1`) |
-| Riesgos | R7 (dependencia externa) con sus mitigaciones (mock, *snapshot*, contrato versionado). Riesgo nuevo: copia desactualizada de los créditos. Resolver el choque de numeración de R7 |
+| Riesgos | R8 (dependencia externa; R7 es el de Wompi) con sus mitigaciones (mock, *snapshot*, contrato versionado). Riesgo nuevo: copia desactualizada de los créditos |
 | Interfaces externas | Referencia a la sección 5 (contrato v1) |
 
 **CU-05 · Consultar la situación académica en el Módulo de Matrícula**
@@ -474,7 +476,7 @@ Lo que ya implementa la rama:
 | Campo | Contenido |
 |---|---|
 | Actores | Principal: sistema de Trámites. Proveedor: Módulo de Matrícula. Beneficiarios: el estudiante y el director de programa |
-| Trazabilidad | HU-19 (TP-140), RF16, RNF06, R7, SC-03 |
+| Trazabilidad | HU-19 (TP-140), RF16, RNF-09 (RNF06 en Jira), R8, SC-03 |
 | Precondiciones | Contrato v1 acordado. Credencial de servicio vigente. El estudiante ha iniciado sesión y tiene cédula |
 | Flujo normal | 1. El estudiante entra o inicia un trámite. 2. Trámites consulta C1 con su cédula. 3. Valida el contrato y actualiza el *snapshot*. 4. Obtiene los créditos aprobados con `AvanceAcademicoProvider`. 5. Evalúa: ACTIVO, legalizado y aprobados ≥ requeridos. 6. Habilita los trámites o explica la causa («Faltan N créditos») |
 | Flujos alternos | 404: no figura como legalizado. 401/403: *login* técnico otra vez una sola vez, y después indisponible más alerta de configuración. *Timeout*, 5xx o *cold start*: reintentos; con *snapshot* vigente se usa el *snapshot*, sin él se bloquea el inicio. Contrato inválido: se descarta y se registra. Créditos aprobados no registrados: bloquea con «Créditos aprobados no registrados; contacta a tu director». 422: programa sin créditos |
