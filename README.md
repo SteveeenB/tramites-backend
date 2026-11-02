@@ -678,13 +678,29 @@ git stash pop
 
 | Clase | Capa | Sprint | Cobertura |
 |---|---|---|---|
-| `TramitesApplicationTests` | Integración | S1 | Carga del contexto Spring Boot |
+| `TramitesApplicationTests` | Integración | S1 | Carga del contexto Spring Boot (H2 en memoria) |
 | `SolicitudRepositoryTest` | Repository | S1 | Consultas JPA sobre `Solicitud` (`@DataJpaTest` real) |
 | `AlertaDirectorServiceTest` | Service | S2 | Alertas por plazo vencido del Director (TP-44) |
 | `DecisionSolicitudServiceTest` | Service | S2 | Flujo completo de aprobación y rechazo (HU-04) |
-| `SolicitudServiceTerminacionTest` | Service | S2 | Reglas de terminación de materias en `SolicitudService` |
+| `SolicitudServiceTerminacionTest` | Service | S2 | Créditos, duplicados y máquina de estados de terminación de materias |
+| `SolicitudServiceGradoYRechazoTest` | Service | 2026-2 | Prerrequisitos de la solicitud de grado y rechazo con motivo y trazabilidad (TP-195) |
+| `SolicitudServiceHistorialTest` | Service | 2026-2 | Historial de cambios de estado y fecha de cierre (TP-201) |
+| `SolicitudServicePerteneceTest` | Service | 2026-2 | Pertenencia de la solicitud al estudiante, prevención de IDOR (TP-186) |
+| `CertificadoServiceTerminacionTest` | Service | 2026-2 | Certificado de terminación exige solicitud APROBADA (TP-189) |
+| `CertificadoServiceReintentoPdfTest` | Service | 2026-2 | Reintentos y fallo en la generación del PDF (TP-199) |
+| `VerificarCertificadoTest` | Service | 2026-2 | Verificación de códigos `UFPS-TM-…` y `UFPS-CERT-…` (TP-190) |
+| `DocumentoServiceValidacionTest` | Service | 2026-2 | Validación de extensión, MIME y firma del archivo subido (TP-191) |
+| `WompiServiceTest` | Service | 2026-2 | Webhook de Wompi: solo una firma válida cambia el pago y avanza la solicitud (TP-195) |
+| `AvanceAcademicoTest` | Service | 2026-2 | Bordes de la regla del 100 % de créditos (SC-03, RF16) |
+| `SincronizacionMatriculaServiceTest` | Service | 2026-2 | Copia del estudiante y contingencia ante caídas de Matrícula (SC-03, N5/N6) |
+| `MatriculaHttpClientTest` | Integración | 2026-2 | Adaptador HTTP de Matrícula contra servidor simulado (TP-146) |
+| `MatriculaMockClientTest` | Integración | 2026-2 | Cliente simulado de Matrícula (TP-146) |
+| `IntegracionMatriculaHttpTest` | Integración | 2026-2 | Cliente HTTP real con sockets y timeouts contra un Matrícula simulado (TP-148) |
 | `AuthControllerTest` | Controller | S3 | `/auth/login-demo` responde 404 con `demo.auth.enabled=false` |
 | `JwtAuthFilterTest` | Security | S3 | Token válido autentica; token inválido pasa sin autenticar |
+| `FechaUtilTest` | Util | 2026-2 | Cálculo de días hábiles para la liquidación (TP-193) |
+
+Las pruebas no necesitan MySQL ni variables de entorno: usan H2 en memoria o mocks, así que `./mvnw test` funciona en un clon limpio. GitHub Actions las ejecuta en cada push y PR (`.github/workflows/ci.yml`).
 
 <!-- FIX TP-195 (Kevin Arias, 07/10/2026): se retiran de este inventario
      CertificadoEndpointTest y CertificadoQRValidationTest porque no
@@ -707,7 +723,7 @@ Reporte HTML:
 
 | Servicio / Flujo | Notas |
 |---|---|
-| `WompiService` | Requiere mock del cliente HTTP de Wompi |
+| `WompiService` (creación de pagos) | El webhook ya está cubierto; falta `crearPago` / `consultarEstado` |
 | `NotificacionService` / `NotificacionSseService` | Mocking de SSE y jobs programados |
 | `PazYSalvoService` | Mocking de dependencias externas |
 | `ValidacionGradoService` | Validación de posgrados HU-09 |
