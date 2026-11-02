@@ -6,5 +6,4 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ProgramaAcademicoRepository extends JpaRepository<ProgramaAcademico, Long> {
     Optional<ProgramaAcademico> findByCodigo(String codigo);
-    Optional<ProgramaAcademico> findFirstByNombreIgnoreCase(String nombre);
 }

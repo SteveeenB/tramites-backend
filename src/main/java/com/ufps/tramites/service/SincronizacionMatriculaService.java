@@ -1,8 +1,10 @@
 package com.ufps.tramites.service;
 
+import java.text.Normalizer;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -211,17 +213,22 @@ public class SincronizacionMatriculaService {
     }
 
     /**
-     * Busca el programa por su código en Matrícula. Si aún no tiene código,
-     * lo adopta del programa con el mismo nombre (los del seed no lo traen).
-     * Los créditos requeridos los define Matrícula: si difieren, gana ella.
+     * Busca el programa por su código en Matrícula. Si ningún programa tiene
+     * ese código, lo adopta el programa sin código con el mismo nombre, sin
+     * distinguir tildes ni mayúsculas (Matrícula escribe «Maestria», nosotros
+     * «Maestría»).
+     * Los créditos requeridos son los de Trámites, que el PO carga con los
+     * valores reales de cada programa; si Matrícula reporta otros, solo se
+     * registra un aviso.
      */
     private Optional<ProgramaAcademico> resolverPrograma(SituacionAcademica s) {
         if (s.programaCodigo() == null || s.programaCodigo().isBlank()) {
             return Optional.empty();
         }
         Optional<ProgramaAcademico> encontrado = programaRepository.findByCodigo(s.programaCodigo())
-                .or(() -> programaRepository.findFirstByNombreIgnoreCase(s.programaNombre())
-                        .filter(p -> p.getCodigo() == null)
+                .or(() -> programaRepository.findAll().stream()
+                        .filter(p -> p.getCodigo() == null && mismoNombre(p.getNombre(), s.programaNombre()))
+                        .findFirst()
                         .map(p -> {
                             log.info("[MATRICULA] programa '{}' queda con codigo={}", p.getNombre(), s.programaCodigo());
                             p.setCodigo(s.programaCodigo());
@@ -234,11 +241,22 @@ public class SincronizacionMatriculaService {
         }
         ProgramaAcademico programa = encontrado.get();
         if (s.creditosRequeridos() > 0 && !Objects.equals(programa.getTotalCreditos(), s.creditosRequeridos())) {
-            log.warn("[MATRICULA] programa '{}': créditos requeridos {} → {} (los define Matrícula)",
-                    programa.getNombre(), programa.getTotalCreditos(), s.creditosRequeridos());
-            programa.setTotalCreditos(s.creditosRequeridos());
+            log.warn("[MATRICULA] programa '{}': Matrícula pide {} créditos y Trámites {}; se conservan los de Trámites",
+                    programa.getNombre(), s.creditosRequeridos(), programa.getTotalCreditos());
         }
         return Optional.of(programaRepository.save(programa));
+    }
+
+    static boolean mismoNombre(String a, String b) {
+        return a != null && b != null && normalizar(a).equals(normalizar(b));
+    }
+
+    private static String normalizar(String texto) {
+        return Normalizer.normalize(texto, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     private static Estudiante nuevoPerfil(Usuario usuario) {
