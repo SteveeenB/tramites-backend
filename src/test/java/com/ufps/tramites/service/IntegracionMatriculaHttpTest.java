@@ -148,7 +148,7 @@ class IntegracionMatriculaHttpTest {
         assertThat(perfil.getMatriculaSincronizadoEn()).isNotNull();
         assertThat(perfil.getPrograma()).isSameAs(programa);
         assertThat(programa.getCodigo()).isEqualTo("2203");
-        assertThat(programa.getTotalCreditos()).isEqualTo(48); // gana Matrícula
+        assertThat(programa.getTotalCreditos()).isEqualTo(56); // se conservan los de Trámites
         assertThat(perfil.getCreditosAprobados()).isEqualTo(56);
     }
 

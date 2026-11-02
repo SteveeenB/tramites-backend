@@ -142,7 +142,7 @@ class SincronizacionMatriculaServiceTest {
     }
 
     @Test
-    void encontrado_programaSinCodigo_loAdoptaPorNombreYGananLosCreditosDeMatricula() {
+    void encontrado_programaSinCodigo_loAdoptaPorNombreYConservaLosCreditosDeTramites() {
         perfilSincronizadoHace(null);
         when(matriculaClient.consultarSituacion(CEDULA))
                 .thenReturn(respuesta(Resultado.ENCONTRADO, situacion(CEDULA, 60)));
@@ -150,7 +150,7 @@ class SincronizacionMatriculaServiceTest {
         servicio(true).verificarParaIniciarTramite(usuario);
 
         assertThat(programa.getCodigo()).isEqualTo("2203");
-        assertThat(programa.getTotalCreditos()).isEqualTo(60);
+        assertThat(programa.getTotalCreditos()).isEqualTo(56);
         verify(programaRepository).save(programa);
     }
 
