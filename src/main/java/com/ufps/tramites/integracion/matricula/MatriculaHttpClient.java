@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -339,5 +340,21 @@ public class MatriculaHttpClient implements MatriculaClient {
         return (System.nanoTime() - t0) / 1_000_000;
     }
 
-    private record Respuesta(int status, byte[] cuerpo) {}
+    private record Respuesta(int status, byte[] cuerpo) {
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof Respuesta r && status == r.status && Arrays.equals(cuerpo, r.cuerpo);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Integer.hashCode(status) + Arrays.hashCode(cuerpo);
+        }
+
+        @Override
+        public String toString() {
+            return "Respuesta[status=" + status + ", bytes=" + (cuerpo == null ? 0 : cuerpo.length) + "]";
+        }
+    }
 }
