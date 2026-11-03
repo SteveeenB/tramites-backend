@@ -4,34 +4,50 @@
 
 ## Estado actual
 
-- **Código:** todo SC-03 está en `main` y `develop` (backend #48–#59, frontend #44). `develop` y `main` sincronizados (#60).
+- **Código:** todo SC-03 está en `main` y `develop` (backend #48–#61, frontend #44). `develop` y `main` sincronizados (#60).
 - **Copia de Matrícula en Render:** <https://posgrados-api-d4yv.onrender.com/posgrados-project>.
   - Base en Aiven, cargada con los scripts de `C:\AYD\copia-matricula-render\`, que quedan fuera de cualquier repo.
   - Rama `SC-03-integracion-tramites`.
   - Cuenta técnica `svc-tramites`.
-  - 4 estudiantes de prueba ficticios.
+  - Estudiantes: los 6 de nuestra base de producción, cargados con `7a` → `7b`. La cuenta de prueba `steven` recibió la cédula `9999999902` con el script `8`; si `7c` todavía la lista, falta cargarla con `7a` → `7b`.
 - **Base de producción de Trámites (Railway):** ya tiene las migraciones `migracion_sc03_snapshot_matricula.sql` y `migracion_sc03_codigos_programa.sql`.
-- **Render de Trámites:** configurado con `MATRICULA_MODO=http`, `MATRICULA_URL`, `MATRICULA_USUARIO` y `MATRICULA_PASSWORD`. **`MATRICULA_SINCRONIZAR` sigue en `false`**: la integración está apagada y producción se comporta como antes.
+- **Render de Trámites:** configurado con `MATRICULA_MODO=http`, `MATRICULA_URL`, `MATRICULA_USUARIO`, `MATRICULA_PASSWORD` y **`MATRICULA_SINCRONIZAR=true`**, desplegado el 2 nov 2026. Falta confirmarlo en los logs (punto 1).
 - **Pruebas:** la integración se probó de punta a punta por internet contra la copia en Render: login técnico, 200, 404 y 403, warm-up, bloqueo de un estudiante inexistente y conservación de nuestros créditos.
 
-## 1. Encender la sincronización (pendiente principal)
+## 1. Confirmar la sincronización en producción
 
-Con `MATRICULA_SINCRONIZAR=true`, Trámites consulta a Matrícula antes de crear una terminación, un grado o un certificado. **Un estudiante que no exista en la copia de Matrícula queda bloqueado** para iniciar trámites nuevos; los ya iniciados siguen su curso. Por eso, antes de encenderla:
+Con `MATRICULA_SINCRONIZAR=true`, Trámites consulta a Matrícula antes de crear una terminación, un grado o un certificado. Un estudiante que no exista en la copia de Matrícula queda bloqueado para iniciar trámites nuevos; los ya iniciados siguen su curso.
 
-1. **Cargar en la copia de Matrícula a los estudiantes reales** que vayan a hacer trámites. Opciones:
-   - **a)** Un script que los copie desde nuestra BD (tablas `estudiante` y `usuario`) a la tabla `estudiantes` de la copia, con cédula, nombres, código, correo y programa por código, en una cohorte y con estado `ACTIVO`.
-   - **b)** Pedirle al equipo de Matrícula sus estudiantes reales (solo los datos que usa la consulta C1).
-2. **Cambiar la contraseña de la cuenta técnica** si todavía es la que quedó en el chat del 2 nov. En Aiven:
+1. **Verificar en los logs de `tramites-backend` (Render):** al iniciar sesión un estudiante deben aparecer:
+   ```
+   [MATRICULA] GET /actuator/health status=200
+   [MATRICULA] POST /auth/login status=200
+   [MATRICULA] GET /api/application/case/integracion/v1/estudiantes/{cedula} cedula=... intento=1 status=200
+   ```
+2. **Cambiar la contraseña de la cuenta técnica**, si todavía es la que quedó en el chat del 2 nov. En Aiven:
    ```sql
    UPDATE clave c JOIN usuarios u ON u.id_clave = c.id
       SET c.valor = '<NUEVA>' WHERE u.nombreusuario = 'svc-tramites';
    ```
    Después, actualizar `MATRICULA_PASSWORD` en Render.
-3. Poner `MATRICULA_SINCRONIZAR=true` en el Render de Trámites.
-4. **Verificar en producción:**
-   - Un estudiante cargado inicia sesión y en el log aparece `[MATRICULA] GET /actuator/health`, `POST /auth/login` y la consulta C1 con 200.
-   - Un estudiante que no está en la copia recibe «El estudiante no aparece como admitido y legalizado en el Módulo de Matrícula» al iniciar un trámite.
-5. **Para apagarla** si algo falla: `MATRICULA_SINCRONIZAR=false`. No hace falta revertir nada más.
+3. **Estudiantes nuevos en Trámites:** cada estudiante que se cree en nuestra base debe existir también en la copia de Matrícula. Si no, queda bloqueado. Para agregarlos, vuelve a correr `7a` (Railway) → `7b` (Aiven); solo inserta los que faltan. `7c` dice quién no se puede cargar y por qué.
+4. **Para apagarla** si algo falla: `MATRICULA_SINCRONIZAR=false`. No hace falta revertir nada más.
+
+## 1b. Mantener despierta la copia de Matrícula (recomendado)
+
+La copia de Matrícula está en el plan gratuito de Render. Render la duerme a los 15 minutos sin uso, y **tarda unos 2 minutos en despertar**: el 2 nov se midieron 131 s. Nuestro cliente se rinde a los 15 s (RNF-09), así que, si Matrícula está dormida:
+- un estudiante con copia de menos de 24 h sigue normal;
+- un estudiante sin copia vigente (la primera vez o tras 24 h) ve «La validación académica no está disponible en este momento. Intenta más tarde». A los ~2 minutos ya le funciona, porque el login la despertó.
+
+**Solución:** un monitor gratuito que la mantenga despierta, por ejemplo [UptimeRobot](https://uptimerobot.com) o [cron-job.org](https://cron-job.org). Configúralo con una petición GET cada **10 minutos** a:
+```
+https://posgrados-api-d4yv.onrender.com/posgrados-project/actuator/health
+```
+Una respuesta 200 con `{"status":"UP"}` significa que está bien.
+
+**Costo en horas:** Render da 750 horas gratis al mes **por cuenta**, y un servicio despierto todo el mes gasta unas 730.
+- Si en esa cuenta solo está la copia de Matrícula, alcanza.
+- Si también está el backend de Trámites y se mantiene despierto, se pasa. En ese caso, programa el monitor solo en horario hábil (por ejemplo, lunes a viernes de 7:00 a 19:00), algo que cron-job.org permite.
 
 ## 2. Estilo visual del frontend (sesión aparte)
 
@@ -50,7 +66,7 @@ No hace falta migrar el build. El plan:
 
 - **Cerrar TP-147 y TP-148:** el trabajo está hecho y comentado. Los cierra el PO o los responsables, Bryan y Santiago.
 - **TP-145:** Diego revisa la propuesta de conteo IFPUG (EIF 5 PF + EI 4 PF = 9 PF), comentada en el issue.
-- **TP-144, TP-140 y TP-138:** cerrarlos cuando la sincronización esté encendida y verificada en producción (punto 1).
+- **TP-144, TP-140 y TP-138:** cerrarlos cuando la sincronización esté verificada en los logs de producción (punto 1).
 
 ## 4. Documentación
 
