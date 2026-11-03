@@ -51,6 +51,8 @@ Una respuesta 200 con `{"status":"UP"}` significa que está bien.
 
 ## 2. Estilo visual del frontend (sesión aparte)
 
+**Prompt listo para la sesión:** `tramites-frontend/docs/prompt-estilo-matricula.md` (frontend #46).
+
 Alinear el estilo de Trámites con el de Matrícula.
 - **Matrícula:** React 19 + Vite + Tailwind 4 + Heroicons (repo `matricula-frontend`, rama `prod`, `src/index.css`).
 - **Trámites:** Create React App + Tailwind 3.
