@@ -43,7 +43,7 @@ El backend gestiona los trámites académicos de posgrado de la UFPS: **terminac
 |---|---|---|
 | Framework | Java 17 + Spring Boot 4.x | Desplegado en Render (prod) |
 | Seguridad | Spring Security + JJWT | JWT Stateless, BCrypt, Google OAuth |
-| Base de Datos | MySQL | ORM: Hibernate / JPA — `ddl-auto: update`, dialecto: MySQLDialect |
+| Base de Datos | MySQL | ORM: Hibernate / JPA — dialecto MySQLDialect, `ddl-auto: validate`; esquema versionado con **Flyway** (`db/migration`, ver [docs/MIGRACIONES.md](docs/MIGRACIONES.md)) |
 | Almacenamiento | Supabase Storage | Bucket: `tramites-documentos` — almacenamiento de PDFs y archivos adjuntos |
 | Generación PDF | iText 7 (v7.2.5) | Actas de grado y certificados en PDF |
 | Códigos QR | ZXing (v3.5.2) | QR embebido en certificados para validación |
@@ -72,6 +72,7 @@ El backend gestiona los trámites académicos de posgrado de la UFPS: **terminac
 | `WOMPI_PUBLIC_KEY` | Llave pública de Wompi |
 | `WOMPI_PRIVATE_KEY` | Llave privada de Wompi |
 | `WOMPI_EVENTS_SECRET` | Secreto para verificar webhooks de Wompi |
+| `DDL_AUTO` | Opcional. Por defecto `validate`. Solo como salida de emergencia en un despliegue: `update` (ver [docs/MIGRACIONES.md](docs/MIGRACIONES.md)) |
 
 ---
 
@@ -239,6 +240,8 @@ El sistema migró de sesiones HTTP a autenticación **JWT Stateless** con Spring
 ---
 
 ## 4. Modelo de Datos
+
+> El esquema de la BD lo crea y evoluciona **Flyway** a partir de `src/main/resources/db/migration` (línea base: `V1__esquema_base.sql`). Cualquier cambio en una entidad debe ir acompañado de una migración nueva `V<n>__descripcion.sql`; ver [docs/MIGRACIONES.md](docs/MIGRACIONES.md).
 
 ### Usuario _(tabla: usuario)_ — Usuarios académicos
 

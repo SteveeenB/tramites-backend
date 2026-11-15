@@ -45,6 +45,17 @@
 			<artifactId>mysql-connector-j</artifactId>
 			<scope>runtime</scope>
 		</dependency>
+		<!-- Flyway — migraciones de esquema versionadas (TP-150 · SC02-T2).
+		     Reemplaza ddl-auto=update; los scripts viven en
+		     src/main/resources/db/migration. Versiones gestionadas por Spring Boot. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-flyway</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-mysql</artifactId>
+		</dependency>
 		<!-- H2 — base embebida solo para arranque local sin MySQL remoto
 		     (activar con spring.profiles.active=h2). No afecta prod. -->
 		<dependency>
