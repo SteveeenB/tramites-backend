@@ -1,0 +1,86 @@
+# TP-211 (SC02-T11): paquete de despliegue del Módulo de Trámites de Posgrado.
+# Guía completa en DEPLOY.md. Requiere Docker Compose 2.20 o superior.
+#
+#   docker compose --profile local up -d --build          # MySQL propio + backend + frontend
+#   docker compose --profile institucional up -d --build  # backend + frontend contra la BD de la UFPS (DB_URL)
+#
+# Sin --profile no se levanta ningún servicio.
+
+services:
+  # ── Solo perfil local: MySQL con la base compartida Trámites + Matrícula (TP-208) ──
+  mysql:
+    # Misma versión que el servidor compartido; confirmar con el ing. Matías (TP-149)
+    image: mysql:${MYSQL_VERSION:-8.4.11}
+    profiles: [local]
+    container_name: tramites-mysql
+    # Mismo charset, collation y sql_mode (ANSI) que el servidor de Matrícula (TP-208, sección 2)
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --sql-mode=REAL_AS_FLOAT,PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ONLY_FULL_GROUP_BY,ANSI,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+    # Solo las variables que necesita MySQL (no env_file: así no recibe JWT_SECRET,
+    # Supabase ni Wompi). Compose las toma de .env; si falta alguna, la imagen de
+    # MySQL o 02_usuario_tramites.sh fallan con un mensaje claro.
+    # No se usa MYSQL_USER: la imagen le daría permisos sobre TODA la base; el usuario
+    # de Trámites lo crea docker/mysql-init/02_usuario_tramites.sh solo sobre tp_*.
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-posgrados}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 01: esquema de Matrícula (si está en docker/mysql-init/matricula/) · 02: usuario de Trámites
+      - ./docker/mysql-init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "${MYSQL_PORT:-3307}:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  # ── Backend (Spring Boot). Flyway crea y evoluciona las tablas tp_* de Trámites ──
+  # En la base compartida FLYWAY_BASELINE_VERSION debe ser 0 (ver DEPLOY.md, sección 5)
+  backend:
+    build:
+      context: .
+    image: tramites-backend:${TAG:-latest}
+    profiles: [local, institucional]
+    container_name: tramites-backend
+    env_file: .env
+    environment:
+      PORT: 8080
+    depends_on:
+      mysql:
+        condition: service_healthy
+        # En el perfil institucional no hay servicio mysql: la BD llega por DB_URL
+        required: false
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    restart: unless-stopped
+
+  # ── Frontend (React + nginx sin root). Lee API_URL al arrancar ──
+  frontend:
+    build:
+      context: ${FRONTEND_DIR:-../tramites-frontend}
+      args:
+        REACT_APP_DEMO_MODE: ${REACT_APP_DEMO_MODE:-false}
+    image: tramites-frontend:${TAG:-latest}
+    profiles: [local, institucional]
+    container_name: tramites-frontend
+    environment:
+      # URL del backend tal como la ve el NAVEGADOR del usuario, no el contenedor
+      API_URL: ${API_URL:?Definir API_URL en .env}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "${FRONTEND_PORT:-8081}:8080"
+    restart: unless-stopped
+
+volumes:
+  mysql-data:

@@ -35,3 +35,11 @@ build/
 ### Configuración local con credenciales — no subir al repo ###
 src/main/resources/application-local.properties
 src/main/resources/application-prod.properties
+
+### Variables de entorno reales de docker-compose (TP-211) — no subir ###
+.env
+.env.*
+!.env.example
+
+### Esquema de Matrícula para el perfil local: lo entrega su equipo, no se versiona ###
+docker/mysql-init/matricula/*.sql
