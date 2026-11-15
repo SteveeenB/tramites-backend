@@ -146,11 +146,22 @@ public class SolicitudService {
     @Autowired
     private AvanceAcademicoService avanceAcademicoService;
 
+    private SincronizacionMatriculaService sincronizacionMatriculaService;
+
+    @Autowired
+    void setSincronizacionMatriculaService(SincronizacionMatriculaService sincronizacionMatriculaService) {
+        this.sincronizacionMatriculaService = sincronizacionMatriculaService;
+    }
+
     /**
      * Crea una solicitud de terminación de materias. Valida: período de
      * convocatoria, créditos aprobados y duplicados.
      */
     public Map<String, Object> crearSolicitudTerminacion(Usuario estudiante) {
+        // 0. Validar contra Matrícula o su copia vigente (SC-03, N6). Va antes
+        //    de los créditos porque puede actualizar los requeridos del programa.
+        sincronizacionMatriculaService.verificarParaIniciarTramite(estudiante);
+
         // 1. Validar créditos (requisito reglamentario, RF16)
         Estudiante perfilEstudiante = estudianteRepository.findByUsuario(estudiante).orElse(null);
         AvanceAcademico avance = avanceAcademicoService.calcular(estudiante, perfilEstudiante);
@@ -228,6 +239,9 @@ public class SolicitudService {
                     "Ya existe una solicitud de grado con estado: " + existente.get().getEstado()
             );
         }
+
+        // Validar contra Matrícula o su copia vigente (SC-03, N6)
+        sincronizacionMatriculaService.verificarParaIniciarTramite(estudiante);
 
         // 3. Crear y guardar la solicitud con los datos del proyecto
         //    (doble-write: cedula + FK Estudiante)

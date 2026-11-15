@@ -52,6 +52,12 @@ public class CertificadoService {
     @Autowired private CorreoConstanciaService correoService;
     @Autowired private SupabaseStorageService storage;
     @Autowired private NotificacionService notificacionService;
+    private SincronizacionMatriculaService sincronizacionMatriculaService;
+
+    @Autowired
+    void setSincronizacionMatriculaService(SincronizacionMatriculaService sincronizacionMatriculaService) {
+        this.sincronizacionMatriculaService = sincronizacionMatriculaService;
+    }
 
     // ── 1) SOLICITUD ──────────────────────────────────────────────────────────
 
@@ -94,6 +100,10 @@ public class CertificadoService {
                 + "solicitud de terminación en estado APROBADA."
             );
         }
+
+        // Validar contra Matrícula o su copia vigente (SC-03, N6), después de
+        // las reglas locales para no esperar a Matrícula si igual se rechaza.
+        sincronizacionMatriculaService.verificarParaIniciarTramite(estudiante);
 
         LocalDate hoy = LocalDate.now();
         double costo = tipo.precioTotal(modalidadEnvio);

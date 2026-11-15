@@ -10,6 +10,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "estudiante")
@@ -76,6 +77,17 @@ public class Estudiante {
 
     @Column(name = "pensum_id")
     private Long pensumId;
+
+    // Snapshot del Módulo de Matrícula (SC-03, N5/N6). estadoMatricula es el
+    // estado del estudiante allá (ACTIVO, ...); no reemplaza a
+    // estadoEstudiante, que decide Trámites (PAGO_GRADO_PENDIENTE, GRADUADO).
+    // matriculaSincronizadoEn marca la última consulta exitosa y define si
+    // la copia sigue vigente cuando Matrícula no responde.
+    @Column(name = "estado_matricula")
+    private String estadoMatricula;
+
+    @Column(name = "matricula_sincronizado_en")
+    private LocalDateTime matriculaSincronizadoEn;
 
     // FK a Usuario — igual que edu_virtual_ufps: Estudiante apunta a Usuario.
     // referencedColumnName = "id" es obligatorio porque la PK real de
@@ -158,6 +170,12 @@ public class Estudiante {
 
     public Long getPensumId() { return pensumId; }
     public void setPensumId(Long pensumId) { this.pensumId = pensumId; }
+
+    public String getEstadoMatricula() { return estadoMatricula; }
+    public void setEstadoMatricula(String estadoMatricula) { this.estadoMatricula = estadoMatricula; }
+
+    public LocalDateTime getMatriculaSincronizadoEn() { return matriculaSincronizadoEn; }
+    public void setMatriculaSincronizadoEn(LocalDateTime matriculaSincronizadoEn) { this.matriculaSincronizadoEn = matriculaSincronizadoEn; }
 
     public Usuario getUsuario() { return usuario; }
     public void setUsuario(Usuario usuario) { this.usuario = usuario; }

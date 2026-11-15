@@ -60,6 +60,25 @@ INSERT IGNORE INTO programa_academico (nombre, tipo, total_creditos) VALUES
 ('Especialización en Educación, Emprendimiento y Economía Solidaria',                                           'ESPECIALIZACION', 32),
 ('Especialización en Educación para la Atención a Población Afectada por el Conflicto Armado y en Problemática Fronteriza', 'ESPECIALIZACION', 28);
 
+-- Código de cada programa en el Módulo de Matrícula (SC-03). Es la llave con la
+-- que se mapea su respuesta; ver .docs/sql/migracion_sc03_codigos_programa.sql.
+UPDATE programa_academico SET codigo = '2301' WHERE nombre = 'Doctorado en Educación' AND codigo IS NULL;
+UPDATE programa_academico SET codigo = '2302' WHERE nombre = 'Doctorado en Educación Matemática' AND codigo IS NULL;
+UPDATE programa_academico SET codigo = '2203' WHERE nombre = 'Maestría en Gerencia de Empresas' AND codigo IS NULL;
+UPDATE programa_academico SET codigo = '2205' WHERE nombre = 'Maestría en Estudios Sociales y Educación Para la Paz' AND codigo IS NULL;
+UPDATE programa_academico SET codigo = '2206' WHERE nombre = 'Maestría en Ingeniería de Recursos Hidráulicos' AND codigo IS NULL;
+UPDATE programa_academico SET codigo = '2207' WHERE nombre = 'Maestría en Tecnologías de la Información y la Comunicación aplicadas a la Educación' AND codigo IS NULL;
+UPDATE programa_academico SET codigo = '2202' WHERE nombre = 'Maestría en Educación Matemáticas' AND codigo IS NULL;
+UPDATE programa_academico SET codigo = '2204' WHERE nombre = 'Maestría en Práctica Pedagógica' AND codigo IS NULL;
+UPDATE programa_academico SET codigo = '2201' WHERE nombre = 'Maestría en Ciencias Biológicas' AND codigo IS NULL;
+UPDATE programa_academico SET codigo = '2208' WHERE nombre = 'Maestría en Negocios Internacionales' AND codigo IS NULL;
+UPDATE programa_academico SET codigo = '2209' WHERE nombre = 'Maestría en Derecho Público: Gobierno, Justicia y Derechos Humanos' AND codigo IS NULL;
+UPDATE programa_academico SET codigo = '2105' WHERE nombre = 'Especialización en Práctica Pedagógica' AND codigo IS NULL;
+UPDATE programa_academico SET codigo = '2102' WHERE nombre = 'Especialización en Estructuras' AND codigo IS NULL;
+UPDATE programa_academico SET codigo = '2107' WHERE nombre = 'Especialización en Logística y Negocios Internacionales' AND codigo IS NULL;
+UPDATE programa_academico SET codigo = '2101' WHERE nombre = 'Especialización en Educación, Emprendimiento y Economía Solidaria' AND codigo IS NULL;
+UPDATE programa_academico SET codigo = '2106' WHERE nombre = 'Especialización en Educación para la Atención a Población Afectada por el Conflicto Armado y en Problemática Fronteriza' AND codigo IS NULL;
+
 INSERT IGNORE INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id, programa_id) VALUES
 -- Estudiante bloqueado: 40/56 créditos
 ('1098765432', '20261001', 'Juan Perez',     '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
