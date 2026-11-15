@@ -19,7 +19,7 @@ git grep -n -i "password=\|secret=\|key=" -- src
 
 Resultado del 15 nov 2026: sin valores reales. Las coincidencias son `${DB_PASSWORD}`, `${JWT_SECRET}`, `${SUPABASE_SERVICE_ROLE_KEY:}`, `${MAIL_PASSWORD:}`, `${WOMPI_*:}`, `${MATRICULA_PASSWORD:}`, el `?public-key=` que `WompiService` arma con la variable y los valores de prueba de H2.
 
-### Pendiente: credenciales que siguen en el historial
+### Credenciales antiguas del historial (rotadas en TP-170)
 
 El repositorio es público y su **historial de git** conserva credenciales que se escribieron en versiones antiguas de `application*.properties`, antes de pasarlas a variables de entorno:
 
@@ -27,7 +27,7 @@ El repositorio es público y su **historial de git** conserva credenciales que s
 - dos contraseñas de aplicación de Gmail (`spring.mail.password`);
 - la *service-role key* de Supabase.
 
-Borrarlas del código no las borra del historial. La acción correcta es **rotarlas**, no reescribir el historial: regenerar la service-role key en Supabase (y actualizar `SUPABASE_SERVICE_ROLE_KEY` en Render), revocar esas contraseñas de aplicación de Gmail y cambiar la contraseña de la base Postgres si todavía existe. Lo hacen los dueños de cada cuenta.
+Borrarlas del código no las borra del historial, por eso se **rotaron** en TP-170 en lugar de reescribir el historial: los valores que aparecen ahí ya no son válidos. Si alguna vez se vuelve a versionar una credencial por error, el procedimiento es el mismo: rotarla con el dueño de la cuenta y actualizar la variable de entorno donde se despliega.
 
 ## 2. Tamaño del pool (HikariCP)
 
@@ -78,4 +78,4 @@ Si se levantan **dos réplicas** del backend, el pool se multiplica por dos: hay
 
 Obligatorias: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET` (32 caracteres o más), `CORS_ORIGIN`, `FRONTEND_URL`; en producción también `MATRICULA_MODO=http`, `MATRICULA_URL`, `MATRICULA_USUARIO`, `MATRICULA_PASSWORD`, `MATRICULA_SINCRONIZAR`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` y las cuatro `WOMPI_*`.
 
-Opcionales, con su valor por defecto: `PORT` (8080), `SPRING_PROFILES_ACTIVE` (`local`; nunca `dev` en producción), `DB_POOL_SIZE` (10), `DB_POOL_MIN_IDLE` (2), `DDL_AUTO` (`validate`, cuando Flyway esté en `develop`), `SHOW_SQL` (false), `SUPABASE_BUCKET` (`tramites-documentos`), `WOMPI_REDIRECT_URL`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_TIMEOUT_MS` (5000), `GOOGLE_CLIENT_ID`, `MATRICULA_TIMEOUT_CONEXION_MS` (2000), `MATRICULA_TIMEOUT_RESPUESTA_MS` (5000), `MATRICULA_MAX_REINTENTOS` (2), `MATRICULA_PRESUPUESTO_MS` (15000), `MATRICULA_SNAPSHOT_VIGENCIA_HORAS` (24).
+Opcionales, con su valor por defecto: `PORT` (8080), `SPRING_PROFILES_ACTIVE` (`local`; nunca `dev` en producción), `DB_POOL_SIZE` (10), `DB_POOL_MIN_IDLE` (2), `DDL_AUTO` (`validate`; el esquema lo gestiona Flyway), `SHOW_SQL` (false), `SUPABASE_BUCKET` (`tramites-documentos`), `WOMPI_REDIRECT_URL`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_TIMEOUT_MS` (5000), `GOOGLE_CLIENT_ID`, `MATRICULA_TIMEOUT_CONEXION_MS` (2000), `MATRICULA_TIMEOUT_RESPUESTA_MS` (5000), `MATRICULA_MAX_REINTENTOS` (2), `MATRICULA_PRESUPUESTO_MS` (15000), `MATRICULA_SNAPSHOT_VIGENCIA_HORAS` (24).
