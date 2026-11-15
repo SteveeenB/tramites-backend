@@ -23,7 +23,9 @@ RUN groupadd --system --gid 10001 tramites \
     && useradd --system --uid 10001 --gid tramites --no-create-home --shell /usr/sbin/nologin tramites
 
 WORKDIR /app
-COPY --from=build --chown=root:root --chmod=0444 /app/target/*.jar app.jar
+# Sin --chmod para no depender de BuildKit: el JAR queda de root con 0644,
+# legible pero no modificable por el usuario tramites.
+COPY --from=build --chown=root:root /app/target/*.jar app.jar
 
 USER tramites
 
