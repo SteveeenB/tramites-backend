@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -36,6 +37,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/solicitudes/verificar").permitAll()
                 .requestMatchers("/api/pagos/webhook").permitAll()
+                // TP-154 (Santiago Cepeda, 15/11/2026): health check del contenedor
+                .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
                 // FIX TP-186 (Santiago Cepeda, 07/10/2026): /subscribe y /stream
                 // ya no son públicos. La autenticación llega vía JwtAuthFilter
                 // leyendo también el query param "token=" porque EventSource no
