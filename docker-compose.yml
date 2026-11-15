@@ -18,10 +18,16 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_0900_ai_ci
       - --sql-mode=REAL_AS_FLOAT,PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ONLY_FULL_GROUP_BY,ANSI,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
-    # MYSQL_ROOT_PASSWORD, MYSQL_DATABASE, DB_USERNAME y DB_PASSWORD llegan de .env.
+    # Solo las variables que necesita MySQL (no env_file: así no recibe JWT_SECRET,
+    # Supabase ni Wompi). Compose las toma de .env; si falta alguna, la imagen de
+    # MySQL o 02_usuario_tramites.sh fallan con un mensaje claro.
     # No se usa MYSQL_USER: la imagen le daría permisos sobre TODA la base; el usuario
     # de Trámites lo crea docker/mysql-init/02_usuario_tramites.sh solo sobre tp_*.
-    env_file: .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-posgrados}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
     volumes:
       - mysql-data:/var/lib/mysql
       # 01: esquema de Matrícula (si está en docker/mysql-init/matricula/) · 02: usuario de Trámites
