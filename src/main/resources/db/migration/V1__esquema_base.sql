@@ -5,7 +5,7 @@
 -- ddl-auto=update a partir de las entidades de com.ufps.tramites.model.
 --
 -- * BD nueva (vacía): Flyway ejecuta este script y crea todo el esquema.
--- * BD existente (Railway): Flyway NO lo ejecuta; con baseline-on-migrate la
+-- * BD existente (Aiven, antes Railway): Flyway NO lo ejecuta; con baseline-on-migrate la
 --   marca como versión 1 y desde ahí aplica solo las migraciones V2, V3, ...
 --
 -- Reglas a partir de ahora:
@@ -33,11 +33,15 @@ create table estados_estudiantes (
 
 create table programa_academico (
     id             bigint       not null auto_increment,
+    -- Código del programa en Matrícula (SC-03). Mismo tipo que
+    -- .docs/sql/migracion_sc03_snapshot_matricula.sql.
+    codigo         varchar(50),
     nombre         varchar(255),
     tipo           varchar(255),
     total_creditos integer,
     primary key (id),
-    constraint uq_programa_academico_nombre unique (nombre)
+    constraint uq_programa_academico_nombre unique (nombre),
+    constraint uk_programa_academico_codigo unique (codigo)
 ) engine=InnoDB;
 
 create table dependencias (
@@ -151,6 +155,9 @@ create table estudiante (
     cohorte_id           bigint,
     pensum_id            bigint,
     usuario_id           bigint,
+    -- Copia del estado de matrícula traída desde Matrícula (SC-03).
+    estado_matricula          varchar(50),
+    matricula_sincronizado_en datetime(6),
     primary key (id),
     constraint uq_estudiante_usuario unique (usuario_id)
 ) engine=InnoDB;
