@@ -1,0 +1,22 @@
+# TP-154: solo pom.xml y src/ entran a la imagen. Nada de credenciales locales,
+# historial de git ni compilados de la máquina.
+target/
+.git/
+.github/
+.mvn/
+mvnw
+mvnw.cmd
+.idea/
+.vscode/
+*.iml
+.env
+.env.*
+!.env.example
+docs/
+.docs/
+docker/
+*.md
+
+# Propiedades con credenciales (también están en .gitignore)
+src/main/resources/application-local.properties
+src/main/resources/application-prod.properties
