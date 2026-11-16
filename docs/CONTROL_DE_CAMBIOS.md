@@ -33,16 +33,15 @@
 
 | Nombre | Rol en el CCB | GitHub |
 |---|---|---|
-| Johan Steven Bueno Rojas | Product Owner, preside el CCB | `SteveeenB` |
-| Kevin Arias | Desarrollador | `kevindavidav` |
+| Johan Steven Bueno Rojas | Product Owner, único miembro del CCB | `SteveeenB` |
 
-- Una decisión es válida con la aprobación de **los dos** miembros. Si uno es autor del cambio, el otro revisa y aprueba el PR; la aprobación de ese PR en GitHub cuenta como su voto.
-- Si un miembro no puede asistir, la decisión queda pendiente hasta la siguiente reunión, salvo un cambio de emergencia (ver más abajo).
+- El CCB lo integra solo el Product Owner, que decide sobre los cambios de la tabla "Qué aprueba el CCB".
+- La decisión del CCB no reemplaza la revisión del PR. Todo PR sigue necesitando **1 aprobación de alguien distinto del autor** (regla 2). Si el PO es el autor, por ejemplo en el PR de `develop` a `main`, la aprobación la da cualquier desarrollador del equipo como revisor.
 
 **Reuniones**
 
 - **Ordinaria:** una vez por semana, para revisar las solicitudes de cambio abiertas y lo que va a pasar de `develop` a `main`.
-- **Extraordinaria:** cuando haya un cambio urgente (falla en producción, seguridad, entrega con fecha). La convoca cualquier miembro por el canal del equipo.
+- **Extraordinaria:** cuando haya un cambio urgente (falla en producción, seguridad, entrega con fecha). La convoca el PO, por iniciativa propia o a pedido de cualquier desarrollador, por el canal del equipo.
 - Cada reunión deja un acta en `docs/actas/ACTA_CCB_<AAAA-MM-DD>.md`, con las decisiones y las claves de Jira y PR.
 
 **Qué aprueba el CCB**
@@ -55,7 +54,7 @@
 | Cambios de infraestructura, despliegue, CI, seguridad o de esta política (incluida la protección de ramas) | |
 | Cambios de alcance: historias nuevas o modificadas fuera del sprint planeado | |
 
-**Cambio de emergencia:** se puede fusionar con la aprobación de un solo miembro y el CI en verde, siempre por PR. Se ratifica en la siguiente reunión y queda en el acta.
+**Cambio de emergencia:** el PO lo autoriza sin esperar la reunión. Entra siempre por PR, con el CI en verde, y queda en el acta de la siguiente reunión.
 
 ## 4. Historial anterior a la política
 
