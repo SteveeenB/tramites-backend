@@ -38,8 +38,10 @@ Por qué el baseline es configurable: con `baseline-version=1` fijo, una base co
 
 Errores al elegir el valor:
 
-- `1` en una base compartida: V1 se salta, V2 no encuentra las 17 tablas viejas y no hace nada, y Hibernate falla con `Schema-validation: missing table [tp_...]`. No se toca ningún dato. Se corrige poniendo `0`, borrando la fila de baseline de `tp_flyway_schema_history` y volviendo a arrancar.
-- `0` en Aiven: V1 crea tablas `tp_*` vacías y V2 falla con `Table 'tp_roles' already exists`. Los datos siguen en las tablas sin prefijo. Se corrige con un respaldo, borrando las tablas `tp_*` vacías y `tp_flyway_schema_history`, poniendo `1` y volviendo a arrancar.
+- `1` en una base compartida: V1 se salta, V2 no encuentra las 17 tablas viejas y no hace nada, y Hibernate falla con `Schema-validation: missing table [tp_...]`. No se toca ningún dato. Se corrige poniendo `0`, borrando la tabla `tp_flyway_schema_history` completa (no basta con la fila de baseline: V2 también quedó registrada como aplicada) y volviendo a arrancar.
+- `0` en Aiven: V1 crea tablas `tp_*` vacías y la migración falla, en V1 con `Duplicate foreign key constraint name 'fk_...'` (si las llaves foráneas existentes tienen los nombres de V1) o en V2 con `Table 'tp_roles' already exists`. Los datos siguen en las tablas sin prefijo. Se corrige con un respaldo, borrando las tablas `tp_*` vacías y `tp_flyway_schema_history`, poniendo `1` y volviendo a arrancar.
+
+Estos cuatro casos (base vacía o compartida con `0`, Aiven con `1` y los dos valores equivocados), y la recuperación del segundo, se probaron en TP-209 sobre MySQL 8.0.44 con el `sql_mode` ANSI del servidor compartido y el esquema de Matrícula cargado.
 
 Si Aiven ya tenía una tabla `flyway_schema_history` (sin prefijo) de un despliegue anterior, queda huérfana: Flyway ya no la usa y se puede borrar después de verificar el arranque.
 
