@@ -16,7 +16,7 @@
 Archivos:
 
 - `src/main/resources/db/migration/V1__esquema_base.sql`: línea base (17 tablas `tp_*`, índices y llaves foráneas).
-- `src/main/resources/db/migration/V2__prefijo_tp_tablas_tramites.sql`: renombra a `tp_*` las tablas sin prefijo de la BD actual de Aiven (TP-209).
+- `src/main/resources/db/migration/V2__prefijo_tp_tablas_tramites.sql`: renombra a `tp_*` las tablas sin prefijo de la BD actual de Trámites en Railway (TP-209).
 - `application.properties`: configuración `spring.flyway.*` (historial en `tp_flyway_schema_history`, baseline con `FLYWAY_BASELINE_VERSION`) y `ddl-auto=${DDL_AUTO:validate}`.
 - `application-h2.properties` y las pruebas: Flyway desactivado (ver más abajo).
 - `pom.xml`: `spring-boot-starter-flyway` y `flyway-mysql`.
@@ -29,21 +29,22 @@ Desde TP-209 la base se comparte con el Módulo de Matrícula (acuerdo TP-208, `
 |---|---|---|
 | **BD vacía** (local, staging, BD nueva) | `0` (por defecto) | Ejecuta `V1` (crea las tablas `tp_*`) y `V2` (no hace nada). Hibernate valida. |
 | **BD compartida con Matrícula** (institucional, perfil `local` del compose) | `0` (por defecto) | La base ya tiene tablas de Matrícula, así que Flyway la considera "no vacía" y hace *baseline*. Con `0`, el baseline queda **por debajo** de V1 y se ejecutan `V1` y `V2` igual que en una BD vacía. No toca ninguna tabla de Matrícula. |
-| **BD actual de Trámites en Aiven** (tablas sin prefijo, con datos, sin `tp_flyway_schema_history`) | `1` | Crea `tp_flyway_schema_history` y marca la versión 1 **sin ejecutar V1**. `V2` renombra las 17 tablas a `tp_*` en un solo `RENAME TABLE`, conservando datos, índices y llaves foráneas. |
+| **BD actual de Trámites en Railway** (tablas sin prefijo, con datos, sin `tp_flyway_schema_history`) | `1` | Crea `tp_flyway_schema_history` y marca la versión 1 **sin ejecutar V1**. `V2` renombra las 17 tablas a `tp_*` en un solo `RENAME TABLE`, conservando datos, índices y llaves foráneas. |
+| **BD de Matrícula en Aiven con las tablas `tp_*` ya creadas** por el DDL entregado (`docs/entrega-matricula/02_ddl_tablas_tramites.sql`, copia de V1), vacías y sin `tp_flyway_schema_history` | `1` | Crea `tp_flyway_schema_history` y marca la versión 1 **sin ejecutar V1**, porque las tablas ya existen. `V2` no hace nada: en esa base solo está el `roles` de Matrícula, no las 17 tablas sin prefijo. Hibernate valida contra las tablas de V1. |
 | **Perfil `h2` y pruebas** | — | Flyway desactivado. Hibernate crea el esquema `tp_*` (`create-drop`) y `data.sql` siembra los datos demo. |
 
 > Los scripts están escritos para MySQL. Por eso no se ejecutan sobre H2.
 
-Por qué el baseline es configurable: con `baseline-version=1` fijo, una base compartida (que ya tiene las tablas de Matrícula) se marcaría como versión 1 y **V1 nunca crearía nuestras tablas**. Al revés, en Aiven V1 no debe correr porque las tablas ya existen.
+Por qué el baseline es configurable: con `baseline-version=1` fijo, una base compartida (que ya tiene las tablas de Matrícula) se marcaría como versión 1 y **V1 nunca crearía nuestras tablas**. Al revés, en Railway V1 no debe correr porque las tablas ya existen.
 
 Errores al elegir el valor:
 
 - `1` en una base compartida: V1 se salta, V2 no encuentra las 17 tablas viejas y no hace nada, y Hibernate falla con `Schema-validation: missing table [tp_...]`. No se toca ningún dato. Se corrige poniendo `0`, borrando la tabla `tp_flyway_schema_history` completa (no basta con la fila de baseline: V2 también quedó registrada como aplicada) y volviendo a arrancar.
-- `0` en Aiven: V1 crea tablas `tp_*` vacías y la migración falla, en V1 con `Duplicate foreign key constraint name 'fk_...'` (si las llaves foráneas existentes tienen los nombres de V1) o en V2 con `Table 'tp_roles' already exists`. Los datos siguen en las tablas sin prefijo. Se corrige con un respaldo, borrando las tablas `tp_*` vacías y `tp_flyway_schema_history`, poniendo `1` y volviendo a arrancar.
+- `0` en Railway: V1 crea tablas `tp_*` vacías y la migración falla, en V1 con `Duplicate foreign key constraint name 'fk_...'` (si las llaves foráneas existentes tienen los nombres de V1) o en V2 con `Table 'tp_roles' already exists`. Los datos siguen en las tablas sin prefijo. Se corrige con un respaldo, borrando las tablas `tp_*` vacías y `tp_flyway_schema_history`, poniendo `1` y volviendo a arrancar.
 
-Estos cuatro casos (base vacía o compartida con `0`, Aiven con `1` y los dos valores equivocados), y la recuperación del segundo, se probaron en TP-209 sobre MySQL 8.0.44 con el `sql_mode` ANSI del servidor compartido y el esquema de Matrícula cargado.
+Estos cuatro casos (base vacía o compartida con `0`, Railway con `1` y los dos valores equivocados), y la recuperación del segundo, se probaron en TP-209 sobre MySQL 8.0.44 con el `sql_mode` ANSI del servidor compartido y el esquema de Matrícula cargado.
 
-Si Aiven ya tenía una tabla `flyway_schema_history` (sin prefijo) de un despliegue anterior, queda huérfana: Flyway ya no la usa y se puede borrar después de verificar el arranque.
+Si Railway ya tenía una tabla `flyway_schema_history` (sin prefijo) de un despliegue anterior, queda huérfana: Flyway ya no la usa y se puede borrar después de verificar el arranque.
 
 V2 solo renombra si existen **las 17** tablas sin prefijo. En la base compartida Matrícula tiene su propia `roles`, pero es una sola, así que V2 nunca la toca.
 
@@ -63,7 +64,7 @@ Reglas:
 ## Verificación recomendada antes de desplegar
 
 1. **BD vacía o compartida.** Con `docker compose --profile local up` y un volumen limpio (`down -v`), o con una base temporal en el mismo MySQL, con `FLYWAY_BASELINE_VERSION=0`. En el log deben aparecer `Migrating schema ... to version "1 - esquema base"` y `... to version "2 - prefijo tp tablas tramites"`, y la app debe levantar sin errores de `validate`. `SHOW TABLES` lista las `tp_*` junto a las de Matrícula.
-2. **Renombrado sobre la BD de Aiven.** Hacer un respaldo (`mysqldump`) y arrancar con `FLYWAY_BASELINE_VERSION=1`. En el log deben aparecer `Successfully baselined schema with version: 1` y `Migrating schema ... to version "2 - prefijo tp tablas tramites"`. Después, `SHOW TABLES` lista solo las `tp_*` de Trámites, con los mismos conteos de filas que antes.
+2. **Renombrado sobre la BD de Railway.** Hacer un respaldo (`mysqldump`) y arrancar con `FLYWAY_BASELINE_VERSION=1`. En el log deben aparecer `Successfully baselined schema with version: 1` y `Migrating schema ... to version "2 - prefijo tp tablas tramites"`. Después, `SHOW TABLES` lista solo las `tp_*` de Trámites, con los mismos conteos de filas que antes.
 
 ## Salida de emergencia
 
