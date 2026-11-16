@@ -4,9 +4,16 @@
 -- Reproduce el esquema que hasta ahora generaba Hibernate con
 -- ddl-auto=update a partir de las entidades de com.ufps.tramites.model.
 --
--- * BD nueva (vacía): Flyway ejecuta este script y crea todo el esquema.
--- * BD existente (Aiven, antes Railway): Flyway NO lo ejecuta; con baseline-on-migrate la
---   marca como versión 1 y desde ahí aplica solo las migraciones V2, V3, ...
+-- TP-209: las 17 tablas llevan el prefijo tp_ para convivir en la misma base
+-- con el Módulo de Matrícula (acuerdo TP-208, docs/BD_COMPARTIDA_MATRICULA.md).
+-- Este archivo se ajustó antes de que algún entorno persistente lo ejecutara
+-- (en Aiven siempre se ha saltado con baseline). Los nombres de restricciones
+-- e índices no cambian: no chocan con los de Matrícula (TP-208, sección 4.2).
+--
+-- * BD nueva o compartida con Matrícula (FLYWAY_BASELINE_VERSION=0): Flyway
+--   ejecuta este script y crea las tablas tp_*. Ver docs/MIGRACIONES.md.
+-- * BD actual de Trámites en Aiven (FLYWAY_BASELINE_VERSION=1): Flyway NO lo
+--   ejecuta; la marca como versión 1 y aplica solo V2 (renombra a tp_*).
 --
 -- Reglas a partir de ahora:
 -- 1. Nunca editar este archivo ni una migración ya aplicada.
@@ -18,20 +25,20 @@
 
 -- ── Catálogos ───────────────────────────────────────────────────────────────
 
-create table roles (
+create table tp_roles (
     id     bigint       not null,
     nombre varchar(255),
     primary key (id)
 ) engine=InnoDB;
 
-create table estados_estudiantes (
+create table tp_estados_estudiantes (
     id     bigint       not null auto_increment,
     nombre varchar(255) not null,
     primary key (id),
     constraint uq_estados_estudiantes_nombre unique (nombre)
 ) engine=InnoDB;
 
-create table programa_academico (
+create table tp_programa_academico (
     id             bigint       not null auto_increment,
     -- Código del programa en Matrícula (SC-03). Mismo tipo que
     -- .docs/sql/migracion_sc03_snapshot_matricula.sql.
@@ -44,7 +51,7 @@ create table programa_academico (
     constraint uk_programa_academico_codigo unique (codigo)
 ) engine=InnoDB;
 
-create table dependencias (
+create table tp_dependencias (
     id          bigint       not null auto_increment,
     nombre      varchar(255),
     descripcion varchar(255),
@@ -53,7 +60,7 @@ create table dependencias (
     constraint uq_dependencias_nombre unique (nombre)
 ) engine=InnoDB;
 
-create table tipos_solicitud (
+create table tp_tipos_solicitud (
     id     bigint       not null auto_increment,
     codigo varchar(255) not null,
     nombre varchar(255),
@@ -63,7 +70,7 @@ create table tipos_solicitud (
     constraint uq_tipos_solicitud_codigo unique (codigo)
 ) engine=InnoDB;
 
-create table tipo_certificado (
+create table tp_tipo_certificado (
     id                     bigint       not null auto_increment,
     codigo                 varchar(255),
     label                  varchar(255),
@@ -78,7 +85,7 @@ create table tipo_certificado (
     constraint uq_tipo_certificado_codigo unique (codigo)
 ) engine=InnoDB;
 
-create table fechas_grado (
+create table tp_fechas_grado (
     id        bigint       not null auto_increment,
     fecha     date         not null,
     modalidad varchar(255) not null,
@@ -91,7 +98,7 @@ create table fechas_grado (
 
 -- ── Personas ────────────────────────────────────────────────────────────────
 
-create table usuario (
+create table tp_usuario (
     id              bigint       not null auto_increment,
     cedula          varchar(255),
     codigo          varchar(255),
@@ -112,7 +119,7 @@ create table usuario (
     constraint uq_usuario_codigo unique (codigo)
 ) engine=InnoDB;
 
-create table admins (
+create table tp_admins (
     id               bigint       not null auto_increment,
     codigo           varchar(255),
     primer_nombre    varchar(255),
@@ -132,7 +139,7 @@ create table admins (
     constraint uq_admins_email unique (email)
 ) engine=InnoDB;
 
-create table estudiante (
+create table tp_estudiante (
     id                   bigint       not null auto_increment,
     nombre               varchar(255),
     nombre2              varchar(255),
@@ -164,7 +171,7 @@ create table estudiante (
 
 -- ── Trámites ────────────────────────────────────────────────────────────────
 
-create table solicitud (
+create table tp_solicitud (
     id                       bigint       not null auto_increment,
     estudiante_id            bigint,
     cedula                   varchar(255),
@@ -196,7 +203,7 @@ create table solicitud (
     constraint uq_solicitud_radicado unique (radicado)
 ) engine=InnoDB;
 
-create table historial_estado_solicitud (
+create table tp_historial_estado_solicitud (
     id                  bigint       not null auto_increment,
     solicitud_id        bigint       not null,
     estado_anterior     varchar(255),
@@ -207,10 +214,10 @@ create table historial_estado_solicitud (
     primary key (id)
 ) engine=InnoDB;
 
-create index idx_hes_solicitud_id on historial_estado_solicitud (solicitud_id);
-create index idx_hes_fecha        on historial_estado_solicitud (fecha);
+create index idx_hes_solicitud_id on tp_historial_estado_solicitud (solicitud_id);
+create index idx_hes_fecha        on tp_historial_estado_solicitud (fecha);
 
-create table documento_solicitud (
+create table tp_documento_solicitud (
     id                bigint       not null auto_increment,
     solicitud_id      bigint,
     tipo              varchar(255),
@@ -222,7 +229,7 @@ create table documento_solicitud (
     primary key (id)
 ) engine=InnoDB;
 
-create table pagos (
+create table tp_pagos (
     id                   bigint       not null auto_increment,
     referencia           varchar(255) not null,
     solicitud_id         bigint       not null,
@@ -238,7 +245,7 @@ create table pagos (
     constraint uq_pagos_referencia unique (referencia)
 ) engine=InnoDB;
 
-create table paz_y_salvo (
+create table tp_paz_y_salvo (
     id                     bigint       not null auto_increment,
     solicitud_id           bigint,
     estudiante_id          bigint,
@@ -254,7 +261,7 @@ create table paz_y_salvo (
     primary key (id)
 ) engine=InnoDB;
 
-create table solicitud_certificado (
+create table tp_solicitud_certificado (
     id                     bigint       not null auto_increment,
     estudiante_id          bigint,
     cedula                 varchar(255),
@@ -274,7 +281,7 @@ create table solicitud_certificado (
     primary key (id)
 ) engine=InnoDB;
 
-create table notificaciones (
+create table tp_notificaciones (
     id                  bigint       not null auto_increment,
     destinatario_cedula varchar(255) not null,
     tipo                varchar(255) not null,
@@ -288,27 +295,27 @@ create table notificaciones (
 
 -- ── Llaves foráneas (las mismas relaciones @ManyToOne / @OneToOne) ───────────
 
-alter table usuario
-    add constraint fk_usuario_rol      foreign key (rol_id)      references roles (id),
-    add constraint fk_usuario_programa foreign key (programa_id) references programa_academico (id);
+alter table tp_usuario
+    add constraint fk_usuario_rol      foreign key (rol_id)      references tp_roles (id),
+    add constraint fk_usuario_programa foreign key (programa_id) references tp_programa_academico (id);
 
-alter table admins
-    add constraint fk_admins_dependencia foreign key (dependencia_id) references dependencias (id);
+alter table tp_admins
+    add constraint fk_admins_dependencia foreign key (dependencia_id) references tp_dependencias (id);
 
-alter table estudiante
-    add constraint fk_estudiante_estado   foreign key (estado_estudiante_id) references estados_estudiantes (id),
-    add constraint fk_estudiante_programa foreign key (programa_id)          references programa_academico (id),
-    add constraint fk_estudiante_usuario  foreign key (usuario_id)           references usuario (id);
+alter table tp_estudiante
+    add constraint fk_estudiante_estado   foreign key (estado_estudiante_id) references tp_estados_estudiantes (id),
+    add constraint fk_estudiante_programa foreign key (programa_id)          references tp_programa_academico (id),
+    add constraint fk_estudiante_usuario  foreign key (usuario_id)           references tp_usuario (id);
 
-alter table solicitud
-    add constraint fk_solicitud_estudiante     foreign key (estudiante_id)      references estudiante (id),
-    add constraint fk_solicitud_posgrados_admin foreign key (posgrados_admin_id) references admins (id);
+alter table tp_solicitud
+    add constraint fk_solicitud_estudiante     foreign key (estudiante_id)      references tp_estudiante (id),
+    add constraint fk_solicitud_posgrados_admin foreign key (posgrados_admin_id) references tp_admins (id);
 
-alter table paz_y_salvo
-    add constraint fk_pys_estudiante          foreign key (estudiante_id)          references estudiante (id),
-    add constraint fk_pys_responsable_admin   foreign key (responsable_admin_id)   references admins (id),
-    add constraint fk_pys_responsable_usuario foreign key (responsable_usuario_id) references usuario (id),
-    add constraint fk_pys_dependencia         foreign key (dependencia_id)         references dependencias (id);
+alter table tp_paz_y_salvo
+    add constraint fk_pys_estudiante          foreign key (estudiante_id)          references tp_estudiante (id),
+    add constraint fk_pys_responsable_admin   foreign key (responsable_admin_id)   references tp_admins (id),
+    add constraint fk_pys_responsable_usuario foreign key (responsable_usuario_id) references tp_usuario (id),
+    add constraint fk_pys_dependencia         foreign key (dependencia_id)         references tp_dependencias (id);
 
-alter table solicitud_certificado
-    add constraint fk_solcert_estudiante foreign key (estudiante_id) references estudiante (id);
+alter table tp_solicitud_certificado
+    add constraint fk_solcert_estudiante foreign key (estudiante_id) references tp_estudiante (id);

@@ -13,7 +13,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "estudiante")
+@Table(name = "tp_estudiante")
 public class Estudiante {
 
     @Id

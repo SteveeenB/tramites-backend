@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "notificaciones")
+@Table(name = "tp_notificaciones")
 @Getter
 @Setter
 @NoArgsConstructor

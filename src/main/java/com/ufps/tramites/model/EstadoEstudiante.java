@@ -20,7 +20,7 @@ import jakarta.persistence.Table;
  *   - GRADUADO
  */
 @Entity
-@Table(name = "estados_estudiantes")
+@Table(name = "tp_estados_estudiantes")
 public class EstadoEstudiante {
 
     @Id
