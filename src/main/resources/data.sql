@@ -8,12 +8,12 @@
 SET NAMES utf8mb4;
 
 -- Corregir contraseñas en texto plano dejadas por runs anteriores
-UPDATE usuario
+UPDATE tp_usuario
 SET contrasena = '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq'
 WHERE contrasena = '123456';
 
 -- ── Roles (deben existir antes que los usuarios) ─────────────────
-INSERT IGNORE INTO roles (id, nombre) VALUES
+INSERT IGNORE INTO tp_roles (id, nombre) VALUES
   (1, 'ESTUDIANTE'),
   (2, 'DIRECTOR'),
   (3, 'ADMIN'),
@@ -25,21 +25,21 @@ INSERT IGNORE INTO roles (id, nombre) VALUES
 -- data.sql nunca lo sembró y arrancar la app contra una BD limpia dejaba
 -- la tabla vacía (hallazgo I_integridad). Sintaxis compatible con MySQL
 -- y con H2 en MODE=MySQL (INSERT IGNORE respeta el UNIQUE(nombre)).
-INSERT IGNORE INTO estados_estudiantes (id, nombre) VALUES
+INSERT IGNORE INTO tp_estados_estudiantes (id, nombre) VALUES
   (1, 'ACTIVO'),
   (2, 'PAGO_GRADO_PENDIENTE'),
   (3, 'GRADUADO');
 
 -- Limpiar duplicados de programa_academico antes de insertar
 -- (puede ocurrir si el primer arranque falló antes de aplicar la constraint única)
-DELETE FROM programa_academico
+DELETE FROM tp_programa_academico
 WHERE id NOT IN (
     SELECT min_id FROM (
-        SELECT MIN(id) AS min_id FROM programa_academico GROUP BY nombre
+        SELECT MIN(id) AS min_id FROM tp_programa_academico GROUP BY nombre
     ) AS t
 );
 
-INSERT IGNORE INTO programa_academico (nombre, tipo, total_creditos) VALUES
+INSERT IGNORE INTO tp_programa_academico (nombre, tipo, total_creditos) VALUES
 -- Doctorados
 ('Doctorado en Educación',                                                                                      'DOCTORADO',       80),
 ('Doctorado en Educación Matemática',                                                                           'DOCTORADO',       90),
@@ -62,53 +62,53 @@ INSERT IGNORE INTO programa_academico (nombre, tipo, total_creditos) VALUES
 
 -- Código de cada programa en el Módulo de Matrícula (SC-03). Es la llave con la
 -- que se mapea su respuesta; ver .docs/sql/migracion_sc03_codigos_programa.sql.
-UPDATE programa_academico SET codigo = '2301' WHERE nombre = 'Doctorado en Educación' AND codigo IS NULL;
-UPDATE programa_academico SET codigo = '2302' WHERE nombre = 'Doctorado en Educación Matemática' AND codigo IS NULL;
-UPDATE programa_academico SET codigo = '2203' WHERE nombre = 'Maestría en Gerencia de Empresas' AND codigo IS NULL;
-UPDATE programa_academico SET codigo = '2205' WHERE nombre = 'Maestría en Estudios Sociales y Educación Para la Paz' AND codigo IS NULL;
-UPDATE programa_academico SET codigo = '2206' WHERE nombre = 'Maestría en Ingeniería de Recursos Hidráulicos' AND codigo IS NULL;
-UPDATE programa_academico SET codigo = '2207' WHERE nombre = 'Maestría en Tecnologías de la Información y la Comunicación aplicadas a la Educación' AND codigo IS NULL;
-UPDATE programa_academico SET codigo = '2202' WHERE nombre = 'Maestría en Educación Matemáticas' AND codigo IS NULL;
-UPDATE programa_academico SET codigo = '2204' WHERE nombre = 'Maestría en Práctica Pedagógica' AND codigo IS NULL;
-UPDATE programa_academico SET codigo = '2201' WHERE nombre = 'Maestría en Ciencias Biológicas' AND codigo IS NULL;
-UPDATE programa_academico SET codigo = '2208' WHERE nombre = 'Maestría en Negocios Internacionales' AND codigo IS NULL;
-UPDATE programa_academico SET codigo = '2209' WHERE nombre = 'Maestría en Derecho Público: Gobierno, Justicia y Derechos Humanos' AND codigo IS NULL;
-UPDATE programa_academico SET codigo = '2105' WHERE nombre = 'Especialización en Práctica Pedagógica' AND codigo IS NULL;
-UPDATE programa_academico SET codigo = '2102' WHERE nombre = 'Especialización en Estructuras' AND codigo IS NULL;
-UPDATE programa_academico SET codigo = '2107' WHERE nombre = 'Especialización en Logística y Negocios Internacionales' AND codigo IS NULL;
-UPDATE programa_academico SET codigo = '2101' WHERE nombre = 'Especialización en Educación, Emprendimiento y Economía Solidaria' AND codigo IS NULL;
-UPDATE programa_academico SET codigo = '2106' WHERE nombre = 'Especialización en Educación para la Atención a Población Afectada por el Conflicto Armado y en Problemática Fronteriza' AND codigo IS NULL;
+UPDATE tp_programa_academico SET codigo = '2301' WHERE nombre = 'Doctorado en Educación' AND codigo IS NULL;
+UPDATE tp_programa_academico SET codigo = '2302' WHERE nombre = 'Doctorado en Educación Matemática' AND codigo IS NULL;
+UPDATE tp_programa_academico SET codigo = '2203' WHERE nombre = 'Maestría en Gerencia de Empresas' AND codigo IS NULL;
+UPDATE tp_programa_academico SET codigo = '2205' WHERE nombre = 'Maestría en Estudios Sociales y Educación Para la Paz' AND codigo IS NULL;
+UPDATE tp_programa_academico SET codigo = '2206' WHERE nombre = 'Maestría en Ingeniería de Recursos Hidráulicos' AND codigo IS NULL;
+UPDATE tp_programa_academico SET codigo = '2207' WHERE nombre = 'Maestría en Tecnologías de la Información y la Comunicación aplicadas a la Educación' AND codigo IS NULL;
+UPDATE tp_programa_academico SET codigo = '2202' WHERE nombre = 'Maestría en Educación Matemáticas' AND codigo IS NULL;
+UPDATE tp_programa_academico SET codigo = '2204' WHERE nombre = 'Maestría en Práctica Pedagógica' AND codigo IS NULL;
+UPDATE tp_programa_academico SET codigo = '2201' WHERE nombre = 'Maestría en Ciencias Biológicas' AND codigo IS NULL;
+UPDATE tp_programa_academico SET codigo = '2208' WHERE nombre = 'Maestría en Negocios Internacionales' AND codigo IS NULL;
+UPDATE tp_programa_academico SET codigo = '2209' WHERE nombre = 'Maestría en Derecho Público: Gobierno, Justicia y Derechos Humanos' AND codigo IS NULL;
+UPDATE tp_programa_academico SET codigo = '2105' WHERE nombre = 'Especialización en Práctica Pedagógica' AND codigo IS NULL;
+UPDATE tp_programa_academico SET codigo = '2102' WHERE nombre = 'Especialización en Estructuras' AND codigo IS NULL;
+UPDATE tp_programa_academico SET codigo = '2107' WHERE nombre = 'Especialización en Logística y Negocios Internacionales' AND codigo IS NULL;
+UPDATE tp_programa_academico SET codigo = '2101' WHERE nombre = 'Especialización en Educación, Emprendimiento y Economía Solidaria' AND codigo IS NULL;
+UPDATE tp_programa_academico SET codigo = '2106' WHERE nombre = 'Especialización en Educación para la Atención a Población Afectada por el Conflicto Armado y en Problemática Fronteriza' AND codigo IS NULL;
 
-INSERT IGNORE INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id, programa_id) VALUES
+INSERT IGNORE INTO tp_usuario (cedula, codigo, nombre_completo, contrasena, rol_id, programa_id) VALUES
 -- Estudiante bloqueado: 40/56 créditos
 ('1098765432', '20261001', 'Juan Perez',     '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
-    (SELECT id FROM roles WHERE nombre = 'ESTUDIANTE' LIMIT 1),
-    (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1)),
+    (SELECT id FROM tp_roles WHERE nombre = 'ESTUDIANTE' LIMIT 1),
+    (SELECT id FROM tp_programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1)),
 -- Estudiante habilitado: 56/56 créditos
 ('1098765435', '20261005', 'Laura Gomez',    '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
-    (SELECT id FROM roles WHERE nombre = 'ESTUDIANTE' LIMIT 1),
-    (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1)),
+    (SELECT id FROM tp_roles WHERE nombre = 'ESTUDIANTE' LIMIT 1),
+    (SELECT id FROM tp_programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1)),
 -- Estudiante demo: solicitud pendiente de pago
 ('1098765436', '20261006', 'Pedro Martinez', '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
-    (SELECT id FROM roles WHERE nombre = 'ESTUDIANTE' LIMIT 1),
-    (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1)),
+    (SELECT id FROM tp_roles WHERE nombre = 'ESTUDIANTE' LIMIT 1),
+    (SELECT id FROM tp_programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1)),
 -- Estudiante demo: solicitud rechazada
 ('1098765437', '20261007', 'Carlos Rueda',   '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
-    (SELECT id FROM roles WHERE nombre = 'ESTUDIANTE' LIMIT 1),
-    (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1)),
+    (SELECT id FROM tp_roles WHERE nombre = 'ESTUDIANTE' LIMIT 1),
+    (SELECT id FROM tp_programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1)),
 -- Director del mismo programa
 ('1098765433', '20261002', 'Maria Director', '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
-    (SELECT id FROM roles WHERE nombre = 'DIRECTOR' LIMIT 1),
-    (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1)),
+    (SELECT id FROM tp_roles WHERE nombre = 'DIRECTOR' LIMIT 1),
+    (SELECT id FROM tp_programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1)),
 -- Coordinador de Posgrados
 ('1098765434', '20261003', 'Coordinador Posgrados', '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
-    (SELECT id FROM roles WHERE nombre = 'POSGRADOS' LIMIT 1),
-    (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1));
+    (SELECT id FROM tp_roles WHERE nombre = 'POSGRADOS' LIMIT 1),
+    (SELECT id FROM tp_programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1));
 
 -- Asignar correo de prueba al director de Maestría en Gerencia de Empresas
-UPDATE usuario SET email = 'maria.director@example.com' WHERE cedula = '1098765433';
+UPDATE tp_usuario SET email = 'maria.director@example.com' WHERE cedula = '1098765433';
 
-INSERT IGNORE INTO solicitud (cedula, tipo, estado, fecha_solicitud, costo, observaciones) VALUES
+INSERT IGNORE INTO tp_solicitud (cedula, tipo, estado, fecha_solicitud, costo, observaciones) VALUES
 ('1098765435', 'TERMINACION_MATERIAS', 'APROBADA',       '2026-04-10', 150000, 'Aprobada por el director.'),
 ('1098765436', 'TERMINACION_MATERIAS', 'PENDIENTE_PAGO', '2026-04-12', 150000, 'En espera de pago.'),
 ('1098765437', 'TERMINACION_MATERIAS', 'RECHAZADA',      '2026-04-08', 150000, 'No cumple requisitos adicionales del programa.');
@@ -117,7 +117,7 @@ INSERT IGNORE INTO solicitud (cedula, tipo, estado, fecha_solicitud, costo, obse
 -- Catálogo de Dependencias
 -- ============================================================
 
-INSERT IGNORE INTO dependencias (nombre, descripcion, activa) VALUES
+INSERT IGNORE INTO tp_dependencias (nombre, descripcion, activa) VALUES
 ('Biblioteca',  'Biblioteca Central UFPS',                 true),
 ('Financiera',  'División Financiera UFPS',                true),
 ('Admisiones',  'Registro y Control Académico',            true),
@@ -127,16 +127,16 @@ INSERT IGNORE INTO dependencias (nombre, descripcion, activa) VALUES
 -- Usuarios para el proceso de Paz y Salvo
 -- ============================================================
 
-INSERT IGNORE INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id, email, programa_id) VALUES
+INSERT IGNORE INTO tp_usuario (cedula, codigo, nombre_completo, contrasena, rol_id, email, programa_id) VALUES
 ('2000000001', 'DIR001', 'Carlos Director Grado', '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
-    (SELECT id FROM roles WHERE nombre = 'DIRECTOR' LIMIT 1),
+    (SELECT id FROM tp_roles WHERE nombre = 'DIRECTOR' LIMIT 1),
     'director.posgrado@test.com',
-    (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1));
+    (SELECT id FROM tp_programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1));
 
 -- ============================================================
--- Admins — viven en `admins` (BCrypt de "123456")
+-- Admins — viven en `tp_admins` (BCrypt de "123456")
 -- ============================================================
-INSERT IGNORE INTO admins (codigo, nombre_completo, email, password, tipo, es_super_admin, dependencia_id)
+INSERT IGNORE INTO tp_admins (codigo, nombre_completo, email, password, tipo, es_super_admin, dependencia_id)
 VALUES
   ('ADMIN1', 'Administrador',         'admin@test.com',
       '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
@@ -146,37 +146,37 @@ VALUES
       'POSGRADOS',   false, NULL),
   ('DEP001', 'Biblioteca Central',    'biblioteca@test.com',
       '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
-      'DEPENDENCIA', false, (SELECT id FROM dependencias WHERE nombre = 'Biblioteca' LIMIT 1)),
+      'DEPENDENCIA', false, (SELECT id FROM tp_dependencias WHERE nombre = 'Biblioteca' LIMIT 1)),
   ('DEP002', 'División Financiera',   'financiera@test.com',
       '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
-      'DEPENDENCIA', false, (SELECT id FROM dependencias WHERE nombre = 'Financiera' LIMIT 1)),
+      'DEPENDENCIA', false, (SELECT id FROM tp_dependencias WHERE nombre = 'Financiera' LIMIT 1)),
   ('DEP003', 'Admisiones y Registro', 'admisiones@test.com',
       '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
-      'DEPENDENCIA', false, (SELECT id FROM dependencias WHERE nombre = 'Admisiones' LIMIT 1));
+      'DEPENDENCIA', false, (SELECT id FROM tp_dependencias WHERE nombre = 'Admisiones' LIMIT 1));
 
 -- FIX RN-04 (Diego Bermudez, 06/09/2026): se retira usuario de prueba personal steven/steven del seed
 
 -- Estudiante con créditos completos y terminación aprobada
-INSERT IGNORE INTO usuario (cedula, codigo, nombre_completo, contrasena, rol_id, email, programa_id) VALUES
+INSERT IGNORE INTO tp_usuario (cedula, codigo, nombre_completo, contrasena, rol_id, email, programa_id) VALUES
 ('2000000010', 'EST010', 'Andrea Prueba Grado', '$2a$10$TCpV633Sg7xBIMP/VpL80uQw9YHjSPvk5iFmk6aFs.yxQwVq5eSBq',
-    (SELECT id FROM roles WHERE nombre = 'ESTUDIANTE' LIMIT 1),
+    (SELECT id FROM tp_roles WHERE nombre = 'ESTUDIANTE' LIMIT 1),
     'andrea.grado@test.com',
-    (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1));
+    (SELECT id FROM tp_programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1));
 
-INSERT IGNORE INTO solicitud (cedula, tipo, estado, fecha_solicitud, costo, observaciones) VALUES
+INSERT IGNORE INTO tp_solicitud (cedula, tipo, estado, fecha_solicitud, costo, observaciones) VALUES
 ('2000000010', 'TERMINACION_MATERIAS', 'APROBADA', '2026-04-15', 150000, 'Aprobada por el director.');
 
 -- ── Tipos de certificado ──────────────────────────────────────────────
 -- precio_digital      = precio base del documento
 -- costo_logistica_fisica = delta adicional cuando se elige modalidad física (impresión + sello + manejo)
 
-INSERT IGNORE INTO tipo_certificado (codigo, label, descripcion, precio_digital, costo_logistica_fisica,
+INSERT IGNORE INTO tp_tipo_certificado (codigo, label, descripcion, precio_digital, costo_logistica_fisica,
                                      tiempo_entrega_dias, activo)
 VALUES ('TERMINACION_MATERIAS', 'CERTIFICADO DE TERMINACIÓN DE MATERIAS',
         'Certificado oficial que acredita la culminación satisfactoria de todos los requisitos académicos del programa de posgrado.',
         150000, 0, 1, true);
 
-INSERT INTO tipo_certificado (codigo, label, descripcion, precio_digital, costo_logistica_fisica,
+INSERT INTO tp_tipo_certificado (codigo, label, descripcion, precio_digital, costo_logistica_fisica,
                               direccion_oficina, tiempo_entrega_dias, activo) VALUES
 ('CONSTANCIA_REGISTRO_CALIFICADO', 'CONSTANCIA REGISTRO CALIFICADO DE UN PROGRAMA ACADEMICO',
     'Constancia oficial del registro calificado vigente del programa académico de posgrado.',
@@ -196,7 +196,7 @@ ON DUPLICATE KEY UPDATE
     tiempo_entrega_dias    = VALUES(tiempo_entrega_dias);
 
 -- ── Costos configurables de solicitudes ──────────────────────────────
-INSERT IGNORE INTO tipos_solicitud (codigo, nombre, costo, activo) VALUES
+INSERT IGNORE INTO tp_tipos_solicitud (codigo, nombre, costo, activo) VALUES
 ('TERMINACION_MATERIAS', 'Terminación de Materias', 150000, true),
 ('GRADO', 'Solicitud de Grado', 250000, true);
 
@@ -204,28 +204,28 @@ INSERT IGNORE INTO tipos_solicitud (codigo, nombre, costo, activo) VALUES
 -- Perfiles de Estudiante (después de usuario por el FK usuario_id)
 -- ============================================================
 
-INSERT IGNORE INTO estudiante (nombre, apellido, cedula, codigo, email, es_posgrado, migrado,
+INSERT IGNORE INTO tp_estudiante (nombre, apellido, cedula, codigo, email, es_posgrado, migrado,
     creditos_aprobados, programa_id, usuario_id)
 VALUES
     ('Juan',   'Perez',    '1098765432', '20261001', 'juan.perez@example.com',        true, false, 40,
-     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1),
-     (SELECT id FROM usuario WHERE cedula = '1098765432' LIMIT 1)),
+     (SELECT id FROM tp_programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1),
+     (SELECT id FROM tp_usuario WHERE cedula = '1098765432' LIMIT 1)),
     ('Laura',  'Gomez',    '1098765435', '20261005', 'laura@example.com',     true, false, 56,
-     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1),
-     (SELECT id FROM usuario WHERE cedula = '1098765435' LIMIT 1)),
+     (SELECT id FROM tp_programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1),
+     (SELECT id FROM tp_usuario WHERE cedula = '1098765435' LIMIT 1)),
     ('Pedro',  'Martinez', '1098765436', '20261006', 'pedro@example.com',     true, false, 56,
-     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1),
-     (SELECT id FROM usuario WHERE cedula = '1098765436' LIMIT 1)),
+     (SELECT id FROM tp_programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1),
+     (SELECT id FROM tp_usuario WHERE cedula = '1098765436' LIMIT 1)),
     ('Carlos', 'Rueda',    '1098765437', '20261007', 'carlos@example.com',    true, false, 56,
-     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1),
-     (SELECT id FROM usuario WHERE cedula = '1098765437' LIMIT 1)),
+     (SELECT id FROM tp_programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1),
+     (SELECT id FROM tp_usuario WHERE cedula = '1098765437' LIMIT 1)),
     ('Andrea', 'Prueba',   '2000000010', 'EST010',   'andrea.grado@test.com', true, false, 56,
-     (SELECT id FROM programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1),
-     (SELECT id FROM usuario WHERE cedula = '2000000010' LIMIT 1));
+     (SELECT id FROM tp_programa_academico WHERE nombre = 'Maestría en Gerencia de Empresas' LIMIT 1),
+     (SELECT id FROM tp_usuario WHERE cedula = '2000000010' LIMIT 1));
      -- FIX RN-04 (Diego Bermudez, 06/09/2026): se retira usuario de prueba personal steven/steven del seed
 
 -- ── Fechas de grado de ejemplo (solo local/H2; en producción las publica Posgrados) ──
-INSERT IGNORE INTO fechas_grado (fecha, modalidad, hora, lugar, activa) VALUES
+INSERT IGNORE INTO tp_fechas_grado (fecha, modalidad, hora, lugar, activa) VALUES
 ('2026-11-04', 'SECRETARIA', '8:00 AM',  'Secretaría de Posgrados', true),
 ('2026-11-13', 'CEREMONIA',  '9:00 AM',  'Auditorio Principal UFPS', true),
 ('2026-11-18', 'SECRETARIA', '8:00 AM',  'Secretaría de Posgrados', true),
@@ -237,7 +237,7 @@ INSERT IGNORE INTO fechas_grado (fecha, modalidad, hora, lugar, activa) VALUES
 -- Los seeds de admins usan INSERT IGNORE, así que no corrigen filas ya existentes.
 -- Evita que el sistema envíe correos reales (Posgrados, Biblioteca, admin) desde
 -- entornos de prueba: las cuentas semilla deben apuntar a direcciones @test.com.
-UPDATE admins SET email = 'admin@test.com'      WHERE codigo = 'ADMIN1' AND email <> 'admin@test.com';
-UPDATE admins SET email = 'posgrados@test.com'  WHERE codigo = 'POS001' AND email <> 'posgrados@test.com';
-UPDATE admins SET email = 'biblioteca@test.com' WHERE codigo = 'DEP001' AND email <> 'biblioteca@test.com';
-UPDATE estudiante SET email = 'juan.perez@example.com' WHERE cedula = '1098765432' AND email <> 'juan.perez@example.com';
+UPDATE tp_admins SET email = 'admin@test.com'      WHERE codigo = 'ADMIN1' AND email <> 'admin@test.com';
+UPDATE tp_admins SET email = 'posgrados@test.com'  WHERE codigo = 'POS001' AND email <> 'posgrados@test.com';
+UPDATE tp_admins SET email = 'biblioteca@test.com' WHERE codigo = 'DEP001' AND email <> 'biblioteca@test.com';
+UPDATE tp_estudiante SET email = 'juan.perez@example.com' WHERE cedula = '1098765432' AND email <> 'juan.perez@example.com';

@@ -122,10 +122,17 @@ docker compose --profile local down -v               # detener y BORRAR el MySQL
 ## 5. Esquema de base de datos (Flyway)
 
 - Las tablas `tp_*` de Trámites las crea y evoluciona **Flyway** al arrancar el backend, con los scripts de `src/main/resources/db/migration`. Hibernate no altera tablas: solo valida (`DDL_AUTO=validate`).
+- Migraciones actuales: `V1` crea las 17 tablas `tp_*`; `V2` renombra a `tp_*` las tablas sin prefijo **solo si existen las 17** (la base de Aiven). En cualquier otra base no hace nada. Nunca renombra el `roles` de Matrícula.
 - **`FLYWAY_BASELINE_VERSION` según la base:**
-  - **Base compartida** (institucional o perfil local): `0`. La base ya tiene las tablas de Matrícula y Flyway la considera "no vacía". Con `0`, de todos modos ejecuta V1 y crea las tablas `tp_*`.
-  - **Base actual de Trámites** (Aiven, tablas sin prefijo y con datos): `1`, para no repetir V1 y aplicar solo las migraciones siguientes.
-  - Si se olvida el `0` en la base compartida, el backend **falla al arrancar** en la validación, sin tocar ningún dato.
+
+  | Base | Valor | Qué corre |
+  |---|---|---|
+  | Nueva (vacía) | `0` (por defecto) | V1 crea las tablas `tp_*`; V2 no hace nada |
+  | Compartida con Matrícula (institucional o perfil local) | `0` (por defecto) | Igual. La base ya tiene las tablas de Matrícula y Flyway la considera "no vacía": con `0`, de todos modos ejecuta V1 |
+  | Actual de Trámites (Aiven, tablas sin prefijo y con datos) | `1` | Se salta V1; V2 renombra las 17 tablas a `tp_*` conservando los datos |
+
+  - Si se pone `1` en la base compartida, el backend **falla al arrancar** en la validación (`missing table [tp_...]`), sin tocar ningún dato.
+  - Si se pone `0` en la base de Aiven, V1 crea tablas `tp_*` vacías y la migración falla: en V1 (`Duplicate foreign key constraint name 'fk_...'`, si las llaves foráneas existentes tienen los mismos nombres) o en V2 (`Table 'tp_roles' already exists`). El backend no arranca y los datos siguen en las tablas sin prefijo (sección 9).
 - El historial queda en la tabla `tp_flyway_schema_history`. Ninguna migración de Trámites crea, altera ni borra tablas del Módulo de Matrícula.
 - En los logs, el aviso `Using MySQL 8.4 which is newer than the version Flyway has been verified with` es informativo: V1 se probó sobre MySQL 8.4 y funciona.
 - Si el backend no arranca por un error de validación del esquema, se puede arrancar una vez con `DDL_AUTO=update` y avisar al equipo de Trámites para que escriba la migración. No debe quedarse así.
@@ -149,7 +156,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES
 -- … una línea igual por cada tabla tp_*
 ```
 
-El script completo para el servidor institucional es `docs/sql/permisos_usuario_tramites.sql`; lo agrega TP-209 junto con el prefijo `tp_`. El perfil local aplica los mismos permisos en `docker/mysql-init/02_usuario_tramites.sh`, que sirve de referencia con la lista de tablas. Cada tabla nueva de una migración futura necesita su línea en los dos.
+El script completo para el servidor institucional es `docs/sql/permisos_usuario_tramites.sql` (TP-209): se reemplazan la base y la contraseña y se ejecuta con un usuario administrador. El perfil local aplica los mismos permisos en `docker/mysql-init/02_usuario_tramites.sh`, que sirve de referencia con la lista de tablas. Cada tabla nueva de una migración futura necesita su línea en los dos.
 
 ## 7. Verificación
 
@@ -176,7 +183,8 @@ curl http://localhost:8080/api/health
 |---|---|---|
 | El backend se reinicia con `Could not resolve placeholder 'JWT_SECRET'` | Falta `JWT_SECRET` en `.env` | Definirla (32 caracteres o más) |
 | `Communications link failure` al arrancar | `DB_URL` incorrecta o MySQL inaccesible desde el contenedor | Revisar host y puerto. Dentro del compose local el host es `mysql`, no `localhost` |
-| `Schema-validation: missing table [tp_...]` en la base compartida | Falta `FLYWAY_BASELINE_VERSION=0`: Flyway hizo *baseline* y no creó las tablas `tp_*` | Poner `FLYWAY_BASELINE_VERSION=0`, borrar la fila de baseline de `tp_flyway_schema_history` y volver a arrancar |
+| `Schema-validation: missing table [tp_...]` en la base compartida | Falta `FLYWAY_BASELINE_VERSION=0`: Flyway hizo *baseline* y no creó las tablas `tp_*` | Poner `FLYWAY_BASELINE_VERSION=0`, borrar la tabla `tp_flyway_schema_history` completa (queda con el baseline y con V2 marcada como aplicada) y volver a arrancar |
+| `Duplicate foreign key constraint name 'fk_...'` en V1 o `Table 'tp_roles' already exists` en V2, contra la base de Aiven | Se arrancó con `FLYWAY_BASELINE_VERSION=0`: V1 creó tablas `tp_*` vacías junto a las que tienen los datos | Hacer respaldo, borrar las 17 tablas `tp_*` vacías y `tp_flyway_schema_history`, poner `FLYWAY_BASELINE_VERSION=1` y volver a arrancar |
 | `Schema-validation: missing table` en otra situación | Esquema desalineado con las entidades | Revisar `tp_flyway_schema_history`; emergencia: `DDL_AUTO=update` una vez |
 | `SELECT command denied` o `CREATE command denied` sobre una tabla `tp_*` | Al usuario de Trámites le falta el permiso de esa tabla | Agregar su línea `GRANT` (sección 6) |
 | El navegador muestra errores de CORS | `CORS_ORIGIN` no coincide con la URL del frontend | Usar exactamente la URL pública del frontend, sin `/` al final |

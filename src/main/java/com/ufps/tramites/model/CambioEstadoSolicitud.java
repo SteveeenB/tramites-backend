@@ -18,7 +18,7 @@ import jakarta.persistence.Table;
 // (CP-046).
 @Entity
 @Table(
-    name = "historial_estado_solicitud",
+    name = "tp_historial_estado_solicitud",
     indexes = {
         @Index(name = "idx_hes_solicitud_id", columnList = "solicitud_id"),
         @Index(name = "idx_hes_fecha",        columnList = "fecha")
