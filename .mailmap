@@ -1,0 +1,24 @@
+# .mailmap — identidades de Git normalizadas (TP-172 · AUD-06)
+# Una persona = un nombre y un correo. Lo usan git shortlog, git log --use-mailmap
+# y git blame. No reescribe el historial. Detalle y evidencia en docs/CMR.md, sección 4.
+#
+# Formato: Nombre canónico <correo canónico> [Nombre en el commit] <correo en el commit>
+
+Johan Steven Bueno Rojas <johanstevenbr@ufps.edu.co> <132406420+SteveeenB@users.noreply.github.com>
+
+Santiago Danilo Cepeda Galeano <santiagodanilocg@ufps.edu.co> <sdcepeda7@gmail.com>
+Santiago Danilo Cepeda Galeano <santiagodanilocg@ufps.edu.co> <141196390+sdcepeda7@users.noreply.github.com>
+Santiago Danilo Cepeda Galeano <santiagodanilocg@ufps.edu.co> sdcepeda <santiagodanilocg@ufps.edu.co>
+
+Kevin David Arias Villamizar <kevarias.2195@gmail.com> unknown <kevarias.2195@gmail.com>
+Kevin David Arias Villamizar <kevarias.2195@gmail.com> <166332087+kevindavidav@users.noreply.github.com>
+
+Bryan Alexander Niño López <bryanalexandernl@ufps.edu.co> AlexNiño <bryanalexandernl@ufps.edu.co>
+Bryan Alexander Niño López <bryanalexandernl@ufps.edu.co> <113863355+AlexCo10@users.noreply.github.com>
+
+Raúl David Báez Suárez <rauldavidbs@ufps.edu.co> DavidBaez-14 <rauldavidbs@ufps.edu.co>
+Raúl David Báez Suárez <rauldavidbs@ufps.edu.co> Raul David Baez Suarez <rauldavidbs@ufps.edu.co>
+
+Diego Alexander Bermúdez Flórez <diegoalexanderbefl@ufps.edu.co> DieBer1 <diegoalexanderbefl@ufps.edu.co>
+Diego Alexander Bermúdez Flórez <diegoalexanderbefl@ufps.edu.co> <100483058+DieBer1@users.noreply.github.com>
+Diego Alexander Bermúdez Flórez <diegoalexanderbefl@ufps.edu.co> <diegobermudezflorez@gmail.com>
