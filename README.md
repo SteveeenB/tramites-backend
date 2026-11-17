@@ -10,7 +10,7 @@
 > **Demo:** [tramites-frontend-r08z.onrender.com](https://tramites-frontend-r08z.onrender.com) · API: [Swagger UI](https://tramites-backend.onrender.com/swagger-ui.html)
 -->
 
-Documentación técnica del backend del sistema **GROWEB — TposgradosUFPS**.  
+Documentación técnica del backend del **Módulo de Trámites de Posgrado (UFPS)**.  
 API REST desarrollada con Java + Spring Boot para la gestión de trámites académicos de posgrado de la Universidad Francisco de Paula Santander (UFPS).
 
 **Equipo:** Raúl David Báez Suárez · Johan Steven Bueno Rojas · Kevin David Arias Villamizar · Santiago Danilo Cepeda Galeano · Diego Alexander Bermúdez Flores · Bryan Alexander Niño López  
