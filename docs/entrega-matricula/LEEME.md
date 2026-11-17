@@ -41,7 +41,7 @@ Resultado esperado del paso 4:
 
 ## Requisitos del servidor
 
-- MySQL 8 con el `sql_mode` ANSI actual. Los scripts usan solo comillas simples y acento grave, así que funcionan con `ANSI_QUOTES`.
+- MySQL 8 o 9 (la base de Matrícula es 9.7.2), con el `sql_mode` ANSI o el vacío. Los scripts usan solo comillas simples y acento grave, así que funcionan con `ANSI_QUOTES`.
 - Funciona con `sql_require_primary_key=ON`: las 17 tablas tienen llave primaria.
 - Charset y collation: los de la base (`utf8mb4` / `utf8mb4_0900_ai_ci`).
 - Conexiones: el backend de Trámites abre hasta 10 (`DB_POOL_SIZE`). Hay que confirmar que caben en `max_connections` junto con las de Matrícula.

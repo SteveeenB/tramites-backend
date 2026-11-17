@@ -66,7 +66,7 @@ responde por ellos y cómo se cambian. Complementa a `docs/METRICAS_CONFIGURACIO
 | EC-18 | Backend en producción | Render `tramites-backend` (`https://tramites-backend.onrender.com`) | **Caído**: su BD (Railway) quedó fuera de servicio | PO |
 | EC-19 | Frontend en producción | Render `tramites-frontend` (`https://tramites-frontend-r08z.onrender.com`) | Arriba | PO |
 | EC-20 | BD de producción (anterior) | Railway (MySQL) | **Fuera de servicio** (venció la prueba gratuita). Datos de prueba, sin respaldo (`docs/PLAN_RESPALDO.md` §4) | PO |
-| EC-21 | BD de producción (nueva) | Addon MySQL en Northflank del equipo de Matrícula (MySQL 8.4, `max_connections` 32), tablas `tp_*` | Tablas `tp_*` creadas por Matrícula el 16/11/2026; corte pendiente de la cuenta técnica (TP-205) | Matrícula (servidor) / Trámites (tablas `tp_*`) |
+| EC-21 | BD de producción (nueva) | Addon MySQL en Northflank del equipo de Matrícula (**MySQL 9.7.2**, base `d4013b5ab4aa`, TLS, `sql_mode` global vacío, `max_connections` 32; verificado con `tramites_app` el 16/11/2026), tablas `tp_*` | Tablas `tp_*` creadas por Matrícula el 16/11/2026; corte pendiente de la cuenta técnica (TP-205) | Matrícula (servidor) / Trámites (tablas `tp_*`) |
 | EC-22 | API del Módulo de Matrícula | Producción: `https://p01--posgrados-project--kqqwl9rwqwbv.code.run/posgrados-project`. Copia temporal SC-03: Render `posgrados-api-d4yv` + nuestra Aiven | Producción UP; falta la cuenta técnica (TP-205) | Equipo de Matrícula |
 | EC-23 | Almacenamiento de documentos | Supabase Storage, bucket `tramites-documentos` | Operativo | PO |
 | EC-24 | Pagos | Wompi (sandbox) | Operativo | PO |

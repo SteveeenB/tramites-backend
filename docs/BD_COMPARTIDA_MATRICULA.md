@@ -9,7 +9,7 @@
 | **Responsable** | Diego Bermúdez (Trámites) |
 | **Implementa** | TP-209 (Kevin Arias, con apoyo de Diego) |
 
-> **Nota del 16/11/2026:** la base de producción de Matrícula, donde quedaron las tablas `tp_*`, es un addon MySQL en **Northflank** (no Aiven). La BD de Trámites de la época de este análisis estaba en **Railway**. El análisis de esquemas de este documento sigue vigente.
+> **Nota del 16/11/2026:** la base de producción de Matrícula, donde quedaron las tablas `tp_*`, es un addon MySQL en **Northflank** (no Aiven). La BD de Trámites de la época de este análisis estaba en **Railway**. El análisis de esquemas de este documento sigue vigente. Datos verificados el 16/11/2026 con `tramites_app`: **MySQL 9.7.2**, base `d4013b5ab4aa` (no `defaultdb`), conexión con TLS y `sql_mode` global **vacío** (no ANSI). El código de Trámites funciona con los dos modos.
 
 ## 1. Contexto
 
