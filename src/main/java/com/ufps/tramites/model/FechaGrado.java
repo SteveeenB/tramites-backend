@@ -16,7 +16,7 @@ import java.time.LocalDate;
  * activa/desactiva y elimina.
  */
 @Entity
-@Table(name = "fechas_grado",
+@Table(name = "tp_fechas_grado",
        uniqueConstraints = @UniqueConstraint(name = "uq_fecha_grado",
                columnNames = {"fecha", "modalidad", "hora"}))
 public class FechaGrado {

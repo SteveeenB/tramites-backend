@@ -1,0 +1,39 @@
+-- ============================================================================
+-- 04_vuelta_atras.sql — Quitar las tablas y el usuario de Trámites
+-- (TP-209 · acuerdo TP-208)
+--
+-- Solo si hay que deshacer 01 y 02 ANTES de que Trámites tenga datos reales
+-- en esta base. Después del corte, NO usarlo sin hablar con el PO de Trámites:
+-- borra los datos de Trámites. Hacer un respaldo (mysqldump) antes.
+--
+-- Solo toca tablas tp_* y el usuario tramites_app. Ninguna tabla de Matrícula.
+-- Está comentado a propósito: quitar los "-- " de las líneas para ejecutarlo,
+-- con el administrador.
+-- ============================================================================
+
+-- Primero las tablas que tienen llaves foráneas, después las que son referenciadas.
+-- DROP TABLE IF EXISTS
+--     tp_solicitud_certificado,
+--     tp_paz_y_salvo,
+--     tp_solicitud,
+--     tp_estudiante,
+--     tp_admins,
+--     tp_usuario,
+--     tp_notificaciones,
+--     tp_pagos,
+--     tp_documento_solicitud,
+--     tp_historial_estado_solicitud,
+--     tp_fechas_grado,
+--     tp_tipo_certificado,
+--     tp_tipos_solicitud,
+--     tp_dependencias,
+--     tp_programa_academico,
+--     tp_estados_estudiantes,
+--     tp_roles,
+--     tp_flyway_schema_history;
+
+-- DROP USER IF EXISTS 'tramites_app'@'%';
+
+-- Comprobación: debe dar 0.
+-- SELECT COUNT(*) FROM information_schema.tables
+--  WHERE table_schema = DATABASE() AND table_name LIKE 'tp\_%';

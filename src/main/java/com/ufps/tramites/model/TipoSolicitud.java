@@ -3,7 +3,7 @@ package com.ufps.tramites.model;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "tipos_solicitud")
+@Table(name = "tp_tipos_solicitud")
 public class TipoSolicitud {
 
     @Id

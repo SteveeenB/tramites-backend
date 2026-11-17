@@ -24,6 +24,7 @@ import com.ufps.tramites.model.Solicitud;
         "spring.datasource.url=jdbc:h2:mem:solicitud-repo-test;MODE=MySQL;DB_CLOSE_DELAY=-1",
         "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
         "spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.flyway.enabled=false",
         "spring.sql.init.mode=never"
 })
 class SolicitudRepositoryTest {

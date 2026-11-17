@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1010" viewBox="0 0 1600 1010" font-family="Segoe UI, Arial, sans-serif">
+  <!-- Diagrama de arquitectura del ADD v3.1 (TP-206). Fuente editable; el PNG se genera desde este archivo. -->
+  <defs>
+    <marker id="flecha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3E4C59"/>
+    </marker>
+    <marker id="flechaGris" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#80868B"/>
+    </marker>
+    <style>
+      .t  { fill:#1F2933; font-size:15px; }
+      .tb { fill:#1F2933; font-size:16px; font-weight:600; }
+      .tg { fill:#1F2933; font-size:17px; font-weight:700; }
+      .ts { fill:#52606D; font-size:13px; }
+      .linea { stroke:#3E4C59; stroke-width:2; fill:none; marker-end:url(#flecha); }
+      .lineaGris { stroke:#80868B; stroke-width:2; fill:none; stroke-dasharray:6 5; marker-end:url(#flechaGris); }
+      .etq { fill:#3E4C59; font-size:13px; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1010" fill="#FFFFFF"/>
+  <text x="40" y="52" class="tg" style="font-size:22px">Arquitectura del Módulo de Trámites de Posgrado · ADD v3.1 (16/11/2026)</text>
+  <text x="40" y="78" class="ts" style="font-size:14px">Arquitectura por capas · base de datos compartida con el Módulo de Matrícula (tablas tp_*) · integración con Matrícula solo por API REST</text>
+
+  <!-- Usuarios -->
+  <rect x="40" y="150" width="250" height="190" rx="10" fill="#F5F7FA" stroke="#9AA5B1" stroke-width="1.5"/>
+  <text x="60" y="180" class="tb">Usuarios (navegador)</text>
+  <text x="60" y="210" class="t">· Estudiante</text>
+  <text x="60" y="235" class="t">· Director de programa</text>
+  <text x="60" y="260" class="t">· Oficina de Posgrados</text>
+  <text x="60" y="285" class="t">· Dependencias (paz y salvo)</text>
+  <text x="60" y="310" class="t">· Administrador</text>
+
+  <!-- Nota de despliegue -->
+  <rect x="40" y="390" width="250" height="150" rx="10" fill="#FFF8E1" stroke="#E0B300" stroke-width="1.5"/>
+  <text x="60" y="420" class="tb">Despliegue</text>
+  <text x="60" y="447" class="t">Backend y frontend en Render.</text>
+  <text x="60" y="471" class="t">Sin despliegue en el servidor</text>
+  <text x="60" y="495" class="t">UFPS (decisión del PO,</text>
+  <text x="60" y="519" class="t">16/11/2026).</text>
+
+  <!-- Render -->
+  <rect x="340" y="110" width="560" height="860" rx="14" fill="#F8F9FB" stroke="#9AA5B1" stroke-width="1.5" stroke-dasharray="8 5"/>
+  <text x="360" y="137" class="ts" style="font-weight:600">RENDER</text>
+
+  <rect x="370" y="150" width="500" height="130" rx="10" fill="#E8F0FE" stroke="#3B6FD8" stroke-width="1.5"/>
+  <text x="390" y="180" class="tb">Capa de Presentación · tramites-frontend</text>
+  <text x="390" y="208" class="t">React 19 · React Router · Tailwind CSS</text>
+  <text x="390" y="232" class="t">Vistas por rol · AuthContext · servicios Axios</text>
+  <text x="390" y="256" class="ts">Imagen nginx sin root</text>
+
+  <path d="M620,280 L620,330" class="linea"/>
+  <text x="630" y="311" class="etq">API REST · JSON · JWT</text>
+
+  <rect x="370" y="335" width="500" height="615" rx="10" fill="#FFFFFF" stroke="#3B6FD8" stroke-width="1.5"/>
+  <text x="390" y="362" class="tb">tramites-backend · Spring Boot 4 · Java 17</text>
+
+  <rect x="390" y="378" width="460" height="90" rx="8" fill="#E8F0FE" stroke="#3B6FD8"/>
+  <text x="408" y="404" class="tb">Capa de Aplicación</text>
+  <text x="408" y="428" class="t">Controladores REST · Spring Security (JWT por rol)</text>
+  <text x="408" y="452" class="t">Servicios: solicitudes, créditos, sincronización con Matrícula</text>
+
+  <rect x="390" y="480" width="460" height="90" rx="8" fill="#E8F0FE" stroke="#3B6FD8"/>
+  <text x="408" y="506" class="tb">Capa de Dominio</text>
+  <text x="408" y="530" class="t">Solicitud · Estudiante · Pago · PazYSalvo · Certificado</text>
+  <text x="408" y="554" class="t">Reglas de créditos y convocatorias · estados del trámite</text>
+
+  <rect x="390" y="582" width="460" height="350" rx="8" fill="#EEF2F7" stroke="#3B6FD8"/>
+  <text x="408" y="608" class="tb">Capa de Infraestructura</text>
+  <rect x="405" y="636" width="430" height="46" rx="6" fill="#FFFFFF" stroke="#9AA5B1"/>
+  <text x="420" y="665" class="t">Spring Data JPA + Flyway (V1–V3) · MySQL</text>
+  <rect x="405" y="692" width="430" height="46" rx="6" fill="#FFFFFF" stroke="#9AA5B1"/>
+  <text x="420" y="721" class="t">MatriculaClient (HTTP / simulado) · copia 24 h</text>
+  <rect x="405" y="748" width="430" height="46" rx="6" fill="#FFFFFF" stroke="#9AA5B1"/>
+  <text x="420" y="777" class="t">SupabaseStorageService · documentos</text>
+  <rect x="405" y="804" width="430" height="46" rx="6" fill="#FFFFFF" stroke="#9AA5B1"/>
+  <text x="420" y="833" class="t">Pasarela de pagos (Wompi)</text>
+  <rect x="405" y="860" width="430" height="46" rx="6" fill="#FFFFFF" stroke="#9AA5B1"/>
+  <text x="420" y="889" class="t">JavaMailSender · notificaciones</text>
+
+  <!-- Northflank: base compartida -->
+  <rect x="960" y="110" width="600" height="450" rx="14" fill="#FAFAFA" stroke="#9AA5B1" stroke-width="1.5" stroke-dasharray="8 5"/>
+  <text x="980" y="137" class="ts" style="font-weight:600">NORTHFLANK · BASE DEL MÓDULO DE MATRÍCULA · MySQL 8.4 · sql_mode ANSI</text>
+
+  <rect x="985" y="160" width="270" height="380" rx="10" fill="#E6F4EA" stroke="#2E7D32" stroke-width="1.8"/>
+  <text x="1003" y="190" class="tb">Tablas de Trámites</text>
+  <text x="1003" y="220" class="t">17 tablas con prefijo tp_</text>
+  <text x="1003" y="244" class="t">(tp_solicitud, tp_usuario,</text>
+  <text x="1003" y="268" class="t">tp_pagos, …)</text>
+  <text x="1003" y="300" class="t">+ tp_flyway_schema_history</text>
+  <text x="1003" y="340" class="tb" style="font-size:15px">Usuario tramites_app</text>
+  <text x="1003" y="364" class="t">Permisos solo sobre tp_*,</text>
+  <text x="1003" y="388" class="t">tabla por tabla</text>
+  <text x="1003" y="428" class="tb" style="font-size:15px">Esquema por Flyway</text>
+  <text x="1003" y="452" class="t">V1 esquema · V2 prefijo</text>
+  <text x="1003" y="476" class="t">V3 catálogos</text>
+  <text x="1003" y="516" class="ts">Dueño: Trámites</text>
+
+  <line x1="1272" y1="165" x2="1272" y2="535" stroke="#B00020" stroke-width="2" stroke-dasharray="4 6"/>
+
+  <rect x="1290" y="160" width="250" height="380" rx="10" fill="#F1F3F4" stroke="#80868B" stroke-width="1.5"/>
+  <text x="1308" y="190" class="tb">Tablas de Matrícula</text>
+  <text x="1308" y="220" class="t">53 tablas (estudiantes,</text>
+  <text x="1308" y="244" class="t">programas, usuarios, …)</text>
+  <text x="1308" y="290" class="t">Trámites no las lee</text>
+  <text x="1308" y="314" class="t">ni las escribe, y no</text>
+  <text x="1308" y="338" class="t">tiene permisos sobre</text>
+  <text x="1308" y="362" class="t">ellas</text>
+  <text x="1308" y="404" class="t">Sin llaves foráneas</text>
+  <text x="1308" y="428" class="t">entre módulos</text>
+  <text x="1308" y="516" class="ts">Dueño: Matrícula</text>
+
+  <!-- JPA -> tablas tp_ -->
+  <path d="M835,659 L925,659 L925,350 L985,350" class="linea"/>
+  <text x="933" y="505" class="etq">JDBC</text><text x="933" y="522" class="etq">TLS</text>
+
+  <!-- API de Matrícula -->
+  <rect x="960" y="670" width="600" height="90" rx="10" fill="#FFF4E5" stroke="#E8A33D" stroke-width="1.5"/>
+  <text x="980" y="698" class="tb">API REST del Módulo de Matrícula (code.run)</text>
+  <text x="980" y="722" class="t">GET /integracion/v1/estudiantes/{cédula} · GET /actuator/health</text>
+  <text x="980" y="746" class="ts">Cuenta técnica con rol SERVICIO_TRAMITES · solo lectura</text>
+  <path d="M835,715 L960,715" class="linea"/>
+  <text x="885" y="705" class="etq">HTTPS</text>
+  <path d="M1415,670 L1415,540" class="lineaGris"/>
+  <text x="1425" y="615" class="ts">su propio acceso</text>
+
+  <!-- Servicios externos -->
+  <rect x="960" y="748" width="290" height="46" rx="8" fill="#FFF4E5" stroke="#E8A33D" stroke-width="1.5" transform="translate(0,26)"/>
+  <text x="978" y="803" class="t">Supabase Storage (bucket privado)</text>
+  <path d="M835,771 L900,771 L900,797 L960,797" class="linea"/>
+
+  <rect x="960" y="830" width="290" height="46" rx="8" fill="#FFF4E5" stroke="#E8A33D" stroke-width="1.5"/>
+  <text x="978" y="859" class="t">Wompi (pagos)</text>
+  <path d="M835,827 L900,827 L900,853 L960,853" class="linea"/>
+
+  <rect x="960" y="886" width="290" height="46" rx="8" fill="#FFF4E5" stroke="#E8A33D" stroke-width="1.5"/>
+  <text x="978" y="915" class="t">Correo SMTP (Gmail)</text>
+  <path d="M835,883 L900,883 L900,909 L960,909" class="linea"/>
+
+  <!-- Usuarios -> frontend (encima de todo) -->
+  <path d="M290,215 L368,215" class="linea"/>
+  <text x="298" y="205" class="etq">HTTPS</text>
+
+  <!-- Leyenda -->
+  <rect x="1280" y="790" width="280" height="142" rx="10" fill="#FFFFFF" stroke="#CBD2D9"/>
+  <text x="1298" y="816" class="tb" style="font-size:14px">Leyenda</text>
+  <rect x="1298" y="830" width="18" height="14" fill="#E8F0FE" stroke="#3B6FD8"/><text x="1324" y="843" class="ts">Componentes de Trámites</text>
+  <rect x="1298" y="854" width="18" height="14" fill="#E6F4EA" stroke="#2E7D32"/><text x="1324" y="867" class="ts">Datos de Trámites (tp_*)</text>
+  <rect x="1298" y="878" width="18" height="14" fill="#FFF4E5" stroke="#E8A33D"/><text x="1324" y="891" class="ts">Servicios externos</text>
+  <line x1="1298" y1="910" x2="1316" y2="910" stroke="#B00020" stroke-width="2" stroke-dasharray="4 6"/><text x="1324" y="915" class="ts">Límite de permisos en la BD</text>
+</svg>
