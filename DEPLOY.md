@@ -122,7 +122,7 @@ docker compose --profile local down -v               # detener y BORRAR el MySQL
 ## 5. Esquema de base de datos (Flyway)
 
 - Las tablas `tp_*` de Trámites las crea y evoluciona **Flyway** al arrancar el backend, con los scripts de `src/main/resources/db/migration`. Hibernate no altera tablas: solo valida (`DDL_AUTO=validate`).
-- Migraciones actuales: `V1` crea las 17 tablas `tp_*`; `V2` renombra a `tp_*` las tablas sin prefijo **solo si existen las 17** (la base actual de Railway). En cualquier otra base no hace nada. Nunca renombra el `roles` de Matrícula.
+- Migraciones actuales: `V1` crea las 17 tablas `tp_*`; `V2` renombra a `tp_*` las tablas sin prefijo **solo si existen las 17** (la base actual de Railway). En cualquier otra base no hace nada. Nunca renombra el `roles` de Matrícula. `V3` carga los catálogos obligatorios (roles, programas, tipos de trámite, …) con `INSERT IGNORE`; no crea usuarios.
 - **`FLYWAY_BASELINE_VERSION` según la base:**
 
   | Base | Valor | Qué corre |
