@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
+import com.ufps.tramites.service.AlmacenamientoNoDisponibleException;
+
 // FIX TP-191 (Bryan Niño, 07/10/2026): manejadores globales para los dos
 // escenarios que la auditoría dejaba sin mensaje legible:
 //   - MaxUploadSizeExceededException: 413 con el límite real configurado.
@@ -37,5 +39,13 @@ public class GlobalExceptionHandler {
                 + ex.getRequestPartName() + "\".";
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", mensaje));
+    }
+
+    // Supabase Storage caído o inalcanzable: 503 con mensaje legible (antes, 500 sin detalle).
+    @ExceptionHandler(AlmacenamientoNoDisponibleException.class)
+    public ResponseEntity<Map<String, String>> manejarAlmacenamientoNoDisponible(
+            AlmacenamientoNoDisponibleException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("error", ex.getMessage()));
     }
 }
