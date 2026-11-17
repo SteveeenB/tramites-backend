@@ -4,7 +4,7 @@
 |---|---|
 | **Fecha** | (por definir, después de la regresión conjunta) |
 | **Tarea** | TP-156 · épica TP-184 |
-| **Asistentes** | Equipo GROWEB: Johan Steven Bueno Rojas (PO), Diego Alexander Bermúdez Flórez, Bryan Alexander Niño López, Kevin David Arias Villamizar, Santiago Danilo Cepeda Galeano. Docentes: (completar) |
+| **Asistentes** | El equipo de desarrollo: Johan Steven Bueno Rojas (PO), Diego Alexander Bermúdez Flórez, Bryan Alexander Niño López, Kevin David Arias Villamizar, Santiago Danilo Cepeda Galeano. Docentes: (completar) |
 
 > Borrador preparado el 16/11/2026 con el estado de Jira y de los repositorios. Las secciones 3 y 4 se completan en la reunión.
 

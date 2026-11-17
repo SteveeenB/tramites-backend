@@ -19,6 +19,7 @@ el tag `v2.0.0`.
 | CI en las últimas 50 ejecuciones | backend 50/50, frontend 40/40 |
 | Ensayo DDL + permisos + baseline 1 + V2/V3 en MySQL 8.0.44 con el esquema de Matrícula y `sql_mode` ANSI | `Started TramitesApplication`; las 52 tablas de Matrícula intactas; `SELECT`/`DROP` sobre ellas denegados |
 | Ensayo de las 15 cuentas iniciales | 15 de 15 inician sesión; una contraseña equivocada da 401 |
+| Ensayo completo en **MySQL 9.7.2** (la versión de la base de Matrícula), `sql_mode` vacío, 16/11/2026 | Permisos y DDL sin errores; Flyway: baseline 1 → V2 → V3 con solo una advertencia («MySQL 9.7 es más nuevo que lo verificado, 8.1»); `Started TramitesApplication`; las 15 cuentas inician sesión; lectura de `usuarios` denegada |
 
 ## 2. Casos
 
