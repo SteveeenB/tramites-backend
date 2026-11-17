@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Tarea** | TP-208 · SC02-T8 (épica SC-02) |
-| **Estado** | Estrategia acordada entre ambos equipos (chat de WhatsApp, 15/11/2026, 10:00 a. m. – 12:00 m.) · **pendiente de aprobación de los PO** |
+| **Estado** | Estrategia acordada entre ambos equipos (chat de WhatsApp, 15/11/2026, 10:00 a. m. – 12:00 m.) · **aprobada y firmada por los dos PO el 16/11/2026** |
 | **Acta** | Acta de reunión TP-208 (formato de actas del equipo), firmada por el PO de cada módulo |
 | **Fecha** | 15/11/2026 |
 | **Responsable** | Diego Bermúdez (Trámites) |
@@ -221,7 +221,7 @@ La aprobación queda registrada con la firma del acta de reunión de TP-208.
 
 | Nombre | Rol | Firma del acta | Fecha |
 |---|---|---|---|
-| Johan Steven Bueno Rojas | Product Owner, Módulo de Trámites | Pendiente | |
-| Adolfo Alejandro Arenas Ramos | Product Owner, Módulo de Matrícula | Pendiente | |
+| Johan Steven Bueno Rojas | Product Owner, Módulo de Trámites | Firmada (PDF en el Drive privado del PO) | 16/11/2026 |
+| Adolfo Alejandro Arenas Ramos | Product Owner, Módulo de Matrícula | Firmada (PDF en el Drive privado del PO) | 16/11/2026 |
 
 Elaborado por: Diego Alexander Bermúdez Flórez (Trámites, TP-208).
