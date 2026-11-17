@@ -61,7 +61,8 @@ Se configuran en `.env`, que no se sube al repositorio. `.env.example` trae toda
 | `GOOGLE_CLIENT_ID` | vacío | Login con Google (backend y frontend) |
 | `MAIL_USERNAME`, `MAIL_PASSWORD` | vacío | Correo SMTP (Gmail). Sin ellas no se envían correos y el resto funciona |
 | `REACT_APP_DEMO_MODE` | `false` | Solo en el build del frontend. Debe quedar en `false` |
-| `JAVA_OPTS` | `-XX:MaxRAMPercentage=75.0` | Opciones de la JVM del backend |
+| `JAVA_OPTS` | `-Xmx256m -XX:MaxMetaspaceSize=160m -XX:+UseSerialGC -Xss512k -XX:TieredStopAtLevel=1` | Opciones de la JVM del backend. El valor por defecto cabe en 512 MB (plan gratis de Render). Si aparece `OutOfMemoryError: Metaspace`, subir `MaxMetaspaceSize` a `192m`. Con 1 GB o más se puede usar `-XX:MaxRAMPercentage=75.0` |
+| `SERVER_TOMCAT_THREADS_MAX` | 200 (Spring) | Hilos máximos de Tomcat. En Render con 512 MB: `20` |
 | `MYSQL_VERSION`, `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_PORT` | `8.4.11` / — / `posgrados` / 3307 | Solo perfil `local` (MySQL del compose). `MYSQL_ROOT_PASSWORD` es obligatoria (`openssl rand -base64 24`) |
 
 ## 4. Levantar el módulo
@@ -78,7 +79,7 @@ El compose tiene dos perfiles. Sin `--profile` no levanta nada.
 No usa este compose. Render despliega cada servicio desde la rama `main` de su repositorio, y las variables de la sección 3 se definen en Render → *Environment*:
 
 1. Matrícula ejecuta `docs/entrega-matricula/` (permisos + DDL) en su base de Northflank y entrega por privado las credenciales de `tramites_app`.
-2. Backend en Render: `DB_URL=jdbc:mysql://<host>:<puerto>/<base>?sslMode=REQUIRED&serverTimezone=UTC&characterEncoding=UTF-8`, `DB_USERNAME=tramites_app`, `DB_PASSWORD`, `FLYWAY_BASELINE_VERSION=1`, `JWT_SECRET`, `CORS_ORIGIN`, `FRONTEND_URL`, `MATRICULA_*`, `SUPABASE_*` y `WOMPI_*`.
+2. Backend en Render: `DB_URL=jdbc:mysql://<host>:<puerto>/<base>?sslMode=REQUIRED&serverTimezone=UTC&characterEncoding=UTF-8`, `DB_USERNAME=tramites_app`, `DB_PASSWORD`, `FLYWAY_BASELINE_VERSION=1`, `JWT_SECRET`, `CORS_ORIGIN`, `FRONTEND_URL`, `MATRICULA_*`, `SUPABASE_*` y `WOMPI_*`. Memoria: el plan gratis da 512 MB; la imagen ya trae `JAVA_OPTS` para ese límite, y además se define `SERVER_TOMCAT_THREADS_MAX=20` y `DB_POOL_SIZE=5`. Si Render muestra *Ran out of memory*, revisar que nadie haya puesto otro `JAVA_OPTS` en *Environment*.
 3. Al arrancar, Flyway registra la versión 1 y aplica V2 (sin cambios) y V3 (catálogos). Las cuentas iniciales se crean con un script privado (`docs/CORTE_RAILWAY_A_AIVEN.md` §0, paso 7).
 4. Verificación: sección 7 y `docs/REGRESION_CONJUNTA.md`.
 

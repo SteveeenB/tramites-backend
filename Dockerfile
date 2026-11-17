@@ -29,8 +29,12 @@ COPY --from=build --chown=root:root /app/target/*.jar app.jar
 
 USER tramites
 
+# JVM para un contenedor de 512 MB (plan gratis de Render). Con
+# MaxRAMPercentage=75 el heap se llevaba 384 MB y, sumando metaspace, code
+# cache e hilos, el proceso pasaba de 512 MB y Render lo mataba. Con más
+# memoria se puede sobrescribir JAVA_OPTS (ver DEPLOY.md, sección 3).
 ENV PORT=8080 \
-    JAVA_OPTS="-XX:MaxRAMPercentage=75.0"
+    JAVA_OPTS="-Xmx256m -XX:MaxMetaspaceSize=160m -XX:+UseSerialGC -Xss512k -XX:TieredStopAtLevel=1"
 EXPOSE 8080
 
 # El arranque de Spring tarda; 90 s de gracia antes de contar fallos
