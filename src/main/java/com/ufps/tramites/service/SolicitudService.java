@@ -1002,6 +1002,24 @@ public class SolicitudService {
     }
 
     /**
+     * TP-156: el estudiante descarga su acta de grado solo cuando la Oficina
+     * de Posgrados ya la generó con {@link #generarActa(Long)}. Este método
+     * no genera el PDF ni cambia el estado del estudiante: la formalización
+     * del grado sigue siendo de Posgrados.
+     */
+    public byte[] obtenerActaParaEstudiante(Long id) {
+        Solicitud s = solicitudRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+        if (!"GRADO".equals(s.getTipo()) || !"APROBADA".equals(s.getEstado())) {
+            throw new IllegalStateException("El acta de grado solo existe para solicitudes de grado aprobadas");
+        }
+        return documentoService.obtenerActa(id)
+                .filter(bytes -> bytes != null && bytes.length > 0)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Tu acta de grado aún no ha sido generada por la Oficina de Posgrados"));
+    }
+
+    /**
      * Genera el certificado de terminación en PDF con QR de verificación.
      */
     public byte[] generarCertificadoPdf(Long id) {
