@@ -65,6 +65,12 @@ public class SolicitudController {
                             tipoProyecto, foto, actaSustentacion, certificadoIngles));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(422).body(error(e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            // TP-156: un archivo con formato o contenido no permitido llegaba
+            // como 500 «Internal Server Error». Ahora el estudiante recibe el
+            // motivo, igual que en POST /{id}/documentos. La transacción del
+            // service se revierte, así que no queda una solicitud a medias.
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error(e.getMessage()));
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(error("Error al procesar los archivos: " + e.getMessage()));
