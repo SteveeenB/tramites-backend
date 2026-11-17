@@ -49,7 +49,7 @@ ADD v3.1 (TP-206); correcciones del Primer Informe (TP-179, TP-180, TP-181); pre
 
 | Pendiente | Motivo | Plan |
 |---|---|---|
-| Producción sobre la BD compartida (TP-141, TP-153) | Depende de que Matrícula cree las tablas en su Aiven. Railway quedó fuera de servicio el 16/11/2026 | Corte según `docs/CORTE_RAILWAY_A_AIVEN.md` §0 |
+| Producción sobre la BD compartida (TP-141, TP-153) | Matrícula ya creó las tablas en su base de Northflank (16/11/2026); falta la cuenta técnica (TP-205) para el corte. Railway quedó fuera de servicio el 16/11/2026 | Corte según `docs/CORTE_RAILWAY_A_AIVEN.md` §0 |
 | Línea base `v2.0.0` (TP-155) | Se crea después del corte y de la regresión | Tag en los dos repos |
 | Sincronización con la producción de Matrícula (TP-203, TP-205) | Falta la cuenta técnica en su producción | Coordinación con su equipo |
 | Monitor anti-sueño (TP-204) | La producción de Matrícula ya no está en Render | Revisar si sigue aplicando |

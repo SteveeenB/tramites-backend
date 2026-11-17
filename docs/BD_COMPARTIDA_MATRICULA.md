@@ -9,6 +9,8 @@
 | **Responsable** | Diego Bermúdez (Trámites) |
 | **Implementa** | TP-209 (Kevin Arias, con apoyo de Diego) |
 
+> **Nota del 16/11/2026:** la base de producción de Matrícula, donde quedaron las tablas `tp_*`, es un addon MySQL en **Northflank** (no Aiven). La BD de Trámites de la época de este análisis estaba en **Railway**. El análisis de esquemas de este documento sigue vigente.
+
 ## 1. Contexto
 
 Este documento fija qué tablas son de quién, qué nombres chocan y cómo conviven los dos
@@ -29,7 +31,7 @@ módulos en **la misma base MySQL**, según las condiciones del ing. Matías (Po
 
 | | Matrícula (vigente) | Trámites (vigente) |
 |---|---|---|
-| Motor | MySQL **8.4.11** | MySQL 8 (Aiven) |
+| Motor | MySQL **8.4.11** | MySQL 8 (Railway) |
 | Charset / collation | `utf8mb4` / `utf8mb4_0900_ai_ci` | Hereda el de la base |
 | Motor de tablas | InnoDB (53/53) | InnoDB (17/17) |
 | Nombre de la base | `defaultdb` (nombre por defecto de Aiven) | — |
@@ -158,13 +160,13 @@ Se verificó que ninguna tabla de Matrícula empieza por `tp_` y que ningún nom
    |---|---|
    | BD vacía | Se crean las 17 tablas `tp_*` |
    | BD compartida (ya tiene las tablas de Matrícula, ninguna nuestra) | Se crean las 17 tablas `tp_*` **sin tocar las de Matrícula** |
-   | BD actual de Trámites en Aiven (tablas sin prefijo, con datos) | Se renombran conservando los datos |
+   | BD actual de Trámites en Railway (tablas sin prefijo, con datos) | Se renombran conservando los datos |
 
    Propuesta:
    - **V1** crea directamente las tablas con prefijo `tp_`. Se puede editar porque ningún entorno ha ejecutado V1 todavía; **confirmarlo antes de cambiarlo** (que ningún despliegue haya corrido Flyway desde `develop`). Si alguno ya lo ejecutó, se deja V1 y todo va en migraciones nuevas.
    - **V2** renombra de forma idempotente: `RENAME TABLE solicitud TO tp_solicitud` solo si existe `solicitud` y no existe `tp_solicitud`, con el mismo patrón de `.docs/sql/migracion_sc03_snapshot_matricula.sql`. En una BD vacía o compartida no hace nada.
    - **Baseline.** Flyway considera "no vacía" una base que ya tiene las tablas de Matrícula: con `baseline-on-migrate` y `baseline-version=1` **se saltaría V1** y no crearía nuestras tablas. Por eso la versión de baseline se vuelve configurable (`spring.flyway.baseline-version=${FLYWAY_BASELINE_VERSION:1}`):
-     - BD actual de Trámites (Aiven): `1`, para saltar V1 y aplicar solo el renombrado.
+     - BD actual de Trámites (Railway): `1`, para saltar V1 y aplicar solo el renombrado.
      - BD compartida institucional: `0`, para que V1 cree las tablas. Va en el perfil institucional del `docker-compose` y en `DEPLOY.md` (TP-211).
      - Si alguien olvida el `0` en la BD compartida, la aplicación **falla al arrancar** (`validate`), sin dañar nada.
 4. **Ampliar** `tp_programa_academico.codigo` a `VARCHAR(100)` (ver 4.4).

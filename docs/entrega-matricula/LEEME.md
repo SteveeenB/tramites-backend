@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Para** | Equipo del Módulo de Matrícula (administradores de su BD en Aiven) |
+| **Para** | Equipo del Módulo de Matrícula (administradores de su BD en Northflank) |
 | **De** | Módulo de Trámites de Posgrado · PO: Johan Steven Bueno Rojas |
 | **Tarea** | TP-209 · acuerdo TP-208 (`docs/BD_COMPARTIDA_MATRICULA.md`) |
 | **Fecha** | 16/11/2026 |
@@ -42,7 +42,7 @@ Resultado esperado del paso 4:
 ## Requisitos del servidor
 
 - MySQL 8 con el `sql_mode` ANSI actual. Los scripts usan solo comillas simples y acento grave, así que funcionan con `ANSI_QUOTES`.
-- Funciona con `sql_require_primary_key=ON` (el valor por defecto de Aiven): las 17 tablas tienen llave primaria.
+- Funciona con `sql_require_primary_key=ON`: las 17 tablas tienen llave primaria.
 - Charset y collation: los de la base (`utf8mb4` / `utf8mb4_0900_ai_ci`).
 - Conexiones: el backend de Trámites abre hasta 10 (`DB_POOL_SIZE`). Hay que confirmar que caben en `max_connections` junto con las de Matrícula.
 

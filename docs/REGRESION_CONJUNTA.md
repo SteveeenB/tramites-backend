@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Tarea** | TP-156 · cierre del ciclo (épica TP-184) |
-| **Cuándo** | Después del corte a la BD compartida (`docs/CORTE_RAILWAY_A_AIVEN.md` §0), sobre producción (Render + Aiven de Matrícula) |
+| **Cuándo** | Después del corte a la BD compartida (`docs/CORTE_RAILWAY_A_AIVEN.md` §0), sobre producción (Render + base de Matrícula en Northflank) |
 | **Quién** | Equipo de Trámites. Para R-30 a R-33, con alguien del equipo de Matrícula |
 | **Cuentas** | Las cuentas iniciales del paso 7 del corte. Las contraseñas se entregan por privado |
 

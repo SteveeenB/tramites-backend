@@ -11,8 +11,8 @@
 | Elemento | Dónde vive | Respaldo | Frecuencia | Dónde se guarda | Retención |
 |---|---|---|---|---|---|
 | Código, historial y tags | GitHub (EC-01, EC-02) | El propio Git: cada clon es una copia completa. Antes de cada línea base, `git bundle create tramites-<repo>-<tag>.bundle --all` | En cada tag | Carpeta privada del PO en Google Drive | Todas las líneas base |
-| Tablas `tp_*` (datos de Trámites) | BD compartida en el Aiven de Matrícula (EC-21) | `mysqldump` de las 17 tablas `tp_*` y `tp_flyway_schema_history` (sección 2) | **Semanal**, y **siempre** antes de una migración Flyway o de un cambio de variables de BD | Carpeta privada del PO en Google Drive, en `.zip` **cifrado** (contiene datos personales) | 4 semanales + el de cada línea base |
-| Servidor MySQL completo | Aiven de Matrícula | Respaldos automáticos de Aiven, según el plan del servicio | Lo define Matrícula | Aiven | Lo define Matrícula (preguntado en la entrega de TP-209) |
+| Tablas `tp_*` (datos de Trámites) | BD compartida de Matrícula en Northflank (EC-21) | `mysqldump` de las 17 tablas `tp_*` y `tp_flyway_schema_history` (sección 2) | **Semanal**, y **siempre** antes de una migración Flyway o de un cambio de variables de BD | Carpeta privada del PO en Google Drive, en `.zip` **cifrado** (contiene datos personales) | 4 semanales + el de cada línea base |
+| Servidor MySQL completo | Addon de Northflank de Matrícula | Respaldos del addon en Northflank (Matrícula hizo uno antes de crear las tablas `tp_*`, 16/11/2026) | Lo define Matrícula | Northflank | Lo define Matrícula (preguntado en la entrega de TP-209) |
 | Documentos subidos | Supabase, bucket `tramites-documentos` (EC-23) | Descarga del bucket (CLI o panel de Supabase) | Mensual | Carpeta privada del PO | 2 copias |
 | Nombres de las variables de producción | Render → *Environment* (EC-13) | Lista de **nombres** en `.env.example`. Los **valores** van en el gestor de contraseñas del PO | En cada cambio | Gestor de contraseñas | Vigente |
 | Backlog y trazabilidad | Jira TP (EC-28) | Exportar a CSV (*Filters* → *Export*) | Al cierre de cada sprint | Carpeta privada del PO | Todas |
@@ -59,5 +59,5 @@ reconstruyeron con las semillas de `data.sql` y los 6 estudiantes que se habían
 **Lecciones:**
 - Un servicio en plan de prueba o gratuito puede apagarse sin aviso. Su respaldo no puede depender de él.
 - El respaldo semanal y el previo a cada cambio son obligatorios desde hoy (sección 1).
-- La fecha de vencimiento de cada plan gratuito (Render, Aiven, Supabase) debe estar anotada en el CMR, con un
+- La fecha de vencimiento de cada plan gratuito (Render, Northflank, Aiven de la copia SC-03, Supabase) debe estar anotada en el CMR, con un
   responsable que la revise.

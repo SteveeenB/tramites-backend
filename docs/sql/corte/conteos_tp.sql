@@ -1,5 +1,5 @@
 -- ============================================================================
--- conteos_tp.sql — Conteo exacto de filas de las 17 tablas de Trámites (con prefijo tp_: ensayo local y Aiven)
+-- conteos_tp.sql — Conteo exacto de filas de las 17 tablas de Trámites (con prefijo tp_: ensayo local y base compartida)
 -- (TP-153 · docs/CORTE_RAILWAY_A_AIVEN.md). Solo lectura.
 -- Ejecutar conectado a la base correspondiente y guardar la salida.
 -- ============================================================================
