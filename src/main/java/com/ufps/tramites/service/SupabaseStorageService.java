@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 @Service
 public class SupabaseStorageService {
@@ -34,14 +35,19 @@ public class SupabaseStorageService {
         String tipo = (contentType != null && !contentType.isBlank())
                 ? contentType : "application/octet-stream";
 
-        restClient.post()
-                .uri(supabaseUrl + "/storage/v1/object/" + bucket + "/" + path)
-                .header("Authorization", "Bearer " + serviceRoleKey)
-                .header("x-upsert", "true")
-                .contentType(MediaType.parseMediaType(tipo))
-                .body(bytes)
-                .retrieve()
-                .toBodilessEntity();
+        try {
+            restClient.post()
+                    .uri(supabaseUrl + "/storage/v1/object/" + bucket + "/" + path)
+                    .header("Authorization", "Bearer " + serviceRoleKey)
+                    .header("x-upsert", "true")
+                    .contentType(MediaType.parseMediaType(tipo))
+                    .body(bytes)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientException e) {
+            throw new AlmacenamientoNoDisponibleException(
+                    "No se pudo guardar el documento en el almacenamiento. Intente más tarde.", e);
+        }
     }
 
     /**

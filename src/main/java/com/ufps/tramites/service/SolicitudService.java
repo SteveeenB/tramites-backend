@@ -1067,7 +1067,10 @@ public class SolicitudService {
         if (!"TERMINACION_MATERIAS".equals(s.getTipo())) {
             throw new IllegalStateException("Este endpoint solo aplica para solicitudes de terminación de materias.");
         }
-        s.setEstado("APROBADA");
+        // La aprobación de Posgrados también deja rastro en historial_estado_solicitud
+        // (antes cambiaba el estado directo y la transición no quedaba registrada).
+        cambiarEstado(s, "APROBADA", posgradosAdmin != null ? posgradosAdmin.getCodigo() : null,
+                posgradosAdmin != null ? "ADMIN" : "SISTEMA");
         if (posgradosAdmin != null) s.setPosgradosAdmin(posgradosAdmin);
         solicitudRepository.save(s);
         notificarEstudiante(s, "APROBADA_DIRECTOR");
