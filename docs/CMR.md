@@ -68,7 +68,7 @@ responde por ellos y cómo se cambian. Complementa a `docs/METRICAS_CONFIGURACIO
 | EC-20 | BD de producción (anterior) | Railway (MySQL) | **Fuera de servicio** (venció la prueba gratuita). Datos de prueba, sin respaldo (`docs/PLAN_RESPALDO.md` §4) | PO |
 | EC-21 | BD de producción (nueva) | Addon MySQL en Northflank del equipo de Matrícula (**MySQL 9.7.2**, base `d4013b5ab4aa`, TLS, `sql_mode` global vacío, `max_connections` 32; verificado con `tramites_app` el 16/11/2026), tablas `tp_*` | En uso desde el corte del 16/11/2026, 10:49 p. m. Flyway: baseline 1 + V2 + V3 | Matrícula (servidor) / Trámites (tablas `tp_*`) |
 | EC-22 | API del Módulo de Matrícula | Producción: `https://p01--posgrados-project--kqqwl9rwqwbv.code.run/posgrados-project`. Copia temporal SC-03: Render `posgrados-api-d4yv` + nuestra Aiven | Producción UP; cuenta técnica `svc-tramites` activa (TP-205 cerrada). Al 16/11/2026, los programas 2203 y 2102 no tenían cohortes en Matrícula (por confirmar) | Equipo de Matrícula |
-| EC-23 | Almacenamiento de documentos | Supabase Storage, bucket `tramites-documentos` | **Caído** desde la regresión del 16/11/2026 (el dominio no resuelve). Las subidas responden 503 (#86) hasta restaurar el proyecto o cambiar `SUPABASE_*` | PO |
+| EC-23 | Almacenamiento de documentos | Supabase Storage, bucket `tramites-documentos` | Operativo. Se cayó en la regresión del 16/11/2026 (el dominio no resolvía) y se arregló ese mismo día. Si vuelve a fallar, las subidas responden 503 con mensaje (#86) | PO |
 | EC-24 | Pagos | Wompi (sandbox) | Operativo | PO |
 
 ### 2.6 Documentación y gestión
