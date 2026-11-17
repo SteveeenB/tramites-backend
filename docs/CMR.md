@@ -99,7 +99,7 @@ frontend, para 6 personas. El archivo `.mailmap` (en los dos repos) las normaliz
 | Santiago Danilo Cepeda Galeano | Desarrollador (empaquetado) | `sdcepeda7` | `sdcepeda7 <gmail>`, `sdcepeda <UFPS>`, *noreply* |
 | Diego Alexander Bermúdez Flórez | Desarrollador | `DieBer1` | `DieBer1 <UFPS>`, `Dieber115 <gmail>`, *noreply* |
 | Bryan Alexander Niño López | Desarrollador | `AlexCo10` | `AlexNiño <UFPS>`, *noreply* de `AlexCo10` |
-| Raúl David Báez Suárez | Desarrollador | `DavidBaez-14` | `DavidBaez-14` y `Raul David Baez Suarez`, mismo correo |
+| Raúl David Báez Suárez | **Ya no hace parte del proyecto** (se conserva por la trazabilidad de sus commits) | `DavidBaez-14` | `DavidBaez-14` y `Raul David Baez Suarez`, mismo correo |
 
 Evidencia de los casos no obvios:
 - **`AlexCo10` = Bryan Niño.** Los PR #26 (HU-16) y #32 (PRB-06) de `AlexCo10` contienen commits de autor
