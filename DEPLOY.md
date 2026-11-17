@@ -1,6 +1,8 @@
 # Despliegue del Módulo de Trámites de Posgrado
 
-> Guía para el equipo que despliega en el servidor institucional de la UFPS. TP-211 · SC02-T11 (épica SC-02).
+> TP-211 · SC02-T11 (épica SC-02).
+>
+> **Actualización del 16/11/2026:** el despliegue en el servidor de la UFPS **no se hará** (decisión del PO, acta CCB N.º 2). Producción corre en **Render**, con la base de datos compartida en el **Aiven del Módulo de Matrícula** (sección 4.1 y `docs/CORTE_RAILWAY_A_AIVEN.md` §0). Este `docker-compose` queda para probar en una máquina local (perfil `local`) o para un despliegue propio con Docker contra una BD externa (perfil `institucional`).
 > El módulo se entrega como dos imágenes Docker (backend y frontend) y un `docker-compose.yml`. La base de datos es **la misma base MySQL del Módulo de Matrícula**: las tablas de Trámites llevan el prefijo `tp_` (acuerdo TP-208, `docs/BD_COMPARTIDA_MATRICULA.md`).
 
 ## 1. Requisitos
@@ -8,7 +10,7 @@
 - Docker Engine 24 o superior con Docker Compose **2.20 o superior** (`docker compose version`). Probado con Docker 29.9 y Compose 5.7.
 - Unos 5 GB libres en disco para las imágenes y el build.
 - Acceso a internet durante el build (descarga de dependencias de Maven y npm).
-- Para el perfil institucional: la base MySQL compartida con Matrícula y un usuario de Trámites con los permisos de la sección 6.
+- Para el perfil `institucional` o para producción en Render: la base MySQL compartida con Matrícula y un usuario de Trámites con los permisos de la sección 6.
 - Puertos libres en el host: 8080 (backend) y 8081 (frontend). Se cambian con `BACKEND_PORT` y `FRONTEND_PORT`.
 
 ## 2. Obtener el código
@@ -35,7 +37,7 @@ Se configuran en `.env`, que no se sube al repositorio. `.env.example` trae toda
 |---|---|---|
 | `DB_URL` | backend | JDBC de la base compartida, ej. `jdbc:mysql://host:3306/posgrados?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&characterEncoding=UTF-8` |
 | `DB_USERNAME`, `DB_PASSWORD` | backend | Usuario de BD de Trámites, con permisos solo sobre las tablas `tp_*` (sección 6). La contraseña se genera con `openssl rand -base64 24` |
-| `FLYWAY_BASELINE_VERSION` | backend | **`0` en la base compartida**, para que Flyway cree las tablas `tp_*` aunque la base ya tenga las de Matrícula (sección 5) |
+| `FLYWAY_BASELINE_VERSION` | backend | **`1` en producción**, porque Matrícula crea las tablas `tp_*` con el DDL de `docs/entrega-matricula/`. **`0`** si la base no tiene las tablas `tp_*` (perfil local): Flyway las crea aunque la base ya tenga las de Matrícula (sección 5) |
 | `JWT_SECRET` | backend | Firma de los tokens. 32 caracteres o más (`openssl rand -base64 48`). Sin él el backend no arranca, a propósito |
 | `CORS_ORIGIN` | backend | URL pública del frontend, ej. `https://tramites.ufps.edu.co` |
 | `FRONTEND_URL` | backend | La misma URL pública del frontend; va en el QR de los certificados |
@@ -69,9 +71,18 @@ El compose tiene dos perfiles. Sin `--profile` no levanta nada.
 | Perfil | Servicios | Uso |
 |---|---|---|
 | `local` | `mysql` + `backend` + `frontend` | Probar en una máquina limpia, con un MySQL propio que reproduce la base compartida: esquema de Matrícula + tablas `tp_*` de Trámites, mismo `sql_mode` ANSI |
-| `institucional` | `backend` + `frontend` | Servidor de la UFPS: el backend usa el MySQL indicado en `DB_URL` |
+| `institucional` | `backend` + `frontend` | Un servidor propio con Docker: el backend usa el MySQL indicado en `DB_URL`. (Era el perfil previsto para el servidor de la UFPS, que ya no se usará) |
 
-### Perfil institucional (servidor UFPS)
+### 4.1 Producción actual: Render + BD compartida en Aiven
+
+No usa este compose. Render despliega cada servicio desde la rama `main` de su repositorio, y las variables de la sección 3 se definen en Render → *Environment*:
+
+1. Matrícula ejecuta `docs/entrega-matricula/` (permisos + DDL) en su Aiven y entrega por privado las credenciales de `tramites_app`.
+2. Backend en Render: `DB_URL=jdbc:mysql://<host>:<puerto>/<base>?sslMode=REQUIRED&serverTimezone=UTC&characterEncoding=UTF-8`, `DB_USERNAME=tramites_app`, `DB_PASSWORD`, `FLYWAY_BASELINE_VERSION=1`, `JWT_SECRET`, `CORS_ORIGIN`, `FRONTEND_URL`, `MATRICULA_*`, `SUPABASE_*` y `WOMPI_*`.
+3. Al arrancar, Flyway registra la versión 1 y aplica V2 (sin cambios) y V3 (catálogos). Las cuentas iniciales se crean con un script privado (`docs/CORTE_RAILWAY_A_AIVEN.md` §0, paso 7).
+4. Verificación: sección 7 y `docs/REGRESION_CONJUNTA.md`.
+
+### 4.2 Perfil institucional (servidor propio con Docker)
 
 1. Crea el usuario de Trámites con el script de la sección 6.
 2. En `.env`, apunta `DB_URL`, `DB_USERNAME` y `DB_PASSWORD` a la base compartida, deja `FLYWAY_BASELINE_VERSION=0` y define las URL públicas (`API_URL`, `CORS_ORIGIN`, `FRONTEND_URL`, `WOMPI_REDIRECT_URL`).
@@ -84,7 +95,7 @@ El compose tiene dos perfiles. Sin `--profile` no levanta nada.
    docker compose --profile institucional logs -f backend
    ```
 
-### Perfil local (prueba en una máquina limpia)
+### 4.3 Perfil local (prueba en una máquina limpia)
 
 1. En `.env` deja `DB_URL` con el host `mysql` y la base `MYSQL_DATABASE` (como vienen en `.env.example`), deja `FLYWAY_BASELINE_VERSION=0` y define `MYSQL_ROOT_PASSWORD`, `DB_PASSWORD` y `JWT_SECRET`.
 2. Opcional, pero es lo que prueba la convivencia: copia el esquema de Matrícula (solo estructura) en `docker/mysql-init/matricula/`. Se carga en **la misma base** `MYSQL_DATABASE` (ver el README de esa carpeta).
@@ -102,7 +113,7 @@ Luego, al arrancar, el backend crea sus tablas `tp_*` con Flyway.
    ```
 4. Abre el frontend en <http://localhost:8081> y el backend en <http://localhost:8080/swagger-ui.html>.
 
-La base local arranca sin datos (sin usuarios). Sirve para comprobar que el módulo levanta y crea su esquema junto al de Matrícula; los datos reales se cargan en la BD institucional.
+La base local arranca sin datos (sin usuarios). Sirve para comprobar que el módulo levanta y crea su esquema junto al de Matrícula; los datos reales viven en la BD compartida de producción.
 
 ### Orden de arranque
 
@@ -128,7 +139,7 @@ docker compose --profile local down -v               # detener y BORRAR el MySQL
   | Base | Valor | Qué corre |
   |---|---|---|
   | Nueva (vacía) | `0` (por defecto) | V1 crea las tablas `tp_*`; V2 no hace nada |
-  | Compartida con Matrícula (institucional o perfil local) | `0` (por defecto) | Igual. La base ya tiene las tablas de Matrícula y Flyway la considera "no vacía": con `0`, de todos modos ejecuta V1 |
+  | Compartida con Matrícula, sin tablas `tp_*` (perfil local) | `0` (por defecto) | Igual. La base ya tiene las tablas de Matrícula y Flyway la considera "no vacía": con `0`, de todos modos ejecuta V1 |
   | Compartida con Matrícula, con las tablas `tp_*` ya creadas por `docs/entrega-matricula/02_ddl_tablas_tramites.sql` | `1` | Se salta V1 (las tablas ya existen); V2 no hace nada |
   | Actual de Trámites (Railway, tablas sin prefijo y con datos) | `1` | Se salta V1; V2 renombra las 17 tablas a `tp_*` conservando los datos |
 
@@ -157,7 +168,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES
 -- … una línea igual por cada tabla tp_*
 ```
 
-El script completo para el servidor institucional es `docs/sql/permisos_usuario_tramites.sql` (TP-209): se reemplazan la base y la contraseña y se ejecuta con un usuario administrador. El perfil local aplica los mismos permisos en `docker/mysql-init/02_usuario_tramites.sh`, que sirve de referencia con la lista de tablas. Cada tabla nueva de una migración futura necesita su línea en los dos.
+El script completo para la base compartida es `docs/sql/permisos_usuario_tramites.sql` (TP-209); la versión que se entregó a Matrícula, con la base `defaultdb`, está en `docs/entrega-matricula/01_permisos_usuario_tramites.sql`: se reemplazan la base y la contraseña y se ejecuta con un usuario administrador. El perfil local aplica los mismos permisos en `docker/mysql-init/02_usuario_tramites.sh`, que sirve de referencia con la lista de tablas. Cada tabla nueva de una migración futura necesita su línea en los dos.
 
 ## 7. Verificación
 
