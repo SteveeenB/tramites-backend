@@ -221,6 +221,31 @@ public class SolicitudController {
         }
     }
 
+    /**
+     * GET /api/solicitudes/{id}/acta-estudiante
+     * TP-156: el estudiante descarga su propia acta de grado, solo si Posgrados
+     * ya la generó. No la genera ni marca al estudiante como graduado.
+     */
+    @PreAuthorize("hasRole('ESTUDIANTE')")
+    @GetMapping("/{id}/acta-estudiante")
+    public ResponseEntity<?> descargarActaEstudiante(@PathVariable Long id, Authentication auth) {
+        ResolvedPrincipal p = principalResolver.resolve(auth);
+        if (p == null || !p.isUsuario() || !solicitudService.perteneceAEstudiante(id, p.cedula())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("No tiene acceso a esta solicitud"));
+        }
+        try {
+            byte[] contenido = solicitudService.obtenerActaParaEstudiante(id);
+            return ResponseEntity.ok()
+                    .header("Content-Disposition", "attachment; filename=\"acta-grado-" + id + ".pdf\"")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(contenido);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(422).body(error(e.getMessage()));
+        }
+    }
+
     /** GET /api/solicitudes/{id}/certificado */
     @PreAuthorize("hasAnyRole('DIRECTOR', 'POSGRADOS')")
     @GetMapping("/{id}/certificado")
