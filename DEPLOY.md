@@ -2,7 +2,7 @@
 
 > TP-211 · SC02-T11 (épica SC-02).
 >
-> **Actualización del 16/11/2026:** el despliegue en el servidor de la UFPS **no se hará** (decisión del PO, acta CCB N.º 2). Producción corre en **Render**, con la base de datos compartida en el **Aiven del Módulo de Matrícula** (sección 4.1 y `docs/CORTE_RAILWAY_A_AIVEN.md` §0). Este `docker-compose` queda para probar en una máquina local (perfil `local`) o para un despliegue propio con Docker contra una BD externa (perfil `institucional`).
+> **Actualización del 16/11/2026:** el despliegue en el servidor de la UFPS **no se hará** (decisión del PO, acta CCB N.º 2). Producción corre en **Render**, con la base de datos compartida en el **addon MySQL de Northflank del Módulo de Matrícula** (sección 4.1 y `docs/CORTE_RAILWAY_A_AIVEN.md` §0). Este `docker-compose` queda para probar en una máquina local (perfil `local`) o para un despliegue propio con Docker contra una BD externa (perfil `institucional`).
 > El módulo se entrega como dos imágenes Docker (backend y frontend) y un `docker-compose.yml`. La base de datos es **la misma base MySQL del Módulo de Matrícula**: las tablas de Trámites llevan el prefijo `tp_` (acuerdo TP-208, `docs/BD_COMPARTIDA_MATRICULA.md`).
 
 ## 1. Requisitos
@@ -73,11 +73,11 @@ El compose tiene dos perfiles. Sin `--profile` no levanta nada.
 | `local` | `mysql` + `backend` + `frontend` | Probar en una máquina limpia, con un MySQL propio que reproduce la base compartida: esquema de Matrícula + tablas `tp_*` de Trámites, mismo `sql_mode` ANSI |
 | `institucional` | `backend` + `frontend` | Un servidor propio con Docker: el backend usa el MySQL indicado en `DB_URL`. (Era el perfil previsto para el servidor de la UFPS, que ya no se usará) |
 
-### 4.1 Producción actual: Render + BD compartida en Aiven
+### 4.1 Producción actual: Render + BD compartida en Northflank
 
 No usa este compose. Render despliega cada servicio desde la rama `main` de su repositorio, y las variables de la sección 3 se definen en Render → *Environment*:
 
-1. Matrícula ejecuta `docs/entrega-matricula/` (permisos + DDL) en su Aiven y entrega por privado las credenciales de `tramites_app`.
+1. Matrícula ejecuta `docs/entrega-matricula/` (permisos + DDL) en su base de Northflank y entrega por privado las credenciales de `tramites_app`.
 2. Backend en Render: `DB_URL=jdbc:mysql://<host>:<puerto>/<base>?sslMode=REQUIRED&serverTimezone=UTC&characterEncoding=UTF-8`, `DB_USERNAME=tramites_app`, `DB_PASSWORD`, `FLYWAY_BASELINE_VERSION=1`, `JWT_SECRET`, `CORS_ORIGIN`, `FRONTEND_URL`, `MATRICULA_*`, `SUPABASE_*` y `WOMPI_*`.
 3. Al arrancar, Flyway registra la versión 1 y aplica V2 (sin cambios) y V3 (catálogos). Las cuentas iniciales se crean con un script privado (`docs/CORTE_RAILWAY_A_AIVEN.md` §0, paso 7).
 4. Verificación: sección 7 y `docs/REGRESION_CONJUNTA.md`.

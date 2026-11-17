@@ -78,9 +78,9 @@
   <rect x="405" y="860" width="430" height="46" rx="6" fill="#FFFFFF" stroke="#9AA5B1"/>
   <text x="420" y="889" class="t">JavaMailSender · notificaciones</text>
 
-  <!-- Aiven: base compartida -->
+  <!-- Northflank: base compartida -->
   <rect x="960" y="110" width="600" height="450" rx="14" fill="#FAFAFA" stroke="#9AA5B1" stroke-width="1.5" stroke-dasharray="8 5"/>
-  <text x="980" y="137" class="ts" style="font-weight:600">AIVEN DEL MÓDULO DE MATRÍCULA · MySQL 8.4 · UNA SOLA BASE · sql_mode ANSI</text>
+  <text x="980" y="137" class="ts" style="font-weight:600">NORTHFLANK · BASE DEL MÓDULO DE MATRÍCULA · MySQL 8.4 · sql_mode ANSI</text>
 
   <rect x="985" y="160" width="270" height="380" rx="10" fill="#E6F4EA" stroke="#2E7D32" stroke-width="1.8"/>
   <text x="1003" y="190" class="tb">Tablas de Trámites</text>

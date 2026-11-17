@@ -1,4 +1,6 @@
-# Corte de producción: de Railway a la BD compartida con Matrícula (Aiven)
+# Corte de producción: de Railway a la BD compartida con Matrícula (Northflank)
+
+> El nombre del archivo conserva «AIVEN» porque ya está enlazado desde Jira, actas y otros documentos. La base de Matrícula es un addon MySQL en **Northflank** (aclarado el 16/11/2026).
 
 | | |
 |---|---|
@@ -16,7 +18,7 @@ Railway (sección 5). Se conservan abajo como referencia por si algún día hay 
 
 | # | Paso | Quién | Cómo se verifica |
 |---|---|---|---|
-| 1 | Ejecutar `01`–`03` de `docs/entrega-matricula/` en su Aiven y enviar el resultado. La contraseña de `tramites_app`, el host y el puerto se envían por privado | Matrícula | 17 tablas `tp_*`, permisos solo sobre ellas |
+| 1 | Ejecutar `01`–`03` de `docs/entrega-matricula/` en su Northflank y enviar el resultado. La contraseña de `tramites_app`, el host y el puerto se envían por privado | Matrícula | 17 tablas `tp_*`, permisos solo sobre ellas |
 | 2 | Fusionar en `develop` los PR #73 (paquete), #75 (V3, catálogos) y #74 (este plan), con aprobación de otro desarrollador y del CCB | Equipo / CCB | CI verde |
 | 3 | PR `develop` → `main` en backend y frontend, aprobados, **sin fusionar todavía** | Equipo | CI verde |
 | 4 | Render (backend) → *Settings* → **Auto-Deploy: Off** | PO | — |
@@ -28,7 +30,7 @@ Railway (sección 5). Se conservan abajo como referencia por si algún día hay 
 
 **Si algo falla:** producción ya está caída, así que no hay un estado anterior que funcione al cual volver. Se
 corrige hacia adelante: se revisa el log de Render, se ajusta la variable o se corrige el código por PR, y se
-vuelve a desplegar. Las tablas `tp_*` de Aiven se pueden vaciar (`TRUNCATE`, con `tramites_app`) o borrar con `04`
+vuelve a desplegar. Las tablas `tp_*` de Northflank se pueden vaciar (`TRUNCATE`, con `tramites_app`) o borrar con `04`
 (lo ejecuta Matrícula) para empezar de nuevo, sin tocar nada de Matrícula.
 
 **Pagos:** las transacciones sandbox de Wompi hechas contra Railway quedan solo en el panel de Wompi. Los documentos
@@ -41,12 +43,12 @@ subidos siguen en Supabase, pero sin las filas que los referencian.
 ## 1. Qué cambia y por qué así
 
 Hoy producción corre `main` en Render contra **Railway**: tablas sin prefijo, `ddl-auto=update` y sin Flyway. Después
-del corte, producción corre `develop` (que pasa a ser `main`) contra la **BD de Matrícula en Aiven**: tablas `tp_*`,
+del corte, producción corre `develop` (que pasa a ser `main`) contra la **BD de Matrícula en Northflank**: tablas `tp_*`,
 Flyway y el usuario `tramites_app`, que solo tiene permisos sobre las tablas `tp_*`.
 
 Decisiones que explican el procedimiento:
 
-- **No se restaura el respaldo de Railway tal cual en Aiven.** Su tabla `roles` chocaría con la `roles` de
+- **No se restaura el respaldo de Railway tal cual en Northflank.** Su tabla `roles` chocaría con la `roles` de
   Matrícula (TP-208 §4.1), y `tramites_app` tampoco tiene permiso para crear tablas sin prefijo. Por eso las tablas
   `tp_*` las crea Matrícula con el DDL de #73 y nosotros cargamos **solo los datos**.
 - **El renombrado se hace en una copia local, no en Railway.** El respaldo de Railway se restaura en el MySQL local,
@@ -56,7 +58,7 @@ Decisiones que explican el procedimiento:
   y con scripts manuales), el error aparece en el ensayo y no en producción.
 - **Se congelan las escrituras durante el corte.** Lo que se escriba en Railway después del respaldo final se
   perdería. Se suspende el backend en Render.
-- **El código viejo de `main` nunca debe conectarse a Aiven.** Con `ddl-auto=update` intentaría crear tablas sin
+- **El código viejo de `main` nunca debe conectarse a Northflank.** Con `ddl-auto=update` intentaría crear tablas sin
   prefijo. Fallaría por falta de permisos, así que no dañaría nada, pero el backend no arrancaría. Por eso se apaga
   el auto-deploy de Render y las variables se cambian con el servicio suspendido.
 
@@ -67,9 +69,9 @@ Decisiones que explican el procedimiento:
 | # | Condición | Quién |
 |---|---|---|
 | 1 | Matrícula ejecutó `01`–`03` de `docs/entrega-matricula/` y envió el resultado | Matrícula |
-| 2 | El PO recibió **por privado** la contraseña de `tramites_app`, el host y el puerto de Aiven | Matrícula → PO |
-| 3 | `max_connections` de su Aiven conocido; `DB_POOL_SIZE` ajustado (`docs/POOL_CONEXIONES.md`) | Matrícula / Trámites |
-| 4 | Confirmado que su Aiven tiene respaldo automático, o que hacen uno justo antes del corte | Matrícula |
+| 2 | El PO recibió **por privado** la contraseña de `tramites_app`, el host y el puerto de Northflank | Matrícula → PO |
+| 3 | `max_connections` de su Northflank conocido; `DB_POOL_SIZE` ajustado (`docs/POOL_CONEXIONES.md`) | Matrícula / Trámites |
+| 4 | Confirmado que su Northflank tiene respaldo automático, o que hacen uno justo antes del corte | Matrícula |
 | 5 | Decidido qué API de Matrícula se usa (ver 2.4) | PO |
 | 6 | Ensayo de la sección 2.3 sin errores | Trámites |
 | 7 | PRs `develop` → `main` (backend y frontend) abiertos, con CI verde y **aprobados por otro desarrollador**, sin fusionar | Equipo |
@@ -90,10 +92,10 @@ user=<usuario>
 password=<contraseña>
 ```
 
-`aiven.cnf`: los datos de `tramites_app` que entrega Matrícula:
+`bd-compartida.cnf`: los datos de `tramites_app` que entrega Matrícula:
 ```ini
 [client]
-host=<host de Aiven>
+host=<host de Northflank>
 port=<puerto>
 user=tramites_app
 password=<contraseña>
@@ -128,7 +130,7 @@ F=$(date +%Y%m%d-%H%M)
   tp_solicitud_certificado tp_notificaciones) > "$C/dml_tramites_$F.sql"
 ```
 
-d) Base local que imita Aiven: el esquema de Matrícula, el `sql_mode` ANSI, `sql_require_primary_key=ON`, `01` con un
+d) Base local que imita Northflank: el esquema de Matrícula, el `sql_mode` ANSI, `sql_require_primary_key=ON`, `01` con un
 usuario de ensayo y `02` con ese usuario (igual que en el ensayo del PR #73). Luego **cargar el DML con el usuario de
 ensayo**, no con root:
 ```bash
@@ -168,11 +170,11 @@ Tiempo estimado: 30–60 min. Las tablas de Trámites son pequeñas; el respaldo
 | 1 | Render (backend) → *Settings* → **Auto-Deploy: Off** | El ajuste queda en Off |
 | 2 | Anotar los valores actuales de `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` y `DB_POOL_SIZE` **en un lugar privado** (gestor de contraseñas), para la vuelta atrás | — |
 | 3 | Render (backend) → **Suspend**. Desde aquí no hay escrituras | La URL del backend deja de responder |
-| 4 | Pedir a Matrícula la confirmación del respaldo de su Aiven (2.1 #4) | Mensaje de Matrícula |
+| 4 | Pedir a Matrícula la confirmación del respaldo de su Northflank (2.1 #4) | Mensaje de Matrícula |
 | 5 | Repetir **2.3 a–c** con Railway: respaldo final, conteos y DML final | `conteos_railway_<F>.txt` |
-| 6 | Comprobar que las `tp_*` de Aiven están vacías: `conteos_tp.sql` con `aiven.cnf` | Todas en 0 |
-| 7 | Cargar el DML en Aiven con `tramites_app`: `mysql --defaults-extra-file="$C/aiven.cnf" <base> < dml_tramites_<F>.sql` | Sin errores |
-| 8 | Conteos en Aiven y `diff` contra Railway | `CONTEOS IGUALES` |
+| 6 | Comprobar que las `tp_*` de Northflank están vacías: `conteos_tp.sql` con `bd-compartida.cnf` | Todas en 0 |
+| 7 | Cargar el DML en Northflank con `tramites_app`: `mysql --defaults-extra-file="$C/bd-compartida.cnf" <base> < dml_tramites_<F>.sql` | Sin errores |
+| 8 | Conteos en Northflank y `diff` contra Railway | `CONTEOS IGUALES` |
 | 9 | Fusionar en GitHub los PR `develop` → `main` (backend y frontend), ya aprobados | Merge en `main`; con Auto-Deploy en Off no se despliega |
 | 10 | Variables del backend en Render (las pone el PO): `DB_URL=jdbc:mysql://<host>:<puerto>/<base>?sslMode=REQUIRED&serverTimezone=UTC&characterEncoding=UTF-8`, `DB_USERNAME=tramites_app`, `DB_PASSWORD`, **`FLYWAY_BASELINE_VERSION=1`**, `DB_POOL_SIZE` y `MATRICULA_*` según 2.4. Guardar **sin desplegar** | Variables guardadas |
 | 11 | **Resume** del servicio y *Manual Deploy* → *Deploy latest commit* | Deploy en curso |
@@ -187,7 +189,7 @@ Tiempo estimado: 30–60 min. Las tablas de Trámites son pequeñas; el respaldo
 3. Ver una solicitud existente con sus documentos: el enlace de Supabase abre.
 4. Crear una solicitud nueva y hacer un pago de **sandbox Wompi**. El evento llega y el pago queda aprobado.
 5. Logs `[MATRICULA] ... status=200` al consultar un estudiante (si `MATRICULA_MODO=http`).
-6. En Aiven, `tp_flyway_schema_history` tiene 2 filas (baseline 1 y V2) y los conteos de `tp_pagos` y `tp_solicitud`
+6. En Northflank, `tp_flyway_schema_history` tiene 2 filas (baseline 1 y V2) y los conteos de `tp_pagos` y `tp_solicitud`
    subieron en 1.
 7. **Pagos durante la ventana:** con el backend suspendido no llegan los eventos de Wompi. Hay que revisar en el
    panel de Wompi las transacciones de esa franja y compararlas con `tp_pagos`. Por eso conviene elegir una ventana
@@ -205,15 +207,15 @@ pueden volver.
 3. Render → *Deploys* → **Rollback** al último deploy anterior al corte (el código viejo de `main`), y *Resume*.
 4. Comprobar `/api/health` y un login. Producción queda como antes, porque **Railway no se modificó**.
 5. GitHub: abrir un PR que revierta el merge de `main`, o dejar Auto-Deploy en Off hasta corregir. Lo decide el CCB.
-6. Aiven: las tablas `tp_*` quedan con los datos cargados. Se vacían antes del siguiente intento
+6. Northflank: las tablas `tp_*` quedan con los datos cargados. Se vacían antes del siguiente intento
    (`TRUNCATE`, con `tramites_app`) o se borran con `04_vuelta_atras.sql` (lo ejecuta Matrícula).
 
-Si la vuelta atrás ocurre **después** de reabrir el servicio, lo escrito en Aiven en ese intervalo no está en Railway
+Si la vuelta atrás ocurre **después** de reabrir el servicio, lo escrito en Northflank en ese intervalo no está en Railway
 y habría que copiarlo a mano. Por eso las pruebas se hacen antes de avisar a los usuarios.
 
 ## 6. Después del corte
 
-- Comentario en TP-153 con la tabla de conteos (Railway frente a Aiven) y los logs del arranque.
+- Comentario en TP-153 con la tabla de conteos (Railway frente a Northflank) y los logs del arranque.
 - Tag `v2.0.0` en los dos repos (TP-155) y acta del CCB.
 - Railway queda **sin uso y sin cambios** como respaldo hasta el cierre del ciclo (TP-156). Su eliminación la decide el PO.
 - Borrar los `.sql` y `.txt` de `$C` al cerrar TP-153. Contienen datos personales.

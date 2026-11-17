@@ -2,7 +2,7 @@
 -- 01_permisos_usuario_tramites.sql — Usuario de BD del Módulo de Trámites
 -- (TP-209 · acuerdo TP-208, sección 8, docs/BD_COMPARTIDA_MATRICULA.md)
 --
--- Para la BD de Matrícula en Aiven (base compartida). Lo ejecuta un
+-- Para la BD de Matrícula en Northflank (base compartida). Lo ejecuta un
 -- usuario administrador (p. ej. avnadmin) ANTES de 02_ddl_tablas_tramites.sql.
 --
 -- Antes de ejecutarlo:

@@ -8,7 +8,7 @@ El resto del documento describe el estado del 2 de noviembre. Lo que cambió des
 
 | Tema | Estado actual |
 |---|---|
-| Base de datos de producción | **Railway quedó fuera de servicio** (venció la prueba gratuita). Producción está caída hasta el corte a la **BD compartida en el Aiven de Matrícula** (`docs/CORTE_RAILWAY_A_AIVEN.md` §0). Los datos eran de prueba y se arranca en limpio |
+| Base de datos de producción | **Railway quedó fuera de servicio** (venció la prueba gratuita). Producción está caída hasta el corte a la **BD compartida de Matrícula en Northflank** (`docs/CORTE_RAILWAY_A_AIVEN.md` §0). Los datos eran de prueba y se arranca en limpio |
 | Despliegue en el servidor UFPS | No se hará (acta CCB N.º 2). Producción sigue en Render |
 | Producción de Matrícula | Su API corre en **code.run** (`https://p01--posgrados-project--kqqwl9rwqwbv.code.run/posgrados-project`, health UP el 16/11/2026). Falta la cuenta técnica `Servicio Tramites` en su producción (TP-205). Cuando exista, `MATRICULA_URL` pasa a esa URL y la copia en Render deja de ser necesaria |
 | Punto 1 (sincronización en producción, TP-203) | Se verifica después del corte (casos R-30 y R-31 de `docs/REGRESION_CONJUNTA.md`). La contraseña de `svc-tramites` de la copia se rota según la sección 1, punto 2 |
