@@ -25,7 +25,7 @@
 
 **Control técnico en `main` (ambos repositorios, desde el 15/11/2026):** PR obligatorio, 1 aprobación, el check de CI como requerido y **sin excepción para administradores**. No se permiten `force push` ni el borrado de la rama. Evidencia en `docs/evidencias/TP-171/`.
 
-**En `develop` no hay protección de rama configurada en GitHub.** Ahí las reglas 1 a 5 son un acuerdo del equipo, no un bloqueo técnico, para no frenar la integración diaria del sprint. Se controla así: el CCB revisa en la reunión semanal el historial de `develop` con los comandos de la sección 4, y cualquier cambio que no entró por PR queda en el acta. Además, todo lo que está en `develop` vuelve a pasar por un PR con aprobación y CI obligatorios antes de llegar a `main`.
+**Control técnico en `develop` (ambos repositorios, desde el 16/11/2026):** la misma protección que `main`: PR obligatorio, 1 aprobación de alguien distinto del autor, el check de CI como requerido y sin excepción para administradores. Se activó porque la métrica M3 mostró que 0 de 20 PR fusionados entre el 03/11 y el 16/11/2026 tenían aprobación formal (acta CCB N.º 2, D7, y `docs/METRICAS_CONFIGURACION.md`). Antes de esa fecha, en `develop` las reglas 1 a 5 eran un acuerdo del equipo sin bloqueo técnico.
 
 ## 3. Comité de Control de Cambios (CCB)
 

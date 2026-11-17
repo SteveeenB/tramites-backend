@@ -57,7 +57,7 @@ responde por ellos y cómo se cambian. Complementa a `docs/METRICAS_CONFIGURACIO
 | EC-14 | CI backend | `.github/workflows/ci.yml` | `Tests (JDK 17, perfil h2)` (requerido en `main`) |
 | EC-15 | CI frontend | `.github/workflows/ci.yml` (frontend) | `Build (Node 22)` (requerido en `main`) |
 | EC-16 | Análisis estático y secretos | SonarCloud, GitGuardian (apps de GitHub, los dos repos) | Informativos; un fallo se corrige o se justifica en el PR |
-| EC-17 | Protección de ramas | GitHub → *Settings* → *Branches* | `main`: PR, 1 aprobación, CI, sin bypass. `develop`: sin protección (sección 5) |
+| EC-17 | Protección de ramas | GitHub → *Settings* → *Branches* | `main` y `develop` (desde el 16/11/2026): PR, 1 aprobación, CI, sin excepción para administradores |
 
 ### 2.5 Entornos y servicios externos
 
@@ -117,6 +117,6 @@ canónicos de la tabla. Una identidad nueva se agrega al `.mailmap` en el mismo 
 
 | # | Observación | Acción propuesta | Decide |
 |---|---|---|---|
-| 1 | En `develop` los PR se fusionan **sin aprobación formal**: 0 de 17 desde el 03/11/2026 (M3). Copilot no alcanzó a revisar #73–#75 por falta de cuota | Activar en `develop` la regla "1 aprobación" o exigir el botón *Approve* antes de fusionar | CCB |
+| 1 | En `develop` los PR se fusionan **sin aprobación formal**: 0 de 17 desde el 03/11/2026 (M3). Copilot no alcanzó a revisar #73–#75 por falta de cuota | **Resuelta el 16/11/2026:** `develop` protegida con 1 aprobación y CI obligatorios en los dos repos | CCB |
 | 2 | La BD de producción no tenía respaldo y se perdió el acceso a ella al vencer el plan | `docs/PLAN_RESPALDO.md` | CCB |
 | 3 | No hay tag de versión desde mayo | Tag `v2.0.0` (TP-155) | CCB |
