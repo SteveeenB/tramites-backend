@@ -7,6 +7,37 @@
 | **Aprueba** | CCB (cambio en la base compartida y paso de `develop` a `main`) |
 | **Estado** | Plan. **No se ejecuta sin aprobación del PO** |
 
+## 0. Actualización del 16/11/2026: arranque en limpio (procedimiento vigente)
+
+Railway quedó **fuera de servicio** al vencer la prueba gratuita, y el backend de Render no arranca sin él. El PO
+confirmó que sus datos eran **de prueba**, así que no se migran datos: producción arranca en limpio en la BD de
+Matrícula. Por eso **no aplican** el ensayo con datos (2.3), los pasos 5 a 8 de la ventana ni la vuelta atrás hacia
+Railway (sección 5). Se conservan abajo como referencia por si algún día hay que migrar datos entre bases.
+
+| # | Paso | Quién | Cómo se verifica |
+|---|---|---|---|
+| 1 | Ejecutar `01`–`03` de `docs/entrega-matricula/` en su Aiven y enviar el resultado. La contraseña de `tramites_app`, el host y el puerto se envían por privado | Matrícula | 17 tablas `tp_*`, permisos solo sobre ellas |
+| 2 | Fusionar en `develop` los PR #73 (paquete), #75 (V3, catálogos) y #74 (este plan), con aprobación de otro desarrollador y del CCB | Equipo / CCB | CI verde |
+| 3 | PR `develop` → `main` en backend y frontend, aprobados, **sin fusionar todavía** | Equipo | CI verde |
+| 4 | Render (backend) → *Settings* → **Auto-Deploy: Off** | PO | — |
+| 5 | Variables del backend en Render: `DB_URL=jdbc:mysql://<host>:<puerto>/<base>?sslMode=REQUIRED&serverTimezone=UTC&characterEncoding=UTF-8`, `DB_USERNAME=tramites_app`, `DB_PASSWORD`, **`FLYWAY_BASELINE_VERSION=1`**, `DB_POOL_SIZE` y `MATRICULA_*` según 2.4 | PO | Variables guardadas |
+| 6 | Fusionar los PR `develop` → `main` y hacer *Manual Deploy* → *Deploy latest commit* | PO | Logs: `Successfully baselined schema with version: 1`, `now at version v3`, `Started TramitesApplication` |
+| 7 | Crear las **cuentas iniciales** (administradores de Posgrados y dependencias, directores, estudiantes de prueba) con un script SQL **privado**, fuera del repositorio. Las contraseñas van con hash BCrypt generado localmente y se entregan a cada persona por privado. Se ejecuta con `tramites_app` | PO / Trámites | Login de cada cuenta |
+| 8 | Pruebas de humo (sección 4) y Auto-Deploy: On | Equipo | Todas bien |
+| 9 | Tag `v2.0.0` (TP-155), comentario en TP-153 y acta del CCB | PO | — |
+
+**Si algo falla:** producción ya está caída, así que no hay un estado anterior que funcione al cual volver. Se
+corrige hacia adelante: se revisa el log de Render, se ajusta la variable o se corrige el código por PR, y se
+vuelve a desplegar. Las tablas `tp_*` de Aiven se pueden vaciar (`TRUNCATE`, con `tramites_app`) o borrar con `04`
+(lo ejecuta Matrícula) para empezar de nuevo, sin tocar nada de Matrícula.
+
+**Pagos:** las transacciones sandbox de Wompi hechas contra Railway quedan solo en el panel de Wompi. Los documentos
+subidos siguen en Supabase, pero sin las filas que los referencian.
+
+---
+
+*Procedimiento original, con migración de datos desde Railway (referencia):*
+
 ## 1. Qué cambia y por qué así
 
 Hoy producción corre `main` en Render contra **Railway**: tablas sin prefijo, `ddl-auto=update` y sin Flyway. Después
