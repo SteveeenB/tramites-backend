@@ -1,6 +1,23 @@
 # Integración Trámites ↔ Matrícula · Pendientes
 
-> Estado al 2 nov 2026. Épica TP-138 (SC-03). Detalle del trabajo hecho en `integracion-matricula-plan.md` y `integracion-matricula-documentacion.md`.
+> Estado al 2 nov 2026. Épica TP-138 (SC-03).
+
+## Actualización del 16/11/2026 (leer primero)
+
+El resto del documento describe el estado del 2 de noviembre. Lo que cambió desde entonces:
+
+| Tema | Estado actual |
+|---|---|
+| Base de datos de producción | **Railway quedó fuera de servicio** (venció la prueba gratuita). Producción está caída hasta el corte a la **BD compartida en el Aiven de Matrícula** (`docs/CORTE_RAILWAY_A_AIVEN.md` §0). Los datos eran de prueba y se arranca en limpio |
+| Despliegue en el servidor UFPS | No se hará (acta CCB N.º 2). Producción sigue en Render |
+| Producción de Matrícula | Su API corre en **code.run** (`https://p01--posgrados-project--kqqwl9rwqwbv.code.run/posgrados-project`, health UP el 16/11/2026). Falta la cuenta técnica `Servicio Tramites` en su producción (TP-205). Cuando exista, `MATRICULA_URL` pasa a esa URL y la copia en Render deja de ser necesaria |
+| Punto 1 (sincronización en producción, TP-203) | Se verifica después del corte (casos R-30 y R-31 de `docs/REGRESION_CONJUNTA.md`). La contraseña de `svc-tramites` de la copia se rota según la sección 1, punto 2 |
+| Punto 1b (monitor, TP-204) | Solo aplica mientras se use la copia en Render |
+| Punto 2 (estilo visual) | Hecho (TP-207) |
+| Punto 3 (Jira) | TP-140, TP-144, TP-145, TP-147 y TP-148 cerrados. TP-138 sigue abierta por TP-203 y TP-205 |
+| Punto 4 (ADD) | Hecho: ADD v3.1 con diagrama, portada y decisiones de SC-02 (TP-206) |
+| Punto 5 (con Matrícula) | Se sigue en TP-205 y en la entrega de `docs/entrega-matricula/` |
+| Punto 6 (proceso) | Formalizado en `docs/CONTROL_DE_CAMBIOS.md` y en las actas del CCB | Detalle del trabajo hecho en `integracion-matricula-plan.md` y `integracion-matricula-documentacion.md`.
 
 ## Estado actual
 
