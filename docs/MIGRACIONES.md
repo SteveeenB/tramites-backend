@@ -17,6 +17,7 @@ Archivos:
 
 - `src/main/resources/db/migration/V1__esquema_base.sql`: línea base (17 tablas `tp_*`, índices y llaves foráneas).
 - `src/main/resources/db/migration/V2__prefijo_tp_tablas_tramites.sql`: renombra a `tp_*` las tablas sin prefijo de la BD actual de Trámites en Railway (TP-209).
+- `src/main/resources/db/migration/V3__catalogos_base.sql`: catálogos obligatorios (roles, estados del estudiante, programas con su código de Matrícula, dependencias, tipos de certificado y de solicitud). Usa `INSERT IGNORE`, así que en una base que ya los tiene no cambia nada (TP-153).
 - `application.properties`: configuración `spring.flyway.*` (historial en `tp_flyway_schema_history`, baseline con `FLYWAY_BASELINE_VERSION`) y `ddl-auto=${DDL_AUTO:validate}`.
 - `application-h2.properties` y las pruebas: Flyway desactivado (ver más abajo).
 - `pom.xml`: `spring-boot-starter-flyway` y `flyway-mysql`.
@@ -47,6 +48,8 @@ Estos cuatro casos (base vacía o compartida con `0`, Railway con `1` y los dos 
 Si Railway ya tenía una tabla `flyway_schema_history` (sin prefijo) de un despliegue anterior, queda huérfana: Flyway ya no la usa y se puede borrar después de verificar el arranque.
 
 V2 solo renombra si existen **las 17** tablas sin prefijo. En la base compartida Matrícula tiene su propia `roles`, pero es una sola, así que V2 nunca la toca.
+
+V3 corre en todos los escenarios con MySQL, con cualquier valor de `FLYWAY_BASELINE_VERSION`, porque su versión es mayor que el baseline. En una base nueva carga los catálogos; en una que ya los tiene (la de Railway) no inserta nada. No trae usuarios ni datos demo: las cuentas iniciales de una base nueva se crean aparte y no van en el repositorio. En el perfil `h2` los catálogos siguen viniendo de `data.sql`.
 
 ## Cómo hacer un cambio de esquema desde ahora
 
